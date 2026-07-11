@@ -1,0 +1,60 @@
+import type { Resident } from '@/features/residents/domain/resident';
+
+export const residentSeed: Resident[] = [
+  {
+    id: 'r-1',
+    name: 'Maria Ribeiro',
+    apt: 'Apto 302',
+    phone: '(11) 90000-0001',
+    email: 'maria@email.com',
+    status: 'em_dia',
+  },
+  {
+    id: 'r-2',
+    name: 'João Pereira',
+    apt: 'Apto 101',
+    phone: '(11) 90000-0002',
+    email: 'joao@email.com',
+    status: 'em_dia',
+  },
+  {
+    id: 'r-3',
+    name: 'Ana Costa',
+    apt: 'Apto 202',
+    phone: '(11) 90000-0003',
+    email: 'ana@email.com',
+    status: 'pendente',
+  },
+  {
+    id: 'r-4',
+    name: 'Carlos Souza',
+    apt: 'Apto 402',
+    phone: '(11) 90000-0004',
+    email: 'carlos@email.com',
+    status: 'em_dia',
+  },
+  {
+    id: 'r-5',
+    name: 'Beatriz Lima',
+    apt: 'Apto 201',
+    phone: '(11) 90000-0005',
+    email: 'bia@email.com',
+    status: 'atrasado',
+  },
+  {
+    id: 'r-6',
+    name: 'Rafael Alves',
+    apt: 'Apto 301',
+    phone: '(11) 90000-0006',
+    email: 'rafael@email.com',
+    status: 'em_dia',
+  },
+  {
+    id: 'r-7',
+    name: 'Fernanda Dias',
+    apt: 'Apto 401',
+    phone: '(11) 90000-0007',
+    email: 'fernanda@email.com',
+    status: 'em_dia',
+  },
+];

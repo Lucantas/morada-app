@@ -1,0 +1,17 @@
+{
+  "name": "morada",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "postinstall": "lefthook install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "lefthook": "^1.10.1",
+    "prettier": "^3.4.2"
+  }
+}

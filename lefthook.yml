@@ -1,0 +1,24 @@
+pre-commit:
+  parallel: true
+  commands:
+    typecheck:
+      root: apps/web/
+      run: pnpm typecheck
+    lint:
+      root: apps/web/
+      glob: '*.{ts,tsx,js}'
+      run: pnpm eslint {staged_files}
+    format:
+      glob: '*.{ts,tsx,js,json,md,css}'
+      run: pnpm prettier --check {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}
+
+pre-push:
+  commands:
+    test:
+      root: apps/web/
+      run: pnpm test:coverage
