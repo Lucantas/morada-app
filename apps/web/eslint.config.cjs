@@ -4,6 +4,7 @@
 const tseslint = require('typescript-eslint');
 const prettierConfig = require('eslint-config-prettier');
 const boundaries = require('eslint-plugin-boundaries');
+const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = tseslint.config(
   { ignores: ['dist/**', 'coverage/**', 'node_modules/**'] },
@@ -17,6 +18,14 @@ module.exports = tseslint.config(
       'no-warning-comments': ['error', { terms: ['todo', 'fixme'], location: 'anywhere' }],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
   {

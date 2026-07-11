@@ -1,4 +1,4 @@
-import type { ChangeEvent, CSSProperties, ReactNode } from 'react';
+import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode } from 'react';
 
 import { Icon, type IconName } from './icon';
 
@@ -6,14 +6,30 @@ export function SurfaceCard({
   children,
   style,
   onClick,
+  label,
 }: {
   children: ReactNode;
   style?: CSSProperties;
   onClick?: () => void;
+  label?: string;
 }) {
+  const interactive = onClick
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        'aria-label': label,
+        onClick,
+        onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick();
+          }
+        },
+      }
+    : {};
   return (
     <div
-      onClick={onClick}
+      {...interactive}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--line)',

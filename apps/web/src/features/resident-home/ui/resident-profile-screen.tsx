@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
@@ -55,8 +55,8 @@ export function ResidentProfileScreen({ resident, onSignOut, bottomNav }: Props)
 
         <SectionLabel>Preferências</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <ToggleRow label="Notificações" on />
-          <ToggleRow label="Unidades: km" on={false} />
+          <ToggleRow label="Notificações" defaultOn />
+          <ToggleRow label="Unidades: km" defaultOn={false} />
         </div>
 
         <div style={{ marginTop: 20 }}>
@@ -109,15 +109,27 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ToggleRow({ label, on }: { label: string; on: boolean }) {
+function ToggleRow({ label, defaultOn }: { label: string; defaultOn: boolean }) {
+  const [on, setOn] = useState(defaultOn);
   return (
-    <SurfaceCard
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => setOn((prev) => !prev)}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 12,
         padding: '13px 14px',
+        width: '100%',
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-md)',
+        cursor: 'pointer',
+        fontFamily: "'Inter', sans-serif",
       }}
     >
       <span style={{ fontWeight: 600, fontSize: '.95rem', color: 'var(--petrol-900)' }}>
@@ -132,6 +144,7 @@ function ToggleRow({ label, on }: { label: string; on: boolean }) {
           borderRadius: 999,
           background: on ? 'var(--pago-700)' : 'var(--line)',
           position: 'relative',
+          transition: 'background .15s',
         }}
       >
         <span
@@ -143,9 +156,10 @@ function ToggleRow({ label, on }: { label: string; on: boolean }) {
             height: 20,
             borderRadius: 999,
             background: '#fff',
+            transition: 'left .15s',
           }}
         />
       </span>
-    </SurfaceCard>
+    </button>
   );
 }

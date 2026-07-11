@@ -3,9 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
+import { unreadCount } from '@/features/messages/domain/unread-count';
 import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
 import { SupportScreen } from '@/features/messages/ui/support-screen';
 import { ThreadScreen } from '@/features/messages/ui/thread-screen';
+import { useThreads } from '@/features/messages/ui/use-threads';
 import { NoticesScreen } from '@/features/notices/ui/notices-screen';
 import { SendNoticeScreen } from '@/features/notices/ui/send-notice-screen';
 import { PayScreen } from '@/features/receipts/ui/pay-screen';
@@ -97,6 +99,8 @@ type RouteProps = {
 };
 
 function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
+  const threads = useThreads(threadRepository);
+  const unread = unreadCount(threads.data ?? []);
   const nav = <BottomNav items={adminNav(view, go, signOut)} />;
   switch (view) {
     case 'a-residents':
@@ -148,6 +152,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
         />
       ) : (
         <ThreadScreen
+          key={residentId}
           repository={threadRepository}
           threadId={residentId}
           onBack={() => go('a-messages')}
@@ -161,7 +166,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onSendNotice={() => go('a-notice')}
           onOpenMessages={() => go('a-messages')}
           onSeeAccounts={() => go('a-accounts')}
-          unreadCount={3}
+          unreadCount={unread}
           bottomNav={nav}
         />
       );

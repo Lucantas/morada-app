@@ -91,6 +91,8 @@ export function SendNoticeScreen({ repository, onSent, onBack }: Props) {
               return (
                 <button
                   key={option}
+                  type="button"
+                  aria-pressed={active}
                   onClick={() => setAudience(option)}
                   style={{
                     flex: 1,
@@ -129,6 +131,8 @@ export function SendNoticeScreen({ repository, onSent, onBack }: Props) {
               return (
                 <button
                   key={option}
+                  type="button"
+                  aria-pressed={active}
                   onClick={() => setKind(option)}
                   style={{
                     flex: 1,

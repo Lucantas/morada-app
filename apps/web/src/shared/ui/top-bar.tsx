@@ -31,7 +31,7 @@ export function TopBar({ eyebrow, title, right, children }: Props) {
           gap: 10,
         }}
       >
-        <span>{title}</span>
+        <h1 style={{ margin: 0, font: 'inherit', color: 'inherit' }}>{title}</h1>
         {right}
       </div>
       {children}
