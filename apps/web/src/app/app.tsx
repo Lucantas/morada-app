@@ -3,8 +3,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
+import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
+import { SupportScreen } from '@/features/messages/ui/support-screen';
+import { ThreadScreen } from '@/features/messages/ui/thread-screen';
+import { NoticesScreen } from '@/features/notices/ui/notices-screen';
+import { SendNoticeScreen } from '@/features/notices/ui/send-notice-screen';
 import { PayScreen } from '@/features/receipts/ui/pay-screen';
 import { ReceiptsScreen } from '@/features/receipts/ui/receipts-screen';
+import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
+import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
+import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
+import { DEFAULT_RESIDENT } from '@/features/resident-home/ui/current-resident';
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
@@ -12,18 +21,21 @@ import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { PhoneFrame } from '@/shared/ui/phone-frame';
 
-import { ComingSoon } from './coming-soon';
 import {
   accountRepository,
   dashboardRepository,
+  noticeRepository,
   receiptRepository,
   residentRepository,
+  threadRepository,
 } from './container';
 import { useNavStore, type View } from './nav-store';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
 });
+
+const CURRENT_RESIDENT = DEFAULT_RESIDENT;
 
 const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-home': 'home',
@@ -36,7 +48,9 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
 const RESIDENT_TAB: Partial<Record<View, string>> = {
   'r-home': 'home',
   'r-receipts': 'receipts',
-  'r-finance': 'finance',
+  'r-pay': 'receipts',
+  'r-notices': 'notices',
+  'r-help': 'help',
   'r-profile': 'profile',
 };
 
@@ -63,66 +77,98 @@ function Router() {
       <LoginScreen
         onEnter={(r) => {
           signInAs(r);
-          go(r === 'admin' ? 'a-home' : 'r-receipts');
+          go(r === 'admin' ? 'a-home' : 'r-home');
         }}
       />
     );
   }
 
   if (role === 'admin') {
-    const nav = <BottomNav items={adminNav(view, go, signOut)} />;
-    switch (view) {
-      case 'a-residents':
-        return (
-          <ResidentsScreen
-            repository={residentRepository}
-            onOpenResident={(id) => go('a-resident-edit', { residentId: id })}
-            bottomNav={nav}
-          />
-        );
-      case 'a-resident-edit':
-        return (
-          <ResidentEditScreen
-            repository={residentRepository}
-            residentId={residentId}
-            onBack={() => go('a-residents')}
-          />
-        );
-      case 'a-accounts':
-        return (
-          <AccountsScreen
-            repository={accountRepository}
-            onOpenAccount={(id) => go('a-account-edit', { residentId: id })}
-            bottomNav={nav}
-          />
-        );
-      case 'a-account-edit':
-        return (
-          <AccountEditScreen
-            repository={accountRepository}
-            accountId={residentId}
-            onBack={() => go('a-accounts')}
-          />
-        );
-      case 'a-notice':
-        return <ComingSoon title="Enviar aviso" bottomNav={nav} />;
-      case 'a-messages':
-        return <ComingSoon title="Mensagens" bottomNav={nav} />;
-      case 'a-home':
-      default:
-        return (
-          <DashboardScreen
-            repository={dashboardRepository}
-            onSendNotice={() => go('a-notice')}
-            onOpenMessages={() => go('a-messages')}
-            onSeeAccounts={() => go('a-accounts')}
-            unreadCount={3}
-            bottomNav={nav}
-          />
-        );
-    }
+    return <AdminRouter view={view} residentId={residentId} go={go} signOut={signOut} />;
   }
+  return <ResidentRouter view={view} residentId={residentId} go={go} signOut={signOut} />;
+}
 
+type RouteProps = {
+  view: View;
+  residentId?: string;
+  go: (view: View, opts?: { residentId?: string }) => void;
+  signOut: () => void;
+};
+
+function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
+  const nav = <BottomNav items={adminNav(view, go, signOut)} />;
+  switch (view) {
+    case 'a-residents':
+      return (
+        <ResidentsScreen
+          repository={residentRepository}
+          onOpenResident={(id) => go('a-resident-edit', { residentId: id })}
+          bottomNav={nav}
+        />
+      );
+    case 'a-resident-edit':
+      return (
+        <ResidentEditScreen
+          repository={residentRepository}
+          residentId={residentId}
+          onBack={() => go('a-residents')}
+        />
+      );
+    case 'a-accounts':
+      return (
+        <AccountsScreen
+          repository={accountRepository}
+          onOpenAccount={(id) => go('a-account-edit', { residentId: id })}
+          bottomNav={nav}
+        />
+      );
+    case 'a-account-edit':
+      return (
+        <AccountEditScreen
+          repository={accountRepository}
+          accountId={residentId}
+          onBack={() => go('a-accounts')}
+        />
+      );
+    case 'a-notice':
+      return (
+        <SendNoticeScreen
+          repository={noticeRepository}
+          onSent={() => go('a-home')}
+          onBack={() => go('a-home')}
+        />
+      );
+    case 'a-messages':
+      return residentId === undefined ? (
+        <AdminMessagesScreen
+          repository={threadRepository}
+          onOpenThread={(id) => go('a-messages', { residentId: id })}
+          bottomNav={nav}
+        />
+      ) : (
+        <ThreadScreen
+          repository={threadRepository}
+          threadId={residentId}
+          onBack={() => go('a-messages')}
+        />
+      );
+    case 'a-home':
+    default:
+      return (
+        <DashboardScreen
+          repository={dashboardRepository}
+          onSendNotice={() => go('a-notice')}
+          onOpenMessages={() => go('a-messages')}
+          onSeeAccounts={() => go('a-accounts')}
+          unreadCount={3}
+          bottomNav={nav}
+        />
+      );
+  }
+}
+
+function ResidentRouter({ view, residentId, go, signOut }: RouteProps) {
   const nav = <BottomNav items={residentNav(view, go)} />;
   switch (view) {
     case 'r-receipts':
@@ -147,12 +193,28 @@ function Router() {
           bottomNav={nav}
         />
       );
+    case 'r-notices':
+      return <NoticesScreen repository={noticeRepository} bottomNav={nav} />;
     case 'r-finance':
-      return <ComingSoon title="Condomínio" bottomNav={nav} />;
+      return <ResidentFinanceScreen dashboardRepository={dashboardRepository} bottomNav={nav} />;
+    case 'r-help':
+      return <SupportScreen repository={threadRepository} threadId="me" bottomNav={nav} />;
     case 'r-profile':
-      return <ComingSoon title="Perfil" bottomNav={nav} />;
+      return (
+        <ResidentProfileScreen resident={CURRENT_RESIDENT} onSignOut={signOut} bottomNav={nav} />
+      );
+    case 'r-home':
     default:
-      return <ComingSoon title="Meus recibos" bottomNav={nav} />;
+      return (
+        <ResidentHomeScreen
+          receiptRepository={receiptRepository}
+          resident={CURRENT_RESIDENT}
+          onGoReceipts={() => go('r-receipts')}
+          onGoFinance={() => go('r-finance')}
+          onGoNotices={() => go('r-notices')}
+          bottomNav={nav}
+        />
+      );
   }
 }
 
@@ -202,11 +264,18 @@ function residentNav(view: View, go: (v: View) => void): NavItem[] {
       onClick: () => go('r-receipts'),
     },
     {
-      key: 'finance',
-      label: 'Condomínio',
-      icon: 'building',
-      active: active === 'finance',
-      onClick: () => go('r-finance'),
+      key: 'notices',
+      label: 'Avisos',
+      icon: 'bell',
+      active: active === 'notices',
+      onClick: () => go('r-notices'),
+    },
+    {
+      key: 'help',
+      label: 'Ajuda',
+      icon: 'message',
+      active: active === 'help',
+      onClick: () => go('r-help'),
     },
     {
       key: 'profile',

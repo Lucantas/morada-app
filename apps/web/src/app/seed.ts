@@ -1,5 +1,7 @@
 import type { Account } from '@/features/accounts/domain/account';
 import type { DashboardSummary } from '@/features/dashboard/domain/dashboard';
+import type { Thread } from '@/features/messages/domain/message';
+import type { Notice } from '@/features/notices/domain/notice';
 import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { Resident } from '@/features/residents/domain/resident';
 
@@ -166,3 +168,65 @@ export const dashboardSeed: DashboardSummary = {
     { id: 'm-2', title: 'Pintura do hall', detail: 'Concluída · 20/03', icon: 'building2' },
   ],
 };
+
+export const noticeSeed: Notice[] = [
+  {
+    id: 'n-1',
+    title: "Manutenção da caixa d'água",
+    body: 'A limpeza ocorrerá dia 12/04, das 9h às 12h. Pode faltar água no período.',
+    kind: 'manutencao',
+    audience: 'Todos os moradores',
+    dateLabel: 'Há 2 dias',
+    dismissed: false,
+  },
+  {
+    id: 'n-2',
+    title: 'Portão da garagem',
+    body: 'O portão está com abertura lenta; técnico agendado para quinta.',
+    kind: 'aviso',
+    audience: 'Bloco 2',
+    dateLabel: 'Há 5 dias',
+    dismissed: false,
+  },
+  {
+    id: 'n-3',
+    title: 'Assembleia extraordinária',
+    body: 'Dia 20/04 às 19h no salão de festas. Presença importante.',
+    kind: 'urgente',
+    audience: 'Todos os moradores',
+    dateLabel: 'Há 1 semana',
+    dismissed: false,
+  },
+];
+
+export const threadSeed: Thread[] = [
+  {
+    id: 'me',
+    residentName: 'Maria Ribeiro',
+    apt: 'Apto 302',
+    unread: false,
+    messages: [
+      {
+        id: 'm1',
+        author: 'resident',
+        text: 'Olá! A luz da garagem está queimada.',
+        dateLabel: 'Ontem',
+      },
+      {
+        id: 'm2',
+        author: 'admin',
+        text: 'Oi Maria, já acionamos o eletricista para amanhã.',
+        dateLabel: 'Ontem',
+      },
+    ],
+  },
+  {
+    id: 't-2',
+    residentName: 'Ana Costa',
+    apt: 'Apto 202',
+    unread: true,
+    messages: [
+      { id: 'm3', author: 'resident', text: 'Posso reservar o salão dia 22?', dateLabel: 'Há 3h' },
+    ],
+  },
+];
