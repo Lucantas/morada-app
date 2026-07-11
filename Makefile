@@ -1,7 +1,9 @@
 .DEFAULT_GOAL := help
 WEB = pnpm --filter @morada/web
+API = pnpm --filter @morada/api
+API_URL ?= http://localhost:8787
 
-.PHONY: help install dev build test test-watch coverage typecheck lint format format-check check clean
+.PHONY: help install dev dev-api dev-web build test test-watch coverage typecheck lint format format-check check check-api clean
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -9,8 +11,14 @@ help: ## List targets
 install: ## Install deps (also installs git hooks via lefthook)
 	pnpm install
 
-dev: ## Start the Vite dev server
+dev: ## Start the Vite dev server (in-memory mode)
 	$(WEB) dev
+
+dev-api: ## Start the API (Hono + SQLite) on :8787
+	$(API) dev
+
+dev-web: ## Start the web pointed at the live API (run `make dev-api` in another shell first)
+	VITE_API_URL=$(API_URL) $(WEB) dev --port 5173 --strictPort
 
 build: ## Production build
 	$(WEB) build
@@ -36,7 +44,10 @@ format: ## Format repo-wide with Prettier
 format-check: ## Check formatting without writing
 	pnpm format:check
 
-check: typecheck lint format-check coverage ## Run everything the git hooks run
+check: typecheck lint format-check coverage ## Run every web gate (hooks)
+
+check-api: ## Run every API gate
+	$(API) typecheck && $(API) lint && $(API) test:coverage
 
 clean: ## Remove caches and coverage output
 	rm -rf apps/web/coverage apps/web/dist node_modules/.cache
