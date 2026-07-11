@@ -1,4 +1,5 @@
-import type { Thread } from '../domain/message';
+import { ThreadNotFoundError } from '../domain/errors';
+import type { MessageAuthor, Thread } from '../domain/message';
 import type { ThreadRepository } from '../domain/thread-repository';
 
 import { toThread } from './thread-row';
@@ -18,8 +19,23 @@ export class InMemoryThreadRepository implements ThreadRepository {
     return this.threads.get(id) ?? null;
   }
 
-  async save(thread: Thread): Promise<Thread> {
-    this.threads = new Map(this.threads).set(thread.id, thread);
-    return thread;
+  async addMessage(threadId: string, author: MessageAuthor, text: string): Promise<Thread> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new ThreadNotFoundError(threadId);
+    const next: Thread = {
+      ...thread,
+      messages: [...thread.messages, { id: crypto.randomUUID(), author, text, dateLabel: 'Agora' }],
+      unread: author === 'resident',
+    };
+    this.threads = new Map(this.threads).set(threadId, next);
+    return next;
+  }
+
+  async markRead(threadId: string): Promise<Thread> {
+    const thread = this.threads.get(threadId);
+    if (!thread) throw new ThreadNotFoundError(threadId);
+    const next: Thread = { ...thread, unread: false };
+    this.threads = new Map(this.threads).set(threadId, next);
+    return next;
   }
 }

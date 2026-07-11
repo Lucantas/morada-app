@@ -37,40 +37,23 @@ describe('HttpThreadRepository', () => {
     await expect(new HttpThreadRepository(api).getById('x')).rejects.toBeInstanceOf(ApiError);
   });
 
-  test('save POSTs to the messages path when a message was appended', async () => {
-    const serverThread = buildThread({ id: 't-9', messages: [buildMessage()] });
-    const newMessage = buildMessage({ text: 'Bom dia!' });
-    const draftThread = buildThread({
-      id: 't-9',
-      messages: [...serverThread.messages, newMessage],
-    });
-    const updatedThread = buildThread({ id: 't-9', messages: draftThread.messages });
-    const api = fakeApi({
-      get: jest.fn().mockResolvedValue(serverThread),
-      post: jest.fn().mockResolvedValue(updatedThread),
-    });
+  test('addMessage POSTs the text to the messages endpoint (author derived server-side)', async () => {
+    const updated = buildThread({ id: 't-9', messages: [buildMessage({ text: 'Bom dia!' })] });
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(updated) });
 
-    const result = await new HttpThreadRepository(api).save(draftThread);
+    const result = await new HttpThreadRepository(api).addMessage('t-9', 'admin', 'Bom dia!');
 
-    expect(api.get).toHaveBeenCalledWith('/api/threads/t-9');
     expect(api.post).toHaveBeenCalledWith('/api/threads/t-9/messages', { text: 'Bom dia!' });
-    expect(result).toEqual(updatedThread);
+    expect(result).toEqual(updated);
   });
 
-  test('save POSTs to the read path when no message was appended', async () => {
-    const messages = [buildMessage(), buildMessage()];
-    const serverThread = buildThread({ id: 't-5', messages, unread: true });
-    const draftThread = buildThread({ id: 't-5', messages, unread: false });
-    const updatedThread = buildThread({ id: 't-5', messages, unread: false });
-    const api = fakeApi({
-      get: jest.fn().mockResolvedValue(serverThread),
-      post: jest.fn().mockResolvedValue(updatedThread),
-    });
+  test('markRead POSTs to the read endpoint', async () => {
+    const updated = buildThread({ id: 't-5', unread: false });
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(updated) });
 
-    const result = await new HttpThreadRepository(api).save(draftThread);
+    const result = await new HttpThreadRepository(api).markRead('t-5');
 
-    expect(api.get).toHaveBeenCalledWith('/api/threads/t-5');
     expect(api.post).toHaveBeenCalledWith('/api/threads/t-5/read');
-    expect(result).toEqual(updatedThread);
+    expect(result).toEqual(updated);
   });
 });

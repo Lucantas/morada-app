@@ -8,7 +8,12 @@ function fakeRepo(threads: Thread[]): ThreadRepository {
   return {
     list: async () => threads,
     getById: async (id) => threads.find((t) => t.id === id) ?? null,
-    save: async (t) => t,
+    addMessage: async () => {
+      throw new Error('not used in this test');
+    },
+    markRead: async () => {
+      throw new Error('not used in this test');
+    },
   };
 }
 

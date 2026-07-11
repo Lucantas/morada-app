@@ -1,4 +1,6 @@
-import { buildThread } from '@/test/factories.messages';
+import { buildMessage, buildThread } from '@/test/factories.messages';
+
+import { ThreadNotFoundError } from '../domain/errors';
 
 import { InMemoryThreadRepository } from './in-memory-thread-repository';
 
@@ -9,22 +11,38 @@ describe('InMemoryThreadRepository', () => {
     expect((await repo.list()).map((t) => t.id)).toEqual(['a', 'b']);
   });
 
-  test('save upserts and getById returns it', async () => {
-    const repo = new InMemoryThreadRepository([]);
-    const thread = buildThread({ id: 'x', residentName: 'Nova' });
+  test('addMessage appends and getById returns the updated thread', async () => {
+    const repo = new InMemoryThreadRepository([buildThread({ id: 'x', messages: [] })]);
 
-    await repo.save(thread);
+    const updated = await repo.addMessage('x', 'admin', 'Olá');
 
-    expect(await repo.getById('x')).toEqual(thread);
+    expect(updated.messages).toHaveLength(1);
+    expect(updated.messages[0]?.author).toBe('admin');
+    expect(await repo.getById('x')).toEqual(updated);
   });
 
-  test('save does not mutate the previously returned list (immutability)', async () => {
-    const repo = new InMemoryThreadRepository([buildThread({ id: 'a' })]);
+  test('addMessage does not mutate the previously returned thread (immutability)', async () => {
+    const repo = new InMemoryThreadRepository([
+      buildThread({ id: 'a', messages: [buildMessage()] }),
+    ]);
     const before = await repo.list();
 
-    await repo.save(buildThread({ id: 'b' }));
+    await repo.addMessage('a', 'resident', 'Nova');
 
-    expect(before).toHaveLength(1);
+    expect(before[0]?.messages).toHaveLength(1);
+  });
+
+  test('markRead clears the unread flag', async () => {
+    const repo = new InMemoryThreadRepository([buildThread({ id: 'a', unread: true })]);
+
+    expect((await repo.markRead('a')).unread).toBe(false);
+  });
+
+  test('addMessage and markRead throw when the thread is missing', async () => {
+    const repo = new InMemoryThreadRepository([]);
+
+    await expect(repo.addMessage('nope', 'admin', 'x')).rejects.toBeInstanceOf(ThreadNotFoundError);
+    await expect(repo.markRead('nope')).rejects.toBeInstanceOf(ThreadNotFoundError);
   });
 
   test('rejects malformed seed data at the boundary', () => {
