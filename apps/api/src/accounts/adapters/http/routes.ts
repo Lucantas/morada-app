@@ -16,7 +16,8 @@ export function accountRoutes(repo: AccountRepository) {
 
   app.post('/', async (c) => {
     const draft = accountDraftSchema.parse(await c.req.json());
-    return c.json(saveAccount(repo, draft), 201);
+    // POST always creates: ignore any client-supplied id so it can't overwrite.
+    return c.json(saveAccount(repo, { ...draft, id: undefined }), 201);
   });
 
   app.put('/:id', async (c) => {

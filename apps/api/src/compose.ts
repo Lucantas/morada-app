@@ -51,9 +51,13 @@ export function buildApp(db: Db) {
 
   app.get('/healthz', (c) => c.json({ status: 'ok' }));
 
+  // NOTE: demo login — a role is chosen with no credential check, matching the
+  // Morada prototype (which has no password UI). NOT for production: wire real
+  // credential verification and a per-resident subject before deploying.
   app.post('/auth/login', async (c) => {
     const { role } = loginSchema.parse(await c.req.json());
-    return c.json({ token: await signSession(role), role });
+    const subject = role === 'resident' ? 'me' : 'admin';
+    return c.json({ token: await signSession(role, subject), role });
   });
 
   const api = new Hono<ApiEnv>();

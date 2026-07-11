@@ -123,11 +123,35 @@ describe('Morada API — authorization wiring', () => {
     expect((await write(admin.auth)).status).toBe(201);
   });
 
-  test('listing all threads is admin-only, but a resident can read a single thread', async () => {
+  test('listing all threads is admin-only, but a resident can read their own thread', async () => {
     const resident = await withRole('resident');
     expect((await resident.auth('/api/threads')).status).toBe(403);
     expect((await resident.auth('/api/threads/me')).status).toBe(200);
     const admin = await withRole('admin');
     expect((await admin.auth('/api/threads')).status).toBe(200);
+  });
+
+  test('a resident cannot read or write another resident thread (IDOR blocked)', async () => {
+    const { auth } = await withRole('resident');
+    expect((await auth('/api/threads/t-2')).status).toBe(403);
+    const post = await auth('/api/threads/t-2/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'intruso' }),
+    });
+    expect(post.status).toBe(403);
+  });
+
+  test('message author is derived from the token role, not the request body', async () => {
+    const { auth } = await withRole('resident');
+    const res = await auth('/api/threads/me/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author: 'admin', text: 'tentativa de spoof' }),
+    });
+    expect(res.status).toBe(200);
+    const thread = (await res.json()) as { messages: { author: string; text: string }[] };
+    const last = thread.messages[thread.messages.length - 1];
+    expect(last?.author).toBe('resident');
   });
 });

@@ -3,11 +3,20 @@ pre-commit:
   commands:
     typecheck:
       root: apps/web/
+      glob: 'apps/web/**/*.{ts,tsx}'
       run: pnpm typecheck
     lint:
       root: apps/web/
-      glob: '*.{ts,tsx,js}'
-      run: pnpm eslint {staged_files}
+      glob: 'apps/web/**/*.{ts,tsx,js}'
+      run: pnpm lint
+    api-typecheck:
+      root: apps/api/
+      glob: 'apps/api/**/*.ts'
+      run: pnpm typecheck
+    api-lint:
+      root: apps/api/
+      glob: 'apps/api/**/*.ts'
+      run: pnpm lint
     format:
       glob: '*.{ts,tsx,js,json,md,css}'
       run: pnpm prettier --check {staged_files}
@@ -21,4 +30,7 @@ pre-push:
   commands:
     test:
       root: apps/web/
+      run: pnpm test:coverage
+    api-test:
+      root: apps/api/
       run: pnpm test:coverage

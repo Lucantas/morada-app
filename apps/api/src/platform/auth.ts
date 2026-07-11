@@ -5,13 +5,14 @@ import { config } from './config';
 
 export type Role = 'admin' | 'resident';
 
-export type ApiEnv = { Variables: { role: Role } };
+/** `sub` identifies the resident (their thread id); admins get 'admin'. */
+export type ApiEnv = { Variables: { role: Role; sub: string } };
 
 const EIGHT_HOURS = 60 * 60 * 8;
 
-export async function signSession(role: Role): Promise<string> {
+export async function signSession(role: Role, subject: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ role, iat: now, exp: now + EIGHT_HOURS }, config.jwtSecret, 'HS256');
+  return sign({ role, sub: subject, iat: now, exp: now + EIGHT_HOURS }, config.jwtSecret, 'HS256');
 }
 
 export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
@@ -21,8 +22,12 @@ export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
   try {
     const payload = await verify(token, config.jwtSecret, 'HS256');
     const role = payload.role;
-    if (role !== 'admin' && role !== 'resident') return c.json({ error: 'Sessão inválida' }, 401);
+    const sub = payload.sub;
+    if ((role !== 'admin' && role !== 'resident') || typeof sub !== 'string') {
+      return c.json({ error: 'Sessão inválida' }, 401);
+    }
     c.set('role', role);
+    c.set('sub', sub);
     await next();
     return;
   } catch {

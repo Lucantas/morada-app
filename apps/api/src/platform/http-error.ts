@@ -7,10 +7,14 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
  */
 export const onError: ErrorHandler = (err, c) => {
   if (err.name === 'ZodError') {
-    return c.json({ error: 'Dados inválidos', details: JSON.parse(err.message) }, 400);
+    return c.json({ error: 'Dados inválidos' }, 400);
   }
   const raw = (err as { status?: unknown }).status;
-  const status: ContentfulStatusCode =
-    typeof raw === 'number' && raw >= 400 && raw < 600 ? (raw as ContentfulStatusCode) : 500;
-  return c.json({ error: err.message }, status);
+  if (typeof raw === 'number' && raw >= 400 && raw < 600) {
+    // Typed app errors carry a safe, user-facing message.
+    return c.json({ error: err.message }, raw as ContentfulStatusCode);
+  }
+  // Unexpected error: don't leak internals (SQL text, stack, driver messages).
+  console.error('Unhandled error:', err);
+  return c.json({ error: 'Erro interno' }, 500);
 };

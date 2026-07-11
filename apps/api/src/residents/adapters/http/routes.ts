@@ -16,7 +16,8 @@ export function residentRoutes(repo: ResidentRepository) {
 
   app.post('/', async (c) => {
     const draft = residentDraftSchema.parse(await c.req.json());
-    return c.json(saveResident(repo, draft), 201);
+    // POST always creates: ignore any client-supplied id so it can't overwrite.
+    return c.json(saveResident(repo, { ...draft, id: undefined }), 201);
   });
 
   app.put('/:id', async (c) => {
