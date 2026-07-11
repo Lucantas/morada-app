@@ -83,3 +83,51 @@ describe('Morada API', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('Morada API — authorization wiring', () => {
+  async function withRole(role: 'admin' | 'resident') {
+    const app = makeApp();
+    const token = await login(app, role);
+    const auth = (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+      });
+    return { app, auth };
+  }
+
+  test('accounts are admin-only', async () => {
+    const resident = await withRole('resident');
+    expect((await resident.auth('/api/accounts')).status).toBe(403);
+    const admin = await withRole('admin');
+    expect((await admin.auth('/api/accounts')).status).toBe(200);
+  });
+
+  test('receipts and dashboard are open to any authenticated user', async () => {
+    const { auth } = await withRole('resident');
+    expect((await auth('/api/receipts')).status).toBe(200);
+    expect((await auth('/api/dashboard')).status).toBe(200);
+  });
+
+  test('notices are readable by residents but writable only by admins', async () => {
+    const resident = await withRole('resident');
+    expect((await resident.auth('/api/notices')).status).toBe(200);
+    const write = (a: typeof resident.auth) =>
+      a('/api/notices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Aviso', body: 'Corpo', kind: 'aviso', audience: 'Todos' }),
+      });
+    expect((await write(resident.auth)).status).toBe(403);
+    const admin = await withRole('admin');
+    expect((await write(admin.auth)).status).toBe(201);
+  });
+
+  test('listing all threads is admin-only, but a resident can read a single thread', async () => {
+    const resident = await withRole('resident');
+    expect((await resident.auth('/api/threads')).status).toBe(403);
+    expect((await resident.auth('/api/threads/me')).status).toBe(200);
+    const admin = await withRole('admin');
+    expect((await admin.auth('/api/threads')).status).toBe(200);
+  });
+});
