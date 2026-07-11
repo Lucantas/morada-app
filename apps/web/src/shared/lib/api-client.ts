@@ -1,0 +1,54 @@
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export type ApiClient = {
+  get(path: string): Promise<unknown>;
+  post(path: string, body?: unknown): Promise<unknown>;
+  put(path: string, body?: unknown): Promise<unknown>;
+  del(path: string): Promise<void>;
+};
+
+export function createApiClient(opts: {
+  baseUrl: string;
+  getToken: () => string | null;
+}): ApiClient {
+  const request = async (method: string, path: string, body?: unknown): Promise<unknown> => {
+    const token = opts.getToken();
+    const res = await fetch(`${opts.baseUrl}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) {
+      let message = `Erro ${res.status}`;
+      try {
+        const data = (await res.json()) as { error?: unknown };
+        if (typeof data.error === 'string') message = data.error;
+      } catch {
+        // response had no JSON body; keep the generic message
+      }
+      throw new ApiError(res.status, message);
+    }
+    if (res.status === 204) return undefined;
+    return res.json();
+  };
+
+  return {
+    get: (path) => request('GET', path),
+    post: (path, body) => request('POST', path, body),
+    put: (path, body) => request('PUT', path, body),
+    del: async (path) => {
+      await request('DELETE', path);
+    },
+  };
+}

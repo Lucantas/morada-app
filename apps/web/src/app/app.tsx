@@ -26,6 +26,7 @@ import { PhoneFrame } from '@/shared/ui/phone-frame';
 import {
   accountRepository,
   dashboardRepository,
+  login,
   noticeRepository,
   receiptRepository,
   residentRepository,
@@ -68,7 +69,6 @@ export function App() {
 
 function Router() {
   const role = useSessionStore((s) => s.role);
-  const signInAs = useSessionStore((s) => s.signInAs);
   const signOut = useSessionStore((s) => s.signOut);
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
@@ -78,8 +78,7 @@ function Router() {
     return (
       <LoginScreen
         onEnter={(r) => {
-          signInAs(r);
-          go(r === 'admin' ? 'a-home' : 'r-home');
+          void login(r).then(() => go(r === 'admin' ? 'a-home' : 'r-home'));
         }}
       />
     );
