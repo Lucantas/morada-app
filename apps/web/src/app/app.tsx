@@ -1,5 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
+import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
+import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
+import { PayScreen } from '@/features/receipts/ui/pay-screen';
+import { ReceiptsScreen } from '@/features/receipts/ui/receipts-screen';
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
@@ -8,7 +13,12 @@ import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { PhoneFrame } from '@/shared/ui/phone-frame';
 
 import { ComingSoon } from './coming-soon';
-import { residentRepository } from './container';
+import {
+  accountRepository,
+  dashboardRepository,
+  receiptRepository,
+  residentRepository,
+} from './container';
 import { useNavStore, type View } from './nav-store';
 
 const queryClient = new QueryClient({
@@ -79,14 +89,71 @@ function Router() {
           />
         );
       case 'a-accounts':
-        return <ComingSoon title="Contas" bottomNav={nav} />;
+        return (
+          <AccountsScreen
+            repository={accountRepository}
+            onOpenAccount={(id) => go('a-account-edit', { residentId: id })}
+            bottomNav={nav}
+          />
+        );
+      case 'a-account-edit':
+        return (
+          <AccountEditScreen
+            repository={accountRepository}
+            accountId={residentId}
+            onBack={() => go('a-accounts')}
+          />
+        );
+      case 'a-notice':
+        return <ComingSoon title="Enviar aviso" bottomNav={nav} />;
+      case 'a-messages':
+        return <ComingSoon title="Mensagens" bottomNav={nav} />;
+      case 'a-home':
       default:
-        return <ComingSoon title="Painel do administrador" bottomNav={nav} />;
+        return (
+          <DashboardScreen
+            repository={dashboardRepository}
+            onSendNotice={() => go('a-notice')}
+            onOpenMessages={() => go('a-messages')}
+            onSeeAccounts={() => go('a-accounts')}
+            unreadCount={3}
+            bottomNav={nav}
+          />
+        );
     }
   }
 
   const nav = <BottomNav items={residentNav(view, go)} />;
-  return <ComingSoon title="Meus recibos" bottomNav={nav} />;
+  switch (view) {
+    case 'r-receipts':
+      return (
+        <ReceiptsScreen
+          repository={receiptRepository}
+          onPay={(id) => go('r-pay', { residentId: id })}
+          bottomNav={nav}
+        />
+      );
+    case 'r-pay':
+      return residentId !== undefined ? (
+        <PayScreen
+          repository={receiptRepository}
+          receiptId={residentId}
+          onDone={() => go('r-receipts')}
+        />
+      ) : (
+        <ReceiptsScreen
+          repository={receiptRepository}
+          onPay={(id) => go('r-pay', { residentId: id })}
+          bottomNav={nav}
+        />
+      );
+    case 'r-finance':
+      return <ComingSoon title="Condomínio" bottomNav={nav} />;
+    case 'r-profile':
+      return <ComingSoon title="Perfil" bottomNav={nav} />;
+    default:
+      return <ComingSoon title="Meus recibos" bottomNav={nav} />;
+  }
 }
 
 function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavItem[] {

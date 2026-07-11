@@ -1,0 +1,36 @@
+import { buildAccount } from '@/test/factories.accounts';
+
+import { InMemoryAccountRepository } from './in-memory-account-repository';
+
+describe('InMemoryAccountRepository', () => {
+  test('lists seeded accounts', async () => {
+    const repo = new InMemoryAccountRepository([
+      buildAccount({ id: 'a' }),
+      buildAccount({ id: 'b' }),
+    ]);
+
+    expect((await repo.list()).map((a) => a.id).sort()).toEqual(['a', 'b']);
+  });
+
+  test('save upserts and getById returns it', async () => {
+    const repo = new InMemoryAccountRepository([]);
+    const account = buildAccount({ id: 'x', description: 'Nova' });
+
+    await repo.save(account);
+
+    expect(await repo.getById('x')).toEqual(account);
+  });
+
+  test('save does not mutate the previously returned list (immutability)', async () => {
+    const repo = new InMemoryAccountRepository([buildAccount({ id: 'a' })]);
+    const before = await repo.list();
+
+    await repo.save(buildAccount({ id: 'b' }));
+
+    expect(before).toHaveLength(1);
+  });
+
+  test('rejects malformed seed data at the boundary', () => {
+    expect(() => new InMemoryAccountRepository([{ id: 'a', description: 'X' }])).toThrow();
+  });
+});

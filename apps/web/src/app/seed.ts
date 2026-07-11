@@ -1,3 +1,6 @@
+import type { Account } from '@/features/accounts/domain/account';
+import type { DashboardSummary } from '@/features/dashboard/domain/dashboard';
+import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { Resident } from '@/features/residents/domain/resident';
 
 export const residentSeed: Resident[] = [
@@ -58,3 +61,108 @@ export const residentSeed: Resident[] = [
     status: 'em_dia',
   },
 ];
+
+export const accountSeed: Account[] = [
+  {
+    id: 'a-1',
+    description: 'Água — abril',
+    category: 'Utilidades',
+    dateLabel: '05/04',
+    valueCents: 124000,
+    status: 'pago',
+  },
+  {
+    id: 'a-2',
+    description: 'Energia — áreas comuns',
+    category: 'Utilidades',
+    dateLabel: '03/04',
+    valueCents: 89000,
+    status: 'pago',
+  },
+  {
+    id: 'a-3',
+    description: 'Limpeza',
+    category: 'Serviços',
+    dateLabel: '02/04',
+    valueCents: 150000,
+    status: 'pago',
+  },
+  {
+    id: 'a-4',
+    description: 'Jardinagem',
+    category: 'Serviços',
+    dateLabel: '12/04',
+    valueCents: 45000,
+    status: 'pendente',
+  },
+  {
+    id: 'a-5',
+    description: 'Reparo portão',
+    category: 'Manutenção',
+    dateLabel: '15/04',
+    valueCents: 30000,
+    status: 'atrasado',
+  },
+];
+
+export const receiptSeed: Receipt[] = [
+  {
+    id: 'rc-1',
+    ref: '04/2026',
+    title: 'Taxa condominial',
+    dueLabel: 'Venc. 10/04/2026',
+    valueCents: 45000,
+    status: 'pendente',
+  },
+  {
+    id: 'rc-2',
+    ref: '03/2026',
+    title: 'Taxa condominial',
+    dueLabel: 'Pago em 08/03/2026',
+    valueCents: 45000,
+    status: 'pago',
+    method: 'pix',
+  },
+  {
+    id: 'rc-3',
+    ref: '02/2026',
+    title: 'Taxa condominial',
+    dueLabel: 'Pago em 07/02/2026',
+    valueCents: 45000,
+    status: 'pago',
+    method: 'boleto',
+  },
+  {
+    id: 'rc-4',
+    ref: '01/2026',
+    title: 'Taxa condominial',
+    dueLabel: 'Pago em 09/01/2026',
+    valueCents: 45000,
+    status: 'pago',
+    method: 'pix',
+  },
+];
+
+export const dashboardSeed: DashboardSummary = {
+  balance: { balanceCents: 1248000, incomeCents: 836000, paidCents: 412000 },
+  recentPaid: [
+    {
+      id: 'p-1',
+      label: 'Conta de água — abril',
+      dateLabel: 'Paga em 05/04',
+      valueCents: 124000,
+      icon: 'water',
+    },
+    {
+      id: 'p-2',
+      label: 'Energia — áreas comuns',
+      dateLabel: 'Paga em 03/04',
+      valueCents: 89000,
+      icon: 'bolt',
+    },
+  ],
+  maintenances: [
+    { id: 'm-1', title: "Bomba d'água", detail: 'Reparo · 28/03', icon: 'wrench' },
+    { id: 'm-2', title: 'Pintura do hall', detail: 'Concluída · 20/03', icon: 'building2' },
+  ],
+};
