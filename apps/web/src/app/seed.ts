@@ -201,7 +201,7 @@ export const noticeSeed: Notice[] = [
 
 export const threadSeed: Thread[] = [
   {
-    id: 'me',
+    id: 'r-1',
     residentName: 'Maria Ribeiro',
     apt: 'Apto 302',
     unread: false,

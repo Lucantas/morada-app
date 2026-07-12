@@ -19,9 +19,10 @@ type Props = {
   repository: ResidentRepository;
   residentId?: string;
   onBack: () => void;
+  onCreateLogin?: () => void;
 };
 
-export function ResidentEditScreen({ repository, residentId, onBack }: Props) {
+export function ResidentEditScreen({ repository, residentId, onBack, onCreateLogin }: Props) {
   const existing = useQuery({
     queryKey: [...residentsQueryKey, residentId],
     queryFn: () => getResident(repository, residentId as string),
@@ -154,6 +155,28 @@ export function ResidentEditScreen({ repository, residentId, onBack }: Props) {
           <PrimaryButton icon="check" onClick={submit}>
             {residentId ? 'Salvar alterações' : 'Cadastrar morador'}
           </PrimaryButton>
+
+          {onCreateLogin && (
+            <button
+              type="button"
+              onClick={onCreateLogin}
+              style={{
+                width: '100%',
+                minHeight: 50,
+                marginTop: 12,
+                borderRadius: 'var(--r-md)',
+                border: '1.5px solid var(--petrol-600)',
+                background: 'var(--surface)',
+                color: 'var(--petrol-800)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              Criar acesso do morador
+            </button>
+          )}
         </div>
       </ScreenBody>
     </Screen>
