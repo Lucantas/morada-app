@@ -38,6 +38,11 @@ export class SqliteUserRepository implements UserRepository {
     return row !== undefined;
   }
 
+  existsByResidentId(residentId: string): boolean {
+    const row = this.db.prepare('SELECT 1 FROM users WHERE resident_id = ?').get(residentId);
+    return row !== undefined;
+  }
+
   save(user: User): User {
     this.db
       .prepare(

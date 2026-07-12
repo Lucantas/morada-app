@@ -29,6 +29,28 @@ describe('SqliteUserRepository', () => {
     expect(repo.existsByUsername('maria302')).toBe(true);
   });
 
+  test('existsByResidentId reflects the linked resident', () => {
+    const repo = new SqliteUserRepository(createTestDb());
+    expect(repo.existsByResidentId('r-1')).toBe(false);
+    repo.save(maria);
+    expect(repo.existsByResidentId('r-1')).toBe(true);
+    expect(repo.existsByResidentId('r-2')).toBe(false);
+  });
+
+  test('rejects a second login for the same resident (unique index)', () => {
+    const repo = new SqliteUserRepository(createTestDb());
+    repo.save(maria);
+    expect(() =>
+      repo.save({
+        id: 'u-2',
+        username: 'maria302-alt',
+        passwordHash: 'hash-c',
+        role: 'resident',
+        residentId: 'r-1',
+      }),
+    ).toThrow();
+  });
+
   test('save persists an admin with a null residentId', () => {
     const repo = new SqliteUserRepository(createTestDb());
     const admin: User = {

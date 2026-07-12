@@ -84,7 +84,7 @@ export function buildApp(db: Db) {
   api.post('/users', requireRole('admin'), async (c) => {
     const { username, residentId } = provisionSchema.parse(await c.req.json());
     const tempPassword = generateTempPassword();
-    const user = await createResidentLogin(users, hasher, {
+    const user = await createResidentLogin(users, hasher, (id) => residents.getById(id) !== null, {
       username,
       password: tempPassword,
       residentId,

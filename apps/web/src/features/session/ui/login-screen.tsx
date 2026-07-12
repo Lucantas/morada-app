@@ -105,6 +105,7 @@ export function LoginScreen({ onSubmit, error, pending }: Props) {
           <input
             id="login-username"
             name="username"
+            autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
             value={username}
@@ -120,6 +121,7 @@ export function LoginScreen({ onSubmit, error, pending }: Props) {
             id="login-password"
             name="password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={inputStyle}

@@ -10,6 +10,7 @@ function fakeRepo(users: User[] = []): UserRepository {
   return {
     findByUsername: (username) => map.get(username) ?? null,
     existsByUsername: (username) => map.has(username),
+    existsByResidentId: (residentId) => [...map.values()].some((u) => u.residentId === residentId),
     save: (u) => {
       map.set(u.username, u);
       return u;
@@ -46,5 +47,20 @@ describe('verifyCredentials', () => {
     await expect(
       verifyCredentials(fakeRepo([maria]), acceptHasher, 'maria302', 'wrong'),
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
+  });
+
+  test('still runs a hash comparison for an unknown username (no timing oracle)', async () => {
+    const verified: string[] = [];
+    const spyHasher: PasswordHasher = {
+      hash: (plain) => Promise.resolve(`hash:${plain}`),
+      verify: (_plain, hash) => {
+        verified.push(hash);
+        return Promise.resolve(false);
+      },
+    };
+    await expect(
+      verifyCredentials(fakeRepo([maria]), spyHasher, 'ghost', 's3nha'),
+    ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    expect(verified).toHaveLength(1);
   });
 });

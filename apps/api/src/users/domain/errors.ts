@@ -21,3 +21,19 @@ export class UserValidationError extends Error {
     this.name = 'UserValidationError';
   }
 }
+
+export class UnknownResidentError extends Error {
+  readonly status = 404;
+  constructor(residentId: string) {
+    super(`Morador não encontrado: ${residentId}`);
+    this.name = 'UnknownResidentError';
+  }
+}
+
+export class ResidentLoginExistsError extends Error {
+  readonly status = 409;
+  constructor(residentId: string) {
+    super(`Este morador já possui um acesso: ${residentId}`);
+    this.name = 'ResidentLoginExistsError';
+  }
+}

@@ -44,5 +44,12 @@ The database seeds two documented logins so the demo works out of the box —
 
 ## Still deferred (post-auth hardening)
 
-1. Refresh/revocation (logout) — tokens are valid for their full 8h.
-2. A validated `WEB_ORIGIN` allowlist and CI action version bumps.
+1. **Per-resident receipt scoping.** Receipts are not yet linked to a resident
+   (no owner column), so `/api/receipts` is open to any authenticated user. Once
+   receipts carry a `resident_id`, scope reads/pay by the caller's `sub` — the
+   same pattern threads already use — before real multi-resident use.
+2. **Gate demo seeding for production.** `seedDatabase` runs on every boot and
+   inserts the documented demo logins. Put it behind `!isProduction` / an
+   explicit `SEED_DEMO_DATA` flag before deploying against a real database.
+3. Refresh/revocation (logout) — tokens are valid for their full 8h.
+4. A validated `WEB_ORIGIN` allowlist and CI action version bumps.
