@@ -182,6 +182,29 @@ describe('Morada API — admin provisions resident logins', () => {
     });
     expect(res.status).toBe(409);
   });
+
+  test('provisioning for a nonexistent resident is rejected with 404', async () => {
+    const app = makeApp();
+    const auth = await adminAuth(app);
+    const res = await auth('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'fantasma', residentId: 'r-does-not-exist' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('provisioning a second login for the same resident is rejected with 409', async () => {
+    const app = makeApp();
+    const auth = await adminAuth(app);
+    const res = await auth('/api/users', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: 'maria-alt',
+        residentId: demoCredentials.resident.residentId,
+      }),
+    });
+    expect(res.status).toBe(409);
+  });
 });
 
 describe('Morada API — authorization wiring', () => {
