@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS threads (
 CREATE TABLE IF NOT EXISTS dashboard (
   id TEXT PRIMARY KEY, data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+  role TEXT NOT NULL, resident_id TEXT
+);
 `;
 
 export function createDb(path: string): Db {

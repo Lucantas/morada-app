@@ -19,8 +19,22 @@ import { SqliteReceiptRepository } from './receipts/adapters/sqlite/receipt-repo
 import { residentRoutes } from './residents/adapters/http/routes';
 import { SqliteResidentRepository } from './residents/adapters/sqlite/resident-repository';
 import { seedDatabase } from './seed-data';
+import { generateTempPassword } from './platform/temp-password';
+import { createResidentLogin } from './users/app/create-resident-login';
+import { verifyCredentials } from './users/app/verify-credentials';
+import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
+import { SqliteUserRepository } from './users/adapters/sqlite/user-repository';
+import { usernameSchema } from './users/domain/user';
 
-const loginSchema = z.object({ role: z.enum(['admin', 'resident']) });
+const loginSchema = z.object({
+  username: z.string().min(1).max(60),
+  password: z.string().min(1).max(200),
+});
+
+const provisionSchema = z.object({
+  username: usernameSchema,
+  residentId: z.string().min(1).max(64),
+});
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   const group = new Hono<ApiEnv>();
@@ -37,6 +51,8 @@ export function buildApp(db: Db) {
   const notices = new SqliteNoticeRepository(db);
   const threads = new SqliteThreadRepository(db);
   const dashboard = new SqliteDashboardRepository(db);
+  const users = new SqliteUserRepository(db);
+  const hasher = new BcryptPasswordHasher(config.bcryptCost);
 
   const app = new Hono<ApiEnv>();
   app.onError(onError);
@@ -51,17 +67,33 @@ export function buildApp(db: Db) {
 
   app.get('/healthz', (c) => c.json({ status: 'ok' }));
 
-  // NOTE: demo login — a role is chosen with no credential check, matching the
-  // Morada prototype (which has no password UI). NOT for production: wire real
-  // credential verification and a per-resident subject before deploying.
+  // Verifies real credentials and issues a JWT whose `sub` is the resident's own
+  // id (admins get their user id), so per-resident data stays scoped by subject.
   app.post('/auth/login', async (c) => {
-    const { role } = loginSchema.parse(await c.req.json());
-    const subject = role === 'resident' ? 'me' : 'admin';
-    return c.json({ token: await signSession(role, subject), role });
+    const { username, password } = loginSchema.parse(await c.req.json());
+    const user = await verifyCredentials(users, hasher, username, password);
+    const subject = user.role === 'resident' ? (user.residentId ?? user.id) : user.id;
+    return c.json({ token: await signSession(user.role, subject), role: user.role });
   });
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
+
+  // Admin-only: provision a resident login. Returns the generated temp password
+  // once for the admin to relay; only the hash is ever stored.
+  api.post('/users', requireRole('admin'), async (c) => {
+    const { username, residentId } = provisionSchema.parse(await c.req.json());
+    const tempPassword = generateTempPassword();
+    const user = await createResidentLogin(users, hasher, {
+      username,
+      password: tempPassword,
+      residentId,
+    });
+    return c.json(
+      { id: user.id, username: user.username, residentId: user.residentId, tempPassword },
+      201,
+    );
+  });
 
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents)));
