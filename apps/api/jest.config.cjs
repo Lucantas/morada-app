@@ -1,3 +1,7 @@
+// Keep bcrypt cheap under test so the credential suite stays fast; production
+// uses the strong default cost from config.
+process.env.BCRYPT_COST = process.env.BCRYPT_COST || '4';
+
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'ts-jest',

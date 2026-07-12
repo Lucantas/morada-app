@@ -1,4 +1,17 @@
+import bcrypt from 'bcryptjs';
+
+import { config } from './platform/config';
 import type { Db } from './platform/db';
+
+/**
+ * Documented demo logins so the deployed demo works out of the box. The admin
+ * provisions further resident logins from the app. Change these before any real
+ * deployment; they are intentionally weak and public.
+ */
+export const demoCredentials = {
+  admin: { username: 'admin', password: 'morada-admin' },
+  resident: { username: 'maria302', password: 'morada-demo', residentId: 'r-1' },
+} as const;
 
 const residents = [
   {
@@ -173,7 +186,7 @@ const notices = [
 
 const threads = [
   {
-    id: 'me',
+    id: 'r-1',
     resident_name: 'Maria Ribeiro',
     apt: 'Apto 302',
     unread: 0,
@@ -276,4 +289,26 @@ export function seedDatabase(db: Db): void {
   if (isEmpty(db, 'threads'))
     insertAll(db, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);
   if (isEmpty(db, 'dashboard')) insertAll(db, 'dashboard', ['id', 'data'], [dashboard]);
+  if (isEmpty(db, 'users')) insertAll(db, 'users', USER_COLUMNS, seedUsers());
+}
+
+const USER_COLUMNS = ['id', 'username', 'password_hash', 'role', 'resident_id'];
+
+function seedUsers(): Record<string, unknown>[] {
+  return [
+    {
+      id: 'u-admin',
+      username: demoCredentials.admin.username,
+      password_hash: bcrypt.hashSync(demoCredentials.admin.password, config.bcryptCost),
+      role: 'admin',
+      resident_id: null,
+    },
+    {
+      id: 'u-maria',
+      username: demoCredentials.resident.username,
+      password_hash: bcrypt.hashSync(demoCredentials.resident.password, config.bcryptCost),
+      role: 'resident',
+      resident_id: demoCredentials.resident.residentId,
+    },
+  ];
 }

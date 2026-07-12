@@ -4,21 +4,30 @@ import userEvent from '@testing-library/user-event';
 import { LoginScreen } from './login-screen';
 
 describe('LoginScreen', () => {
-  test('entering as administrador reports the admin role', async () => {
-    const onEnter = jest.fn();
-    render(<LoginScreen onEnter={onEnter} />);
+  test('submits the typed username and password', async () => {
+    const user = userEvent.setup();
+    const onSubmit = jest.fn();
+    render(<LoginScreen onSubmit={onSubmit} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Administrador' }));
+    await user.type(screen.getByLabelText('Usuário'), 'maria302');
+    await user.type(screen.getByLabelText('Senha'), 'morada-demo');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(onEnter).toHaveBeenCalledWith('admin');
+    expect(onSubmit).toHaveBeenCalledWith('maria302', 'morada-demo');
   });
 
-  test('entering as morador reports the resident role', async () => {
-    const onEnter = jest.fn();
-    render(<LoginScreen onEnter={onEnter} />);
+  test('does not submit when the fields are empty', async () => {
+    const user = userEvent.setup();
+    const onSubmit = jest.fn();
+    render(<LoginScreen onSubmit={onSubmit} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Morador' }));
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(onEnter).toHaveBeenCalledWith('resident');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  test('shows an error message when provided', () => {
+    render(<LoginScreen onSubmit={jest.fn()} error="Usuário ou senha inválidos" />);
+    expect(screen.getByText('Usuário ou senha inválidos')).toBeInTheDocument();
   });
 });

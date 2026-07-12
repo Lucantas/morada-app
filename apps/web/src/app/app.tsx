@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
@@ -18,6 +19,7 @@ import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-prof
 import { DEFAULT_RESIDENT } from '@/features/resident-home/ui/current-resident';
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
+import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
@@ -28,6 +30,7 @@ import {
   dashboardRepository,
   login,
   noticeRepository,
+  provisionResidentLogin,
   receiptRepository,
   residentRepository,
   threadRepository,
@@ -69,16 +72,28 @@ export function App() {
 
 function Router() {
   const role = useSessionStore((s) => s.role);
+  const subject = useSessionStore((s) => s.subject);
   const signOut = useSessionStore((s) => s.signOut);
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
   const go = useNavStore((s) => s.go);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   if (!role) {
     return (
       <LoginScreen
-        onEnter={(r) => {
-          void login(r).then(() => go(r === 'admin' ? 'a-home' : 'r-home'));
+        pending={pending}
+        error={loginError}
+        onSubmit={(username, password) => {
+          setPending(true);
+          setLoginError(null);
+          login(username, password)
+            .then((r) => go(r === 'admin' ? 'a-home' : 'r-home'))
+            .catch((err: unknown) =>
+              setLoginError(err instanceof Error ? err.message : 'Não foi possível entrar.'),
+            )
+            .finally(() => setPending(false));
         }}
       />
     );
@@ -87,12 +102,21 @@ function Router() {
   if (role === 'admin') {
     return <AdminRouter view={view} residentId={residentId} go={go} signOut={signOut} />;
   }
-  return <ResidentRouter view={view} residentId={residentId} go={go} signOut={signOut} />;
+  return (
+    <ResidentRouter
+      view={view}
+      residentId={residentId}
+      subject={subject}
+      go={go}
+      signOut={signOut}
+    />
+  );
 }
 
 type RouteProps = {
   view: View;
   residentId?: string;
+  subject?: string | null;
   go: (view: View, opts?: { residentId?: string }) => void;
   signOut: () => void;
 };
@@ -116,6 +140,21 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           repository={residentRepository}
           residentId={residentId}
           onBack={() => go('a-residents')}
+          onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
+        />
+      );
+    case 'a-resident-login':
+      return residentId !== undefined ? (
+        <CreateLoginScreen
+          residentId={residentId}
+          provision={provisionResidentLogin}
+          onBack={() => go('a-resident-edit', { residentId })}
+        />
+      ) : (
+        <ResidentsScreen
+          repository={residentRepository}
+          onOpenResident={(id) => go('a-resident-edit', { residentId: id })}
+          bottomNav={nav}
         />
       );
     case 'a-accounts':
@@ -172,7 +211,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
   }
 }
 
-function ResidentRouter({ view, residentId, go, signOut }: RouteProps) {
+function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {
   const nav = <BottomNav items={residentNav(view, go)} />;
   switch (view) {
     case 'r-receipts':
@@ -202,7 +241,9 @@ function ResidentRouter({ view, residentId, go, signOut }: RouteProps) {
     case 'r-finance':
       return <ResidentFinanceScreen dashboardRepository={dashboardRepository} bottomNav={nav} />;
     case 'r-help':
-      return <SupportScreen repository={threadRepository} threadId="me" bottomNav={nav} />;
+      return (
+        <SupportScreen repository={threadRepository} threadId={subject ?? 'r-1'} bottomNav={nav} />
+      );
     case 'r-profile':
       return (
         <ResidentProfileScreen resident={CURRENT_RESIDENT} onSignOut={signOut} bottomNav={nav} />

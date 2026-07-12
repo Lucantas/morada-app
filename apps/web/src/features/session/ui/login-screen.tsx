@@ -1,10 +1,52 @@
+import { useState, type CSSProperties } from 'react';
+
 import { Icon } from '@/shared/ui/icon';
 
-import type { Role } from '../domain/session';
+type Props = {
+  onSubmit: (username: string, password: string) => void;
+  error?: string | null;
+  pending?: boolean;
+};
 
-export function LoginScreen({ onEnter }: { onEnter: (role: Role) => void }) {
+const inputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 50,
+  borderRadius: 12,
+  border: '1.5px solid rgba(255,255,255,.22)',
+  background: 'rgba(255,255,255,.08)',
+  color: '#fff',
+  padding: '0 14px',
+  fontFamily: "'Inter', sans-serif",
+  fontSize: '1rem',
+  outline: 'none',
+};
+
+const labelStyle: CSSProperties = {
+  display: 'block',
+  fontSize: '.72rem',
+  color: '#9FC0C3',
+  letterSpacing: '.12em',
+  textTransform: 'uppercase',
+  fontWeight: 600,
+  margin: '0 0 6px 2px',
+};
+
+export function LoginScreen({ onSubmit, error, pending }: Props) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const submit = () => {
+    const u = username.trim();
+    if (!u || !password) return;
+    onSubmit(u, password);
+  };
+
   return (
-    <div
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
       style={{
         height: '100%',
         display: 'flex',
@@ -54,21 +96,47 @@ export function LoginScreen({ onEnter }: { onEnter: (role: Role) => void }) {
         </h1>
         <p style={{ color: '#C9DCDD', fontSize: '1.2rem', marginTop: 8 }}>Bloco 2</p>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p
-          style={{
-            fontSize: '.82rem',
-            color: '#9FC0C3',
-            letterSpacing: '.14em',
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            marginBottom: 4,
-          }}
-        >
-          Entrar como
-        </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
+        <div>
+          <label htmlFor="login-username" style={labelStyle}>
+            Usuário
+          </label>
+          <input
+            id="login-username"
+            name="username"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label htmlFor="login-password" style={labelStyle}>
+            Senha
+          </label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        {error && (
+          <p role="alert" style={{ color: '#F4B9A8', fontSize: '.9rem', margin: '2px 2px 0' }}>
+            {error}
+          </p>
+        )}
+
         <button
-          onClick={() => onEnter('admin')}
+          type="submit"
+          disabled={pending}
           style={{
             width: '100%',
             minHeight: 54,
@@ -79,30 +147,15 @@ export function LoginScreen({ onEnter }: { onEnter: (role: Role) => void }) {
             fontFamily: "'Inter', sans-serif",
             fontWeight: 600,
             fontSize: '1.05rem',
-            cursor: 'pointer',
+            cursor: pending ? 'default' : 'pointer',
+            opacity: pending ? 0.7 : 1,
             boxShadow: 'var(--sh-2)',
+            marginTop: 4,
           }}
         >
-          Administrador
-        </button>
-        <button
-          onClick={() => onEnter('resident')}
-          style={{
-            width: '100%',
-            minHeight: 54,
-            borderRadius: 14,
-            background: 'transparent',
-            color: '#fff',
-            border: '1.5px solid rgba(255,255,255,.4)',
-            fontFamily: "'Inter', sans-serif",
-            fontWeight: 600,
-            fontSize: '1.05rem',
-            cursor: 'pointer',
-          }}
-        >
-          Morador
+          {pending ? 'Entrando…' : 'Entrar'}
         </button>
       </div>
-    </div>
+    </form>
   );
 }

@@ -11,4 +11,5 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET ?? 'dev-morada-secret-change-me',
   dbPath: process.env.DB_PATH ?? 'morada.db',
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
+  bcryptCost: Number(process.env.BCRYPT_COST ?? 12),
 };
