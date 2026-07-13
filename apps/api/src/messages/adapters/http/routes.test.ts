@@ -8,9 +8,9 @@ import { threadRoutes } from './routes';
 function fakeRepo(list: Thread[]): ThreadRepository {
   const map = new Map(list.map((t) => [t.id, t]));
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (t) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (t) => {
       map.set(t.id, t);
       return t;
     },
@@ -28,7 +28,7 @@ const build = (over: Partial<Thread>): Thread => ({
 
 function mount(
   repo: ThreadRepository,
-  lookup: (id: string) => { name: string; apt: string } | null = () => ({
+  lookup: (id: string) => Promise<{ name: string; apt: string } | null> = async () => ({
     name: 'Morador',
     apt: 'Apto',
   }),
@@ -49,7 +49,7 @@ describe('threadRoutes', () => {
   });
 
   test('GET /:id materialises an empty thread when none exists yet', async () => {
-    const app = mount(fakeRepo([]), () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const app = mount(fakeRepo([]), async () => ({ name: 'Maria', apt: 'Apto 302' }));
     const res = await app.request('/threads/r-1');
     expect(res.status).toBe(200);
     const body = (await res.json()) as Thread;
@@ -58,14 +58,14 @@ describe('threadRoutes', () => {
 
   test('POST /:id/messages creates the thread on the first message', async () => {
     const repo = fakeRepo([]);
-    const app = mount(repo, () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const app = mount(repo, async () => ({ name: 'Maria', apt: 'Apto 302' }));
     const res = await app.request('/threads/r-1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: 'Primeira mensagem' }),
     });
     expect(res.status).toBe(200);
-    expect(repo.getById('r-1')?.messages).toHaveLength(1);
+    expect((await repo.getById('r-1'))?.messages).toHaveLength(1);
   });
 
   test('POST /:id/messages appends a message', async () => {

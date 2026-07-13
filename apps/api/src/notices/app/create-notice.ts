@@ -4,7 +4,7 @@ import { NoticeValidationError } from '../domain/errors';
 import { noticeDraftSchema, noticeSchema, type Notice } from '../domain/notice';
 import type { NoticeRepository } from '../domain/notice-repository';
 
-export function createNotice(repo: NoticeRepository, draft: unknown): Notice {
+export async function createNotice(repo: NoticeRepository, draft: unknown): Promise<Notice> {
   const parsed = noticeDraftSchema.safeParse(draft);
   if (!parsed.success) throw new NoticeValidationError('Dados do aviso inválidos');
   if (!parsed.data.title || !parsed.data.body) {

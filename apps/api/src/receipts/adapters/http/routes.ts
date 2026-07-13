@@ -23,24 +23,26 @@ function denyForeignReceipt(c: Context<ApiEnv>, receipt: Receipt): Response | nu
 export function receiptRoutes(repo: ReceiptRepository) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/', (c) =>
+  app.get('/', async (c) =>
     c.json(
-      c.get('role') === 'resident' ? listResidentReceipts(repo, c.get('sub')) : listReceipts(repo),
+      c.get('role') === 'resident'
+        ? await listResidentReceipts(repo, c.get('sub'))
+        : await listReceipts(repo),
     ),
   );
 
-  app.get('/:id', (c) => {
-    const receipt = getReceipt(repo, c.req.param('id'));
+  app.get('/:id', async (c) => {
+    const receipt = await getReceipt(repo, c.req.param('id'));
     const denied = denyForeignReceipt(c, receipt);
     return denied ?? c.json(receipt);
   });
 
   app.post('/:id/pay', async (c) => {
-    const receipt = getReceipt(repo, c.req.param('id'));
+    const receipt = await getReceipt(repo, c.req.param('id'));
     const denied = denyForeignReceipt(c, receipt);
     if (denied) return denied;
     const { method } = paySchema.parse(await c.req.json());
-    return c.json(payReceipt(repo, c.req.param('id'), method));
+    return c.json(await payReceipt(repo, c.req.param('id'), method));
   });
 
   return app;

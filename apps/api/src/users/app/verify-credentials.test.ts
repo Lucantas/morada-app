@@ -8,10 +8,11 @@ import { verifyCredentials } from './verify-credentials';
 function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
-    findByUsername: (username) => map.get(username) ?? null,
-    existsByUsername: (username) => map.has(username),
-    existsByResidentId: (residentId) => [...map.values()].some((u) => u.residentId === residentId),
-    save: (u) => {
+    findByUsername: async (username) => map.get(username) ?? null,
+    existsByUsername: async (username) => map.has(username),
+    existsByResidentId: async (residentId) =>
+      [...map.values()].some((u) => u.residentId === residentId),
+    save: async (u) => {
       map.set(u.username, u);
       return u;
     },

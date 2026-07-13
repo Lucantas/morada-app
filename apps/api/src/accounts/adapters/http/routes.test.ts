@@ -15,7 +15,7 @@ function mountApp() {
 describe('accountRoutes', () => {
   test('GET / returns the account list', async () => {
     const { app, repo } = mountApp();
-    repo.save({
+    await repo.save({
       id: 'a-1',
       description: 'Energia',
       category: 'Utilidades',
@@ -50,12 +50,12 @@ describe('accountRoutes', () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as { id: string };
     expect(body.id).toMatch(/.+/);
-    expect(repo.getById(body.id)?.description).toBe('Água');
+    expect((await repo.getById(body.id))?.description).toBe('Água');
   });
 
   test('GET /:id returns a single account', async () => {
     const { app, repo } = mountApp();
-    repo.save({
+    await repo.save({
       id: 'a-9',
       description: 'Gás',
       category: 'Utilidades',

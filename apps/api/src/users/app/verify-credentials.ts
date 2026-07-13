@@ -14,7 +14,7 @@ export async function verifyCredentials(
   username: string,
   password: string,
 ): Promise<User> {
-  const user = repo.findByUsername(username);
+  const user = await repo.findByUsername(username);
   const matches = await hasher.verify(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !matches) throw new InvalidCredentialsError();
   return user;

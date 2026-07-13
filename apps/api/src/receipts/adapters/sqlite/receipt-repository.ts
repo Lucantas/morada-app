@@ -35,30 +35,30 @@ function toReceipt(row: unknown): Receipt {
 export class SqliteReceiptRepository implements ReceiptRepository {
   constructor(private readonly db: Db) {}
 
-  list(): Receipt[] {
+  async list(): Promise<Receipt[]> {
     return this.db.prepare(`SELECT ${COLUMNS} FROM receipts`).all().map(toReceipt);
   }
 
-  listByResident(residentId: string): Receipt[] {
+  async listByResident(residentId: string): Promise<Receipt[]> {
     return this.db
       .prepare(`SELECT ${COLUMNS} FROM receipts WHERE resident_id = ?`)
       .all(residentId)
       .map(toReceipt);
   }
 
-  listByApartment(apartmentId: string): Receipt[] {
+  async listByApartment(apartmentId: string): Promise<Receipt[]> {
     return this.db
       .prepare(`SELECT ${COLUMNS} FROM receipts WHERE apartment_id = ?`)
       .all(apartmentId)
       .map(toReceipt);
   }
 
-  getById(id: string): Receipt | null {
+  async getById(id: string): Promise<Receipt | null> {
     const row = this.db.prepare(`SELECT ${COLUMNS} FROM receipts WHERE id = ?`).get(id);
     return row ? toReceipt(row) : null;
   }
 
-  save(receipt: Receipt): Receipt {
+  async save(receipt: Receipt): Promise<Receipt> {
     this.db
       .prepare(
         `INSERT INTO receipts (${COLUMNS})

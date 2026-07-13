@@ -13,17 +13,17 @@ import { createResidentLogin } from './create-resident-login';
 function fakeRepo(users: User[] = []): UserRepository {
   const list = [...users];
   return {
-    findByUsername: (username) => list.find((u) => u.username === username) ?? null,
-    existsByUsername: (username) => list.some((u) => u.username === username),
-    existsByResidentId: (residentId) => list.some((u) => u.residentId === residentId),
-    save: (u) => {
+    findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
+    existsByUsername: async (username) => list.some((u) => u.username === username),
+    existsByResidentId: async (residentId) => list.some((u) => u.residentId === residentId),
+    save: async (u) => {
       list.push(u);
       return u;
     },
   };
 }
 
-const anyResident = () => true;
+const anyResident = async () => true;
 
 const hasher: PasswordHasher = {
   hash: (plain) => Promise.resolve(`hash:${plain}`),
@@ -44,7 +44,7 @@ describe('createResidentLogin', () => {
     expect(user.residentId).toBe('r-1');
     expect(user.passwordHash).toBe('hash:s3nha-temp');
     expect(user.id).toMatch(/.+/);
-    expect(repo.findByUsername('maria302')).toEqual(user);
+    expect(await repo.findByUsername('maria302')).toEqual(user);
   });
 
   test('stores the hasher output, never the raw password', async () => {
@@ -76,7 +76,7 @@ describe('createResidentLogin', () => {
 
   test('throws UnknownResidentError when the resident does not exist', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, () => false, {
+      createResidentLogin(fakeRepo(), hasher, async () => false, {
         username: 'ghost404',
         password: 's3nha-temp',
         residentId: 'r-nope',

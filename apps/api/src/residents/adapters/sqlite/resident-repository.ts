@@ -40,23 +40,23 @@ function toResident(row: unknown): Resident {
 export class SqliteResidentRepository implements ResidentRepository {
   constructor(private readonly db: Db) {}
 
-  list(): Resident[] {
+  async list(): Promise<Resident[]> {
     return this.db.prepare(`${SELECT} WHERE ar.active = 1 ORDER BY a.label`).all().map(toResident);
   }
 
-  getById(id: string): Resident | null {
+  async getById(id: string): Promise<Resident | null> {
     const row = this.db.prepare(`${SELECT} WHERE r.id = ?`).get(id);
     return row ? toResident(row) : null;
   }
 
-  listByApartment(apartmentId: string): Resident[] {
+  async listByApartment(apartmentId: string): Promise<Resident[]> {
     return this.db
       .prepare(`${SELECT} WHERE ar.apartment_id = ? ORDER BY ar.active DESC`)
       .all(apartmentId)
       .map(toResident);
   }
 
-  apartmentOf(residentId: string): { apartmentId: string; apt: string } | null {
+  async apartmentOf(residentId: string): Promise<{ apartmentId: string; apt: string } | null> {
     const row = this.db
       .prepare(
         `SELECT ar.apartment_id AS apartmentId, a.label AS apt
@@ -76,14 +76,14 @@ export class SqliteResidentRepository implements ResidentRepository {
     return id;
   }
 
-  save(input: {
+  async save(input: {
     id: string;
     name: string;
     apt: string;
     phone: string;
     email: string;
     status: Resident['status'];
-  }): Resident {
+  }): Promise<Resident> {
     const exists = this.db.prepare('SELECT 1 FROM residents WHERE id = ?').get(input.id);
     if (exists) {
       this.db
@@ -116,12 +116,12 @@ export class SqliteResidentRepository implements ResidentRepository {
     return this.getByIdOrThrow(input.id);
   }
 
-  deactivate(id: string): void {
+  async deactivate(id: string): Promise<void> {
     this.db.prepare('UPDATE apartment_residents SET active = 0 WHERE resident_id = ?').run(id);
   }
 
-  private getByIdOrThrow(id: string): Resident {
-    const resident = this.getById(id);
+  private async getByIdOrThrow(id: string): Promise<Resident> {
+    const resident = await this.getById(id);
     if (!resident) throw new Error(`Resident not found after save: ${id}`);
     return resident;
   }

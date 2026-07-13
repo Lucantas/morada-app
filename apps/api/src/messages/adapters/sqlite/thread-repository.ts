@@ -29,17 +29,17 @@ function toThread(row: unknown): Thread {
 export class SqliteThreadRepository implements ThreadRepository {
   constructor(private readonly db: Db) {}
 
-  list(): Thread[] {
+  async list(): Promise<Thread[]> {
     const rows = this.db.prepare(`SELECT ${COLUMNS} FROM threads`).all();
     return rows.map(toThread);
   }
 
-  getById(id: string): Thread | null {
+  async getById(id: string): Promise<Thread | null> {
     const row = this.db.prepare(`SELECT ${COLUMNS} FROM threads WHERE id = ?`).get(id);
     return row ? toThread(row) : null;
   }
 
-  save(thread: Thread): Thread {
+  async save(thread: Thread): Promise<Thread> {
     this.db
       .prepare(
         `INSERT INTO threads (${COLUMNS}) VALUES (@id, @resident_name, @apt, @unread, @messages)

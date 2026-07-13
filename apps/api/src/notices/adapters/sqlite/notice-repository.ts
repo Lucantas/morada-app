@@ -28,17 +28,17 @@ function toNotice(row: unknown): Notice {
 export class SqliteNoticeRepository implements NoticeRepository {
   constructor(private readonly db: Db) {}
 
-  list(): Notice[] {
+  async list(): Promise<Notice[]> {
     const rows = this.db.prepare(`SELECT ${COLUMNS} FROM notices`).all();
     return rows.map(toNotice);
   }
 
-  getById(id: string): Notice | null {
+  async getById(id: string): Promise<Notice | null> {
     const row = this.db.prepare(`SELECT ${COLUMNS} FROM notices WHERE id = ?`).get(id);
     return row ? toNotice(row) : null;
   }
 
-  save(notice: Notice): Notice {
+  async save(notice: Notice): Promise<Notice> {
     this.db
       .prepare(
         `INSERT INTO notices (${COLUMNS}) VALUES (@id, @title, @body, @kind, @audience, @dateLabel, @dismissed)
@@ -58,7 +58,7 @@ export class SqliteNoticeRepository implements NoticeRepository {
     return notice;
   }
 
-  remove(id: string): void {
+  async remove(id: string): Promise<void> {
     this.db.prepare('DELETE FROM notices WHERE id = ?').run(id);
   }
 }

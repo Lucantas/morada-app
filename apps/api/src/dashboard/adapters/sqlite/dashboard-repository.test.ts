@@ -25,7 +25,7 @@ function seedReceipt(db: Db, r: { id: string; valueCents: number; status: string
 }
 
 describe('SqliteDashboardRepository', () => {
-  test('derives the balance live from paid accounts and paid receipts', () => {
+  test('derives the balance live from paid accounts and paid receipts', async () => {
     const db = createTestDb();
     seedAccount(db, {
       id: 'a-1',
@@ -47,7 +47,7 @@ describe('SqliteDashboardRepository', () => {
     seedReceipt(db, { id: 'rc-2', valueCents: 45000, status: 'pago' });
     seedReceipt(db, { id: 'rc-3', valueCents: 45000, status: 'pendente' });
 
-    const summary = new SqliteDashboardRepository(db).getSummary();
+    const summary = await new SqliteDashboardRepository(db).getSummary();
 
     expect(summary.balance.incomeCents).toBe(90000);
     expect(summary.balance.paidCents).toBe(100000);
@@ -55,8 +55,8 @@ describe('SqliteDashboardRepository', () => {
     expect(summary.recentPaid.map((p) => p.id)).toEqual(['a-1']);
   });
 
-  test('returns a zeroed summary for an empty ledger', () => {
-    const summary = new SqliteDashboardRepository(createTestDb()).getSummary();
+  test('returns a zeroed summary for an empty ledger', async () => {
+    const summary = await new SqliteDashboardRepository(createTestDb()).getSummary();
     expect(summary.balance).toEqual({ balanceCents: 0, incomeCents: 0, paidCents: 0 });
     expect(summary.recentPaid).toEqual([]);
     expect(summary.maintenances).toEqual([]);

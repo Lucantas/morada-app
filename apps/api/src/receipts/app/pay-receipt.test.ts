@@ -7,11 +7,11 @@ import { payReceipt } from './pay-receipt';
 function fakeRepo(list: Receipt[]): ReceiptRepository {
   const map = new Map(list.map((r) => [r.id, r]));
   return {
-    list: () => [...map.values()],
-    listByResident: (rid) => [...map.values()].filter((r) => r.residentId === rid),
-    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
-    getById: (id) => map.get(id) ?? null,
-    save: (r) => {
+    list: async () => [...map.values()],
+    listByResident: async (rid) => [...map.values()].filter((r) => r.residentId === rid),
+    listByApartment: async (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
+    getById: async (id) => map.get(id) ?? null,
+    save: async (r) => {
       map.set(r.id, r);
       return r;
     },
@@ -28,26 +28,26 @@ const pending: Receipt = {
 };
 
 describe('payReceipt', () => {
-  test('marks the receipt as pago and sets the method', () => {
+  test('marks the receipt as pago and sets the method', async () => {
     const repo = fakeRepo([pending]);
-    const paid = payReceipt(repo, 'r-1', 'pix');
+    const paid = await payReceipt(repo, 'r-1', 'pix');
     expect(paid.status).toBe('pago');
     expect(paid.method).toBe('pix');
-    expect(repo.getById('r-1')).toEqual(paid);
+    expect(await repo.getById('r-1')).toEqual(paid);
   });
 
-  test('does not mutate the original receipt', () => {
+  test('does not mutate the original receipt', async () => {
     const repo = fakeRepo([pending]);
-    payReceipt(repo, 'r-1', 'boleto');
+    await payReceipt(repo, 'r-1', 'boleto');
     expect(pending.status).toBe('pendente');
     expect(pending.method).toBeUndefined();
   });
 
-  test('throws 404 when the receipt is missing', () => {
-    expect(() => payReceipt(fakeRepo([]), 'nope', 'pix')).toThrow(ReceiptNotFoundError);
+  test('throws 404 when the receipt is missing', async () => {
+    await expect(payReceipt(fakeRepo([]), 'nope', 'pix')).rejects.toThrow(ReceiptNotFoundError);
   });
 
-  test('rejects an invalid method', () => {
-    expect(() => payReceipt(fakeRepo([pending]), 'r-1', 'dinheiro')).toThrow(PaymentError);
+  test('rejects an invalid method', async () => {
+    await expect(payReceipt(fakeRepo([pending]), 'r-1', 'dinheiro')).rejects.toThrow(PaymentError);
   });
 });

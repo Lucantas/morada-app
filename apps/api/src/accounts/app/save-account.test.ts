@@ -8,9 +8,9 @@ import { saveAccount } from './save-account';
 function fakeRepo(): AccountRepository {
   const map = new Map<string, Account>();
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (a) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (a) => {
       map.set(a.id, a);
       return a;
     },
@@ -18,9 +18,9 @@ function fakeRepo(): AccountRepository {
 }
 
 describe('saveAccount', () => {
-  test('assigns an id when the draft has none', () => {
+  test('assigns an id when the draft has none', async () => {
     const repo = fakeRepo();
-    const saved = saveAccount(repo, {
+    const saved = await saveAccount(repo, {
       description: 'Energia',
       category: 'Utilidades',
       dateLabel: '2026-07-10',
@@ -28,12 +28,12 @@ describe('saveAccount', () => {
       status: 'pendente',
     });
     expect(saved.id).toMatch(/.+/);
-    expect(getAccount(repo, saved.id)).toEqual(saved);
+    expect(await getAccount(repo, saved.id)).toEqual(saved);
   });
 
-  test('keeps an existing id', () => {
+  test('keeps an existing id', async () => {
     const repo = fakeRepo();
-    const saved = saveAccount(repo, {
+    const saved = await saveAccount(repo, {
       id: 'a-1',
       description: 'Água',
       category: 'Utilidades',
@@ -44,8 +44,8 @@ describe('saveAccount', () => {
     expect(saved.id).toBe('a-1');
   });
 
-  test('rejects an empty description', () => {
-    expect(() =>
+  test('rejects an empty description', async () => {
+    await expect(
       saveAccount(fakeRepo(), {
         description: '',
         category: 'Utilidades',
@@ -53,14 +53,14 @@ describe('saveAccount', () => {
         valueCents: 3000,
         status: 'pendente',
       }),
-    ).toThrow(AccountValidationError);
+    ).rejects.toThrow(AccountValidationError);
   });
 });
 
 describe('getAccount', () => {
-  test('throws with status 404 when missing', () => {
+  test('throws with status 404 when missing', async () => {
     try {
-      getAccount(fakeRepo(), 'nope');
+      await getAccount(fakeRepo(), 'nope');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);

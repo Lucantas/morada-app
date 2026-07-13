@@ -6,9 +6,9 @@ import { listAccounts } from './list-accounts';
 function fakeRepo(list: Account[]): AccountRepository {
   const map = new Map(list.map((a) => [a.id, a]));
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (a) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (a) => {
       map.set(a.id, a);
       return a;
     },
@@ -26,12 +26,12 @@ const build = (over: Partial<Account>): Account => ({
 });
 
 describe('listAccounts', () => {
-  test('returns accounts in insertion order', () => {
+  test('returns accounts in insertion order', async () => {
     const repo = fakeRepo([
       build({ id: 'b', description: 'Bruno' }),
       build({ id: 'a', description: 'Ana' }),
       build({ id: 'c', description: 'Carla' }),
     ]);
-    expect(listAccounts(repo).map((a) => a.description)).toEqual(['Bruno', 'Ana', 'Carla']);
+    expect((await listAccounts(repo)).map((a) => a.description)).toEqual(['Bruno', 'Ana', 'Carla']);
   });
 });

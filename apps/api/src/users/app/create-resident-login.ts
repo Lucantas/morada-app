@@ -20,7 +20,7 @@ const inputSchema = z.object({
 
 /** Confirms the target resident exists (compose wires this to the resident repo)
  *  so a login can't be provisioned for a dangling or mistyped resident id. */
-export type ResidentGuard = (residentId: string) => boolean;
+export type ResidentGuard = (residentId: string) => Promise<boolean>;
 
 export async function createResidentLogin(
   repo: UserRepository,
@@ -32,9 +32,9 @@ export async function createResidentLogin(
   if (!parsed.success) throw new UserValidationError('Dados de acesso inválidos');
   const { username, password, residentId } = parsed.data;
 
-  if (!residentExists(residentId)) throw new UnknownResidentError(residentId);
-  if (repo.existsByUsername(username)) throw new UsernameTakenError(username);
-  if (repo.existsByResidentId(residentId)) throw new ResidentLoginExistsError(residentId);
+  if (!(await residentExists(residentId))) throw new UnknownResidentError(residentId);
+  if (await repo.existsByUsername(username)) throw new UsernameTakenError(username);
+  if (await repo.existsByResidentId(residentId)) throw new ResidentLoginExistsError(residentId);
 
   const user = userSchema.parse({
     id: randomUUID(),

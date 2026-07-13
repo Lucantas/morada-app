@@ -86,11 +86,16 @@ export function buildApp(db: Db) {
   api.post('/users', requireRole('admin'), async (c) => {
     const { username, residentId } = provisionSchema.parse(await c.req.json());
     const tempPassword = generateTempPassword();
-    const user = await createResidentLogin(users, hasher, (id) => residents.getById(id) !== null, {
-      username,
-      password: tempPassword,
-      residentId,
-    });
+    const user = await createResidentLogin(
+      users,
+      hasher,
+      async (id) => (await residents.getById(id)) !== null,
+      {
+        username,
+        password: tempPassword,
+        residentId,
+      },
+    );
     return c.json(
       { id: user.id, username: user.username, residentId: user.residentId, tempPassword },
       201,
@@ -99,7 +104,7 @@ export function buildApp(db: Db) {
 
   // A resident reads their own record by their JWT subject (before the
   // admin-only group below, which would otherwise 403 this).
-  api.get('/residents/me', (c) => c.json(getResident(residents, c.get('sub'))));
+  api.get('/residents/me', async (c) => c.json(await getResident(residents, c.get('sub'))));
 
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents)));
@@ -108,15 +113,15 @@ export function buildApp(db: Db) {
   // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
   api.post('/receipts', requireRole('admin'), async (c) =>
     c.json(
-      createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
+      await createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
       201,
     ),
   );
 
   // Admin: an apartment's full receipt ledger, across every resident who has
   // occupied it (the resident-facing view stays scoped to their own receipts).
-  api.get('/apartments/:id/receipts', requireRole('admin'), (c) =>
-    c.json(receipts.listByApartment(c.req.param('id'))),
+  api.get('/apartments/:id/receipts', requireRole('admin'), async (c) =>
+    c.json(await receipts.listByApartment(c.req.param('id'))),
   );
 
   // Any authenticated user (reads are scoped to the caller inside the routes).
@@ -134,8 +139,8 @@ export function buildApp(db: Db) {
   api.on('GET', '/threads', requireRole('admin'));
   api.route(
     '/threads',
-    threadRoutes(threads, (id) => {
-      const resident = residents.getById(id);
+    threadRoutes(threads, async (id) => {
+      const resident = await residents.getById(id);
       return resident ? { name: resident.name, apt: resident.apt } : null;
     }),
   );

@@ -16,11 +16,11 @@ const summary: DashboardSummary = {
 };
 
 function fakeRepo(value: DashboardSummary): DashboardRepository {
-  return { getSummary: () => value };
+  return { getSummary: async () => value };
 }
 
 describe('getDashboardSummary', () => {
-  test('returns the summary from the repository', () => {
-    expect(getDashboardSummary(fakeRepo(summary))).toEqual(summary);
+  test('returns the summary from the repository', async () => {
+    expect(await getDashboardSummary(fakeRepo(summary))).toEqual(summary);
   });
 });

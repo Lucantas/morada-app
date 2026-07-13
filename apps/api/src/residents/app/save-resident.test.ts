@@ -8,19 +8,19 @@ import { saveResident } from './save-resident';
 function fakeRepo(): ResidentRepository {
   const map = new Map<string, Resident>();
   return {
-    list: () => [...map.values()].filter((r) => r.active),
-    getById: (id) => map.get(id) ?? null,
-    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
-    apartmentOf: (id) => {
+    list: async () => [...map.values()].filter((r) => r.active),
+    getById: async (id) => map.get(id) ?? null,
+    listByApartment: async (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
+    apartmentOf: async (id) => {
       const r = map.get(id);
       return r ? { apartmentId: r.apartmentId, apt: r.apt } : null;
     },
-    save: (input) => {
+    save: async (input) => {
       const resident: Resident = { ...input, apartmentId: `ap-${input.apt}`, active: true };
       map.set(input.id, resident);
       return resident;
     },
-    deactivate: (id) => {
+    deactivate: async (id) => {
       const r = map.get(id);
       if (r) map.set(id, { ...r, active: false });
     },
@@ -28,9 +28,9 @@ function fakeRepo(): ResidentRepository {
 }
 
 describe('saveResident', () => {
-  test('assigns an id when the draft has none', () => {
+  test('assigns an id when the draft has none', async () => {
     const repo = fakeRepo();
-    const saved = saveResident(repo, {
+    const saved = await saveResident(repo, {
       name: 'Maria',
       apt: 'Apto 302',
       phone: '',
@@ -38,12 +38,12 @@ describe('saveResident', () => {
       status: 'em_dia',
     });
     expect(saved.id).toMatch(/.+/);
-    expect(getResident(repo, saved.id)).toEqual(saved);
+    expect(await getResident(repo, saved.id)).toEqual(saved);
   });
 
-  test('keeps an existing id', () => {
+  test('keeps an existing id', async () => {
     const repo = fakeRepo();
-    const saved = saveResident(repo, {
+    const saved = await saveResident(repo, {
       id: 'r-1',
       name: 'X',
       apt: 'A',
@@ -54,17 +54,17 @@ describe('saveResident', () => {
     expect(saved.id).toBe('r-1');
   });
 
-  test('rejects an empty name', () => {
-    expect(() =>
+  test('rejects an empty name', async () => {
+    await expect(
       saveResident(fakeRepo(), { name: '', apt: 'A', phone: '', email: '', status: 'em_dia' }),
-    ).toThrow(ResidentValidationError);
+    ).rejects.toThrow(ResidentValidationError);
   });
 });
 
 describe('getResident', () => {
-  test('throws with status 404 when missing', () => {
+  test('throws with status 404 when missing', async () => {
     try {
-      getResident(fakeRepo(), 'nope');
+      await getResident(fakeRepo(), 'nope');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);

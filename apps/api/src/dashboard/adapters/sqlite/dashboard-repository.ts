@@ -26,7 +26,7 @@ interface ReceiptRow {
 export class SqliteDashboardRepository implements DashboardRepository {
   constructor(private readonly db: Db) {}
 
-  getSummary(): DashboardSummary {
+  async getSummary(): Promise<DashboardSummary> {
     const accounts: LedgerAccount[] = this.db
       .prepare('SELECT id, description, category, date_label, value_cents, status FROM accounts')
       .all()

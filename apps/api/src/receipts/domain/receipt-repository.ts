@@ -1,9 +1,9 @@
 import type { Receipt } from './receipt';
 
 export interface ReceiptRepository {
-  list(): Receipt[];
-  listByResident(residentId: string): Receipt[];
-  listByApartment(apartmentId: string): Receipt[];
-  getById(id: string): Receipt | null;
-  save(receipt: Receipt): Receipt;
+  list(): Promise<Receipt[]>;
+  listByResident(residentId: string): Promise<Receipt[]>;
+  listByApartment(apartmentId: string): Promise<Receipt[]>;
+  getById(id: string): Promise<Receipt | null>;
+  save(receipt: Receipt): Promise<Receipt>;
 }

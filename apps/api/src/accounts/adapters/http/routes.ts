@@ -10,19 +10,19 @@ import type { AccountRepository } from '../../domain/account-repository';
 export function accountRoutes(repo: AccountRepository) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/', (c) => c.json(listAccounts(repo)));
+  app.get('/', async (c) => c.json(await listAccounts(repo)));
 
-  app.get('/:id', (c) => c.json(getAccount(repo, c.req.param('id'))));
+  app.get('/:id', async (c) => c.json(await getAccount(repo, c.req.param('id'))));
 
   app.post('/', async (c) => {
     const draft = accountDraftSchema.parse(await c.req.json());
     // POST always creates: ignore any client-supplied id so it can't overwrite.
-    return c.json(saveAccount(repo, { ...draft, id: undefined }), 201);
+    return c.json(await saveAccount(repo, { ...draft, id: undefined }), 201);
   });
 
   app.put('/:id', async (c) => {
     const draft = accountDraftSchema.parse({ ...(await c.req.json()), id: c.req.param('id') });
-    return c.json(saveAccount(repo, draft));
+    return c.json(await saveAccount(repo, draft));
   });
 
   return app;

@@ -1,8 +1,8 @@
 import type { Notice } from './notice';
 
 export interface NoticeRepository {
-  list(): Notice[];
-  getById(id: string): Notice | null;
-  save(notice: Notice): Notice;
-  remove(id: string): void;
+  list(): Promise<Notice[]>;
+  getById(id: string): Promise<Notice | null>;
+  save(notice: Notice): Promise<Notice>;
+  remove(id: string): Promise<void>;
 }

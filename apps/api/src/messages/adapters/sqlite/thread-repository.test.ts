@@ -13,7 +13,7 @@ const build = (over: Partial<Thread>): Thread => ({
 });
 
 describe('SqliteThreadRepository', () => {
-  test('save then getById round-trips including messages and unread', () => {
+  test('save then getById round-trips including messages and unread', async () => {
     const repo = new SqliteThreadRepository(createTestDb());
     const thread = build({
       id: 't-1',
@@ -21,28 +21,28 @@ describe('SqliteThreadRepository', () => {
       messages: [{ id: 'm-1', author: 'resident', text: 'Oi', dateLabel: 'Agora' }],
     });
 
-    repo.save(thread);
+    await repo.save(thread);
 
-    expect(repo.getById('t-1')).toEqual(thread);
+    expect(await repo.getById('t-1')).toEqual(thread);
   });
 
-  test('save upserts on conflicting id', () => {
+  test('save upserts on conflicting id', async () => {
     const repo = new SqliteThreadRepository(createTestDb());
-    repo.save(build({ id: 't-1', residentName: 'Ana', unread: false }));
-    repo.save(build({ id: 't-1', residentName: 'Ana Paula', unread: true }));
+    await repo.save(build({ id: 't-1', residentName: 'Ana', unread: false }));
+    await repo.save(build({ id: 't-1', residentName: 'Ana Paula', unread: true }));
 
-    expect(repo.list()).toHaveLength(1);
-    expect(repo.getById('t-1')?.residentName).toBe('Ana Paula');
-    expect(repo.getById('t-1')?.unread).toBe(true);
+    expect(await repo.list()).toHaveLength(1);
+    expect((await repo.getById('t-1'))?.residentName).toBe('Ana Paula');
+    expect((await repo.getById('t-1'))?.unread).toBe(true);
   });
 
-  test('persists appended messages', () => {
+  test('persists appended messages', async () => {
     const repo = new SqliteThreadRepository(createTestDb());
-    repo.save(build({ id: 't-1', messages: [] }));
+    await repo.save(build({ id: 't-1', messages: [] }));
 
-    const stored = repo.getById('t-1');
+    const stored = await repo.getById('t-1');
     if (!stored) throw new Error('thread should exist');
-    repo.save({
+    await repo.save({
       ...stored,
       messages: [
         ...stored.messages,
@@ -50,11 +50,11 @@ describe('SqliteThreadRepository', () => {
       ],
     });
 
-    expect(repo.getById('t-1')?.messages).toHaveLength(1);
-    expect(repo.getById('t-1')?.messages[0]?.text).toBe('Olá');
+    expect((await repo.getById('t-1'))?.messages).toHaveLength(1);
+    expect((await repo.getById('t-1'))?.messages[0]?.text).toBe('Olá');
   });
 
-  test('getById returns null when missing', () => {
-    expect(new SqliteThreadRepository(createTestDb()).getById('nope')).toBeNull();
+  test('getById returns null when missing', async () => {
+    expect(await new SqliteThreadRepository(createTestDb()).getById('nope')).toBeNull();
   });
 });

@@ -6,11 +6,11 @@ import { getReceipt } from './get-receipt';
 function fakeRepo(list: Receipt[]): ReceiptRepository {
   const map = new Map(list.map((r) => [r.id, r]));
   return {
-    list: () => [...map.values()],
-    listByResident: (rid) => [...map.values()].filter((r) => r.residentId === rid),
-    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
-    getById: (id) => map.get(id) ?? null,
-    save: (r) => {
+    list: async () => [...map.values()],
+    listByResident: async (rid) => [...map.values()].filter((r) => r.residentId === rid),
+    listByApartment: async (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
+    getById: async (id) => map.get(id) ?? null,
+    save: async (r) => {
       map.set(r.id, r);
       return r;
     },
@@ -27,13 +27,13 @@ const receipt: Receipt = {
 };
 
 describe('getReceipt', () => {
-  test('returns the receipt when present', () => {
-    expect(getReceipt(fakeRepo([receipt]), 'r-1')).toEqual(receipt);
+  test('returns the receipt when present', async () => {
+    expect(await getReceipt(fakeRepo([receipt]), 'r-1')).toEqual(receipt);
   });
 
-  test('throws with status 404 when missing', () => {
+  test('throws with status 404 when missing', async () => {
     try {
-      getReceipt(fakeRepo([]), 'nope');
+      await getReceipt(fakeRepo([]), 'nope');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);

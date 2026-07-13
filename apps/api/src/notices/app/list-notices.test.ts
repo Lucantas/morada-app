@@ -6,13 +6,13 @@ import { listNotices } from './list-notices';
 function fakeRepo(list: Notice[]): NoticeRepository {
   const map = new Map(list.map((n) => [n.id, n]));
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (n) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (n) => {
       map.set(n.id, n);
       return n;
     },
-    remove: (id) => {
+    remove: async (id) => {
       map.delete(id);
     },
   };
@@ -30,12 +30,12 @@ const build = (over: Partial<Notice>): Notice => ({
 });
 
 describe('listNotices', () => {
-  test('returns every notice from the repository', () => {
+  test('returns every notice from the repository', async () => {
     const repo = fakeRepo([build({ id: 'a' }), build({ id: 'b' }), build({ id: 'c' })]);
-    expect(listNotices(repo).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+    expect((await listNotices(repo)).map((n) => n.id)).toEqual(['a', 'b', 'c']);
   });
 
-  test('returns an empty array when there are no notices', () => {
-    expect(listNotices(fakeRepo([]))).toEqual([]);
+  test('returns an empty array when there are no notices', async () => {
+    expect(await listNotices(fakeRepo([]))).toEqual([]);
   });
 });

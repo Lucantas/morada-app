@@ -7,7 +7,7 @@ import type { DashboardRepository } from '../../domain/dashboard-repository';
 export function dashboardRoutes(repo: DashboardRepository) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/', (c) => c.json(getDashboardSummary(repo)));
+  app.get('/', async (c) => c.json(await getDashboardSummary(repo)));
 
   return app;
 }

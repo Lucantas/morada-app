@@ -4,13 +4,13 @@ import { EmptyMessageError, ThreadNotFoundError } from '../domain/errors';
 import type { Message, Thread } from '../domain/message';
 import type { ThreadRepository } from '../domain/thread-repository';
 
-export function postMessage(
+export async function postMessage(
   repo: ThreadRepository,
   threadId: string,
   author: Message['author'],
   text: string,
-): Thread {
-  const thread = repo.getById(threadId);
+): Promise<Thread> {
+  const thread = await repo.getById(threadId);
   if (!thread) throw new ThreadNotFoundError(threadId);
   if (text.trim().length === 0) throw new EmptyMessageError();
 

@@ -8,13 +8,13 @@ import { noticeRoutes } from './routes';
 function fakeRepo(list: Notice[] = []): NoticeRepository {
   const map = new Map(list.map((n) => [n.id, n]));
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (n) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (n) => {
       map.set(n.id, n);
       return n;
     },
-    remove: (id) => {
+    remove: async (id) => {
       map.delete(id);
     },
   };
@@ -62,7 +62,7 @@ describe('noticeRoutes', () => {
     expect(res.status).toBe(201);
     const body = (await res.json()) as Notice;
     expect(body.id).toMatch(/.+/);
-    expect(repo.getById(body.id)).not.toBeNull();
+    expect(await repo.getById(body.id)).not.toBeNull();
   });
 
   test('POST /:id/dismiss flips dismissed to true', async () => {
@@ -78,6 +78,6 @@ describe('noticeRoutes', () => {
     const app = mount(repo);
     const res = await app.request('/notices/n-1', { method: 'DELETE' });
     expect(res.status).toBe(204);
-    expect(repo.getById('n-1')).toBeNull();
+    expect(await repo.getById('n-1')).toBeNull();
   });
 });

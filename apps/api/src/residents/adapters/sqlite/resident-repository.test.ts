@@ -13,9 +13,9 @@ const maria = {
 };
 
 describe('SqliteResidentRepository', () => {
-  test('save creates the apartment + active occupancy and getById joins them', () => {
+  test('save creates the apartment + active occupancy and getById joins them', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    const saved = repo.save(maria);
+    const saved = await repo.save(maria);
 
     expect(saved).toMatchObject({
       id: 'r-1',
@@ -24,51 +24,50 @@ describe('SqliteResidentRepository', () => {
       active: true,
     });
     expect(saved.apartmentId).toMatch(/.+/);
-    expect(repo.getById('r-1')).toEqual(saved);
+    expect(await repo.getById('r-1')).toEqual(saved);
   });
 
-  test('reuses the apartment for the same label', () => {
+  test('reuses the apartment for the same label', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    const first = repo.save(maria);
-    repo.deactivate('r-1');
-    const next = repo.save({ ...maria, id: 'r-9', name: 'Ana' });
+    const first = await repo.save(maria);
+    await repo.deactivate('r-1');
+    const next = await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
     expect(next.apartmentId).toBe(first.apartmentId);
   });
 
-  test('rejects a second active resident in the same apartment', () => {
+  test('rejects a second active resident in the same apartment', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    repo.save(maria);
-    expect(() => repo.save({ ...maria, id: 'r-9', name: 'Ana' })).toThrow(ApartmentOccupiedError);
+    await repo.save(maria);
+    await expect(repo.save({ ...maria, id: 'r-9', name: 'Ana' })).rejects.toThrow(
+      ApartmentOccupiedError,
+    );
   });
 
-  test('deactivate frees the apartment for the next occupant', () => {
+  test('deactivate frees the apartment for the next occupant', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    repo.save(maria);
-    repo.deactivate('r-1');
-    const ana = repo.save({ ...maria, id: 'r-9', name: 'Ana' });
+    await repo.save(maria);
+    await repo.deactivate('r-1');
+    const ana = await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
 
     expect(ana.active).toBe(true);
-    expect(repo.getById('r-1')?.active).toBe(false);
-    expect(repo.list().map((r) => r.id)).toEqual(['r-9']); // only the active one
+    expect((await repo.getById('r-1'))?.active).toBe(false);
+    expect((await repo.list()).map((r) => r.id)).toEqual(['r-9']); // only the active one
   });
 
-  test('listByApartment returns the full history of the apartment', () => {
+  test('listByApartment returns the full history of the apartment', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    const mamaria = repo.save(maria);
-    repo.deactivate('r-1');
-    repo.save({ ...maria, id: 'r-9', name: 'Ana' });
+    const mamaria = await repo.save(maria);
+    await repo.deactivate('r-1');
+    await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
 
-    const history = repo
-      .listByApartment(mamaria.apartmentId)
-      .map((r) => r.name)
-      .sort();
+    const history = (await repo.listByApartment(mamaria.apartmentId)).map((r) => r.name).sort();
     expect(history).toEqual(['Ana', 'Maria Ribeiro']);
   });
 
-  test('update keeps the id and occupancy, changing person fields', () => {
+  test('update keeps the id and occupancy, changing person fields', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    repo.save(maria);
-    const updated = repo.save({ ...maria, name: 'Maria R.', status: 'pendente' });
+    await repo.save(maria);
+    const updated = await repo.save({ ...maria, name: 'Maria R.', status: 'pendente' });
 
     expect(updated).toMatchObject({
       id: 'r-1',
@@ -76,16 +75,19 @@ describe('SqliteResidentRepository', () => {
       status: 'pendente',
       active: true,
     });
-    expect(repo.list()).toHaveLength(1);
+    expect(await repo.list()).toHaveLength(1);
   });
 
-  test('apartmentOf resolves the resident apartment', () => {
+  test('apartmentOf resolves the resident apartment', async () => {
     const repo = new SqliteResidentRepository(createTestDb());
-    const saved = repo.save(maria);
-    expect(repo.apartmentOf('r-1')).toEqual({ apartmentId: saved.apartmentId, apt: 'Apto 302' });
+    const saved = await repo.save(maria);
+    expect(await repo.apartmentOf('r-1')).toEqual({
+      apartmentId: saved.apartmentId,
+      apt: 'Apto 302',
+    });
   });
 
-  test('getById returns null when missing', () => {
-    expect(new SqliteResidentRepository(createTestDb()).getById('nope')).toBeNull();
+  test('getById returns null when missing', async () => {
+    expect(await new SqliteResidentRepository(createTestDb()).getById('nope')).toBeNull();
   });
 });

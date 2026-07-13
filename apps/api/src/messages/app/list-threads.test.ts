@@ -10,9 +10,9 @@ import { unreadCount } from './unread-count';
 function fakeRepo(list: Thread[]): ThreadRepository {
   const map = new Map(list.map((t) => [t.id, t]));
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (t) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (t) => {
       map.set(t.id, t);
       return t;
     },
@@ -29,20 +29,20 @@ const build = (over: Partial<Thread>): Thread => ({
 });
 
 describe('listThreads', () => {
-  test('returns threads sorted by resident name', () => {
+  test('returns threads sorted by resident name', async () => {
     const repo = fakeRepo([
       build({ id: 'b', residentName: 'Bruno' }),
       build({ id: 'a', residentName: 'Ana' }),
       build({ id: 'c', residentName: 'Carla' }),
     ]);
-    expect(listThreads(repo).map((t) => t.residentName)).toEqual(['Ana', 'Bruno', 'Carla']);
+    expect((await listThreads(repo)).map((t) => t.residentName)).toEqual(['Ana', 'Bruno', 'Carla']);
   });
 });
 
 describe('getThread', () => {
-  test('throws with status 404 when missing', () => {
+  test('throws with status 404 when missing', async () => {
     try {
-      getThread(fakeRepo([]), 'nope');
+      await getThread(fakeRepo([]), 'nope');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);
@@ -51,11 +51,11 @@ describe('getThread', () => {
 });
 
 describe('postMessage', () => {
-  test('appends a message immutably', () => {
+  test('appends a message immutably', async () => {
     const original = build({ id: 't-1', messages: [] });
     const repo = fakeRepo([original]);
 
-    const updated = postMessage(repo, 't-1', 'admin', 'Olá');
+    const updated = await postMessage(repo, 't-1', 'admin', 'Olá');
 
     expect(original.messages).toHaveLength(0);
     expect(updated.messages).toHaveLength(1);
@@ -63,29 +63,29 @@ describe('postMessage', () => {
     expect(updated.messages[0]?.id).toMatch(/.+/);
   });
 
-  test('marks unread when the author is a resident', () => {
+  test('marks unread when the author is a resident', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: false })]);
-    expect(postMessage(repo, 't-1', 'resident', 'Oi').unread).toBe(true);
+    expect((await postMessage(repo, 't-1', 'resident', 'Oi')).unread).toBe(true);
   });
 
-  test('clears unread when the author is an admin', () => {
+  test('clears unread when the author is an admin', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: true })]);
-    expect(postMessage(repo, 't-1', 'admin', 'Resposta').unread).toBe(false);
+    expect((await postMessage(repo, 't-1', 'admin', 'Resposta')).unread).toBe(false);
   });
 
-  test('rejects empty text', () => {
+  test('rejects empty text', async () => {
     const repo = fakeRepo([build({ id: 't-1' })]);
     try {
-      postMessage(repo, 't-1', 'admin', '   ');
+      await postMessage(repo, 't-1', 'admin', '   ');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(400);
     }
   });
 
-  test('throws 404 when the thread is missing', () => {
+  test('throws 404 when the thread is missing', async () => {
     try {
-      postMessage(fakeRepo([]), 'nope', 'admin', 'Oi');
+      await postMessage(fakeRepo([]), 'nope', 'admin', 'Oi');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);
@@ -94,9 +94,9 @@ describe('postMessage', () => {
 });
 
 describe('markRead', () => {
-  test('clears the unread flag', () => {
+  test('clears the unread flag', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: true })]);
-    expect(markRead(repo, 't-1').unread).toBe(false);
+    expect((await markRead(repo, 't-1')).unread).toBe(false);
   });
 });
 

@@ -28,17 +28,17 @@ function toAccount(row: unknown): Account {
 export class SqliteAccountRepository implements AccountRepository {
   constructor(private readonly db: Db) {}
 
-  list(): Account[] {
+  async list(): Promise<Account[]> {
     const rows = this.db.prepare(`SELECT ${COLUMNS} FROM accounts`).all();
     return rows.map(toAccount);
   }
 
-  getById(id: string): Account | null {
+  async getById(id: string): Promise<Account | null> {
     const row = this.db.prepare(`SELECT ${COLUMNS} FROM accounts WHERE id = ?`).get(id);
     return row ? toAccount(row) : null;
   }
 
-  save(account: Account): Account {
+  async save(account: Account): Promise<Account> {
     this.db
       .prepare(
         `INSERT INTO accounts (${COLUMNS})

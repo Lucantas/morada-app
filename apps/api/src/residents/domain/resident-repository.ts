@@ -2,13 +2,13 @@ import type { Resident } from './resident';
 
 export interface ResidentRepository {
   /** Active occupants (one per apartment), each joined with their apartment. */
-  list(): Resident[];
+  list(): Promise<Resident[]>;
   /** Any resident (active or moved out) with their apartment. */
-  getById(id: string): Resident | null;
+  getById(id: string): Promise<Resident | null>;
   /** Every resident who has occupied an apartment — the apartment's history. */
-  listByApartment(apartmentId: string): Resident[];
+  listByApartment(apartmentId: string): Promise<Resident[]>;
   /** The apartment a resident occupies (for scoping receipts). */
-  apartmentOf(residentId: string): { apartmentId: string; apt: string } | null;
+  apartmentOf(residentId: string): Promise<{ apartmentId: string; apt: string } | null>;
   /** Create (find-or-create the apartment + active occupancy) or update a resident. */
   save(input: {
     id: string;
@@ -17,7 +17,7 @@ export interface ResidentRepository {
     phone: string;
     email: string;
     status: Resident['status'];
-  }): Resident;
+  }): Promise<Resident>;
   /** Mark a resident as moved out, freeing their apartment for the next occupant. */
-  deactivate(id: string): void;
+  deactivate(id: string): Promise<void>;
 }

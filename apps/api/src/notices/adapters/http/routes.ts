@@ -10,17 +10,17 @@ import type { NoticeRepository } from '../../domain/notice-repository';
 export function noticeRoutes(repo: NoticeRepository) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/', (c) => c.json(listNotices(repo)));
+  app.get('/', async (c) => c.json(await listNotices(repo)));
 
   app.post('/', async (c) => {
     const draft = noticeDraftSchema.parse(await c.req.json());
-    return c.json(createNotice(repo, draft), 201);
+    return c.json(await createNotice(repo, draft), 201);
   });
 
-  app.post('/:id/dismiss', (c) => c.json(dismissNotice(repo, c.req.param('id'))));
+  app.post('/:id/dismiss', async (c) => c.json(await dismissNotice(repo, c.req.param('id'))));
 
-  app.delete('/:id', (c) => {
-    repo.remove(c.req.param('id'));
+  app.delete('/:id', async (c) => {
+    await repo.remove(c.req.param('id'));
     return c.body(null, 204);
   });
 

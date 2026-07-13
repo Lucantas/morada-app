@@ -12,7 +12,7 @@ const summary: DashboardSummary = {
 };
 
 function fakeRepo(value: DashboardSummary): DashboardRepository {
-  return { getSummary: () => value };
+  return { getSummary: async () => value };
 }
 
 describe('dashboardRoutes', () => {

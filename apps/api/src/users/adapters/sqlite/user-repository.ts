@@ -24,7 +24,7 @@ function toUser(row: unknown): User {
 export class SqliteUserRepository implements UserRepository {
   constructor(private readonly db: Db) {}
 
-  findByUsername(username: string): User | null {
+  async findByUsername(username: string): Promise<User | null> {
     const row = this.db
       .prepare(
         'SELECT id, username, password_hash, role, resident_id FROM users WHERE username = ?',
@@ -33,17 +33,17 @@ export class SqliteUserRepository implements UserRepository {
     return row ? toUser(row) : null;
   }
 
-  existsByUsername(username: string): boolean {
+  async existsByUsername(username: string): Promise<boolean> {
     const row = this.db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
     return row !== undefined;
   }
 
-  existsByResidentId(residentId: string): boolean {
+  async existsByResidentId(residentId: string): Promise<boolean> {
     const row = this.db.prepare('SELECT 1 FROM users WHERE resident_id = ?').get(residentId);
     return row !== undefined;
   }
 
-  save(user: User): User {
+  async save(user: User): Promise<User> {
     this.db
       .prepare(
         `INSERT INTO users (id, username, password_hash, role, resident_id)

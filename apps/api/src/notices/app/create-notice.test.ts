@@ -7,13 +7,13 @@ import { createNotice } from './create-notice';
 function fakeRepo(): NoticeRepository {
   const map = new Map<string, Notice>();
   return {
-    list: () => [...map.values()],
-    getById: (id) => map.get(id) ?? null,
-    save: (n) => {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (n) => {
       map.set(n.id, n);
       return n;
     },
-    remove: (id) => {
+    remove: async (id) => {
       map.delete(id);
     },
   };
@@ -28,26 +28,30 @@ const draft = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('createNotice', () => {
-  test('assigns an id, defaults dateLabel to Agora and dismissed to false', () => {
+  test('assigns an id, defaults dateLabel to Agora and dismissed to false', async () => {
     const repo = fakeRepo();
-    const saved = createNotice(repo, draft());
+    const saved = await createNotice(repo, draft());
     expect(saved.id).toMatch(/.+/);
     expect(saved.dateLabel).toBe('Agora');
     expect(saved.dismissed).toBe(false);
-    expect(repo.getById(saved.id)).toEqual(saved);
+    expect(await repo.getById(saved.id)).toEqual(saved);
   });
 
-  test('keeps a provided id and dateLabel', () => {
-    const saved = createNotice(fakeRepo(), draft({ id: 'n-1', dateLabel: 'Ontem' }));
+  test('keeps a provided id and dateLabel', async () => {
+    const saved = await createNotice(fakeRepo(), draft({ id: 'n-1', dateLabel: 'Ontem' }));
     expect(saved.id).toBe('n-1');
     expect(saved.dateLabel).toBe('Ontem');
   });
 
-  test('rejects an empty title', () => {
-    expect(() => createNotice(fakeRepo(), draft({ title: '' }))).toThrow(NoticeValidationError);
+  test('rejects an empty title', async () => {
+    await expect(createNotice(fakeRepo(), draft({ title: '' }))).rejects.toThrow(
+      NoticeValidationError,
+    );
   });
 
-  test('rejects an empty body', () => {
-    expect(() => createNotice(fakeRepo(), draft({ body: '' }))).toThrow(NoticeValidationError);
+  test('rejects an empty body', async () => {
+    await expect(createNotice(fakeRepo(), draft({ body: '' }))).rejects.toThrow(
+      NoticeValidationError,
+    );
   });
 });

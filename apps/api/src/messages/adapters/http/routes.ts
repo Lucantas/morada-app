@@ -16,7 +16,9 @@ const postMessageSchema = z.object({ text: z.string().min(1).max(2000) });
 
 // Resolves the resident behind a thread id, so a thread can be materialised
 // on demand with the resident's real name/apt (a resident's thread id is their id).
-export type ThreadResidentLookup = (residentId: string) => { name: string; apt: string } | null;
+export type ThreadResidentLookup = (
+  residentId: string,
+) => Promise<{ name: string; apt: string } | null>;
 
 /**
  * A resident may only touch their own thread (their JWT `sub`). Admins are
@@ -37,37 +39,37 @@ export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResid
 
   // A thread is created lazily the first time it is opened/written, so residents
   // start with an empty conversation rather than a 404.
-  function loadOrEmpty(id: string): Thread {
-    const existing = repo.getById(id);
+  async function loadOrEmpty(id: string): Promise<Thread> {
+    const existing = await repo.getById(id);
     if (existing) return existing;
-    const resident = residentLookup(id);
+    const resident = await residentLookup(id);
     if (!resident) throw new ThreadNotFoundError(id);
     return { id, residentName: resident.name, apt: resident.apt, unread: false, messages: [] };
   }
 
-  app.get('/', (c) => c.json(listThreads(repo)));
+  app.get('/', async (c) => c.json(await listThreads(repo)));
 
-  app.get('/:id', (c) => {
+  app.get('/:id', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
-    return denied ?? c.json(loadOrEmpty(id));
+    return denied ?? c.json(await loadOrEmpty(id));
   });
 
   app.post('/:id/messages', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
-    if (!repo.getById(id)) repo.save(loadOrEmpty(id));
+    if (!(await repo.getById(id))) await repo.save(await loadOrEmpty(id));
     const { text } = postMessageSchema.parse(await c.req.json());
     const author = c.get('role') ?? 'resident';
-    return c.json(postMessage(repo, id, author, text));
+    return c.json(await postMessage(repo, id, author, text));
   });
 
-  app.post('/:id/read', (c) => {
+  app.post('/:id/read', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
-    return c.json(repo.getById(id) ? markRead(repo, id) : loadOrEmpty(id));
+    return c.json((await repo.getById(id)) ? await markRead(repo, id) : await loadOrEmpty(id));
   });
 
   return app;
