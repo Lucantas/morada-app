@@ -16,6 +16,7 @@ const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
 const apiClient = createApiClient({
   baseUrl: apiUrl,
   getToken: () => useSessionStore.getState().token,
+  onUnauthorized: () => useSessionStore.getState().signOut(),
 });
 
 export const residentRepository = new HttpResidentRepository(apiClient);
