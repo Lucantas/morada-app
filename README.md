@@ -22,21 +22,22 @@ or UI changes.
 ```bash
 make install         # deps + git hooks
 
-# Offline demo (seeded in-memory, no backend):
-make dev             # web on :5173
+# Full stack (one command):
+make start           # API on :8787 + web on :5173 wired to it (Ctrl-C stops both)
 
-# Full stack (two shells):
-make dev-api         # API on :8787 (creates + seeds morada.db)
-make dev-web         # web on :5173 pointed at the API (real login)
+# Or run the pieces separately:
+make start-backend   # API on :8787 (creates + seeds morada.db)
+make start-app       # web on :5173 pointed at the live API (real login)
+make dev             # web on :5173 offline (seeded in-memory, no backend)
 
 # Gates:
 make check           # web: typecheck + lint(boundaries) + prettier + coverage
-make check-api       # api: typecheck + lint(boundaries) + coverage
+make api-check       # api: typecheck + lint(boundaries) + coverage
 ```
 
-Log in by picking a role (Administrador / Morador). See
-[apps/api/README.md](apps/api/README.md) for the auth model and its demo-only
-caveats.
+Log in with a username and password. See
+[apps/api/README.md](apps/api/README.md) for the auth model and the seeded demo
+logins.
 
 ## Docs
 

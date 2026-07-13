@@ -62,6 +62,7 @@ Monorepo (pnpm workspaces): `apps/web` is the app. Run commands as
 
 ## Commands
 
-- `make dev` — Vite dev server
-- `make test` / `make coverage` — Jest (gate = 80%)
-- `make typecheck` · `make lint` · `make check` (everything the hooks run)
+- `make start` — full stack (API :8787 + web :5173 wired to it); `make start-backend` /
+  `make start-app` run the pieces; `make dev` runs the web offline (in-memory)
+- `make test` / `make coverage` — web Jest (gate = 80%); `make api-test` for the API
+- `make check` — every web gate (hooks); `make api-check` — every API gate
