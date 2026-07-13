@@ -8,7 +8,7 @@ API_URL = http://localhost:$(API_PORT)
 WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 
-.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check
+.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down api-test-pg
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -74,3 +74,14 @@ api-lint: ## Run ESLint on the API (includes architecture boundaries)
 	$(API) lint
 
 api-check: api-typecheck api-lint api-test ## Run every API gate
+
+DB_URL ?= postgres://morada:morada@localhost:5433/morada
+
+db-up: ## Start the local Postgres (docker compose) used by the pg adapter tests
+	docker compose up -d --wait
+
+db-down: ## Stop the local Postgres
+	docker compose down
+
+api-test-pg: ## Run the Postgres adapter contract tests against the local Postgres
+	DATABASE_URL=$(DB_URL) $(API) test:pg

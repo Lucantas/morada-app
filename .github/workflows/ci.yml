@@ -30,6 +30,20 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: morada
+          POSTGRES_PASSWORD: morada
+          POSTGRES_DB: morada
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U morada -d morada"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -41,3 +55,6 @@ jobs:
       - run: pnpm --filter @morada/api typecheck
       - run: pnpm --filter @morada/api lint
       - run: pnpm --filter @morada/api test:coverage
+      - run: pnpm --filter @morada/api test:pg
+        env:
+          DATABASE_URL: postgres://morada:morada@localhost:5433/morada

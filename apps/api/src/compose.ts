@@ -41,7 +41,11 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   const { residents, accounts, receipts, notices, threads, dashboard, users } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
-  await seedAdmin(users, hasher);
+  // The seeded admin uses a weak, public password — never auto-seed it into a
+  // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
+  if (!config.isProduction || process.env.SEED_DEMO_DATA === '1') {
+    await seedAdmin(users, hasher);
+  }
 
   const app = new Hono<ApiEnv>();
   app.onError(onError);
