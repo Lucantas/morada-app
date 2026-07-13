@@ -166,6 +166,24 @@ const receipts = [
     method: null,
     resident_id: 'r-3',
   },
+  // Paid history for the up-to-date residents, so the (live-computed) condo
+  // balance reflects the whole building rather than a single unit.
+  ...['r-2', 'r-4', 'r-6', 'r-7'].flatMap((residentId) =>
+    [
+      { ref: '03/2026', due_label: 'Pago em 08/03/2026', method: 'pix' },
+      { ref: '02/2026', due_label: 'Pago em 07/02/2026', method: 'boleto' },
+      { ref: '01/2026', due_label: 'Pago em 09/01/2026', method: 'pix' },
+    ].map((m) => ({
+      id: `rc-${residentId}-${m.ref.slice(0, 2)}`,
+      ref: m.ref,
+      title: 'Taxa condominial',
+      due_label: m.due_label,
+      value_cents: 45000,
+      status: 'pago',
+      method: m.method,
+      resident_id: residentId,
+    })),
+  ),
 ];
 
 const notices = [
@@ -230,33 +248,6 @@ const threads = [
   },
 ];
 
-const dashboard = {
-  id: 'current',
-  data: JSON.stringify({
-    balance: { balanceCents: 1248000, incomeCents: 836000, paidCents: 412000 },
-    recentPaid: [
-      {
-        id: 'p-1',
-        label: 'Conta de água — abril',
-        dateLabel: 'Paga em 05/04',
-        valueCents: 124000,
-        icon: 'water',
-      },
-      {
-        id: 'p-2',
-        label: 'Energia — áreas comuns',
-        dateLabel: 'Paga em 03/04',
-        valueCents: 89000,
-        icon: 'bolt',
-      },
-    ],
-    maintenances: [
-      { id: 'm-1', title: "Bomba d'água", detail: 'Reparo · 28/03', icon: 'wrench' },
-      { id: 'm-2', title: 'Pintura do hall', detail: 'Concluída · 20/03', icon: 'building2' },
-    ],
-  }),
-};
-
 function isEmpty(db: Db, table: string): boolean {
   const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
   return row.n === 0;
@@ -302,7 +293,6 @@ export function seedDatabase(db: Db): void {
     );
   if (isEmpty(db, 'threads'))
     insertAll(db, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);
-  if (isEmpty(db, 'dashboard')) insertAll(db, 'dashboard', ['id', 'data'], [dashboard]);
   if (isEmpty(db, 'users')) insertAll(db, 'users', USER_COLUMNS, seedUsers());
 }
 
