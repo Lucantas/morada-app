@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: morada-postgres
+    environment:
+      POSTGRES_USER: morada
+      POSTGRES_PASSWORD: morada
+      POSTGRES_DB: morada
+    ports:
+      - '5433:5432'
+    volumes:
+      - morada-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U morada -d morada']
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  morada-pgdata:
