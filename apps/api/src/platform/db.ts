@@ -50,6 +50,18 @@ export function createDb(path: string): Db {
   return db;
 }
 
+const openTestDbs = new Set<Db>();
+
 export function createTestDb(): Db {
-  return createDb(':memory:');
+  const db = createDb(':memory:');
+  openTestDbs.add(db);
+  return db;
+}
+
+// Frees each test's in-memory connection at a safe point (an afterEach). Left
+// open, better-sqlite3 handles pile up and finalise via GC at unpredictable
+// moments — a native-addon flake that coverage instrumentation makes worse.
+export function closeTestDbs(): void {
+  for (const db of openTestDbs) if (db.open) db.close();
+  openTestDbs.clear();
 }

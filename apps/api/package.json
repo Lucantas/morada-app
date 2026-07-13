@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:pg": "jest --config jest.pg.config.cjs --runInBand"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
