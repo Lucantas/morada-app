@@ -13,3 +13,11 @@ export class ResidentValidationError extends Error {
     this.name = 'ResidentValidationError';
   }
 }
+
+export class ApartmentOccupiedError extends Error {
+  readonly status = 409;
+  constructor(apt: string) {
+    super(`O apartamento já tem um morador ativo: ${apt}`);
+    this.name = 'ApartmentOccupiedError';
+  }
+}

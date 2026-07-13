@@ -1,7 +1,23 @@
 import type { Resident } from './resident';
 
 export interface ResidentRepository {
+  /** Active occupants (one per apartment), each joined with their apartment. */
   list(): Resident[];
+  /** Any resident (active or moved out) with their apartment. */
   getById(id: string): Resident | null;
-  save(resident: Resident): Resident;
+  /** Every resident who has occupied an apartment — the apartment's history. */
+  listByApartment(apartmentId: string): Resident[];
+  /** The apartment a resident occupies (for scoping receipts). */
+  apartmentOf(residentId: string): { apartmentId: string; apt: string } | null;
+  /** Create (find-or-create the apartment + active occupancy) or update a resident. */
+  save(input: {
+    id: string;
+    name: string;
+    apt: string;
+    phone: string;
+    email: string;
+    status: Resident['status'];
+  }): Resident;
+  /** Mark a resident as moved out, freeing their apartment for the next occupant. */
+  deactivate(id: string): void;
 }

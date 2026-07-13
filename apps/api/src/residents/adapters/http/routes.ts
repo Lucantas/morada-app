@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
+import { deactivateResident } from '../../app/deactivate-resident';
 import { getResident } from '../../app/get-resident';
 import { listResidents } from '../../app/list-residents';
 import { saveResident } from '../../app/save-resident';
@@ -23,6 +24,12 @@ export function residentRoutes(repo: ResidentRepository) {
   app.put('/:id', async (c) => {
     const draft = residentDraftSchema.parse({ ...(await c.req.json()), id: c.req.param('id') });
     return c.json(saveResident(repo, draft));
+  });
+
+  // Move-out: free the apartment for the next occupant (history preserved).
+  app.post('/:id/deactivate', (c) => {
+    deactivateResident(repo, c.req.param('id'));
+    return c.body(null, 204);
   });
 
   return app;

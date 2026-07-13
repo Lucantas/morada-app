@@ -147,19 +147,75 @@ describe('Morada API — real credentials', () => {
   });
 });
 
+async function adminAuthFor(app: ReturnType<typeof buildApp>) {
+  const token = await tokenFor(app, adminCredentials);
+  return (path: string, init: RequestInit = {}) =>
+    app.request(path, {
+      ...init,
+      headers: {
+        ...(init.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+}
+
+describe('Morada API — apartments & occupancy', () => {
+  const resident = (apt: string, name: string) =>
+    JSON.stringify({ name, apt, phone: '', email: '', status: 'em_dia' });
+
+  test('rejects a second active resident in an occupied apartment (409)', async () => {
+    const app = makeApp();
+    const auth = await adminAuthFor(app);
+    expect(
+      (await auth('/api/residents', { method: 'POST', body: resident('Apto 999', 'A') })).status,
+    ).toBe(201);
+    const second = await auth('/api/residents', {
+      method: 'POST',
+      body: resident('Apto 999', 'B'),
+    });
+    expect(second.status).toBe(409);
+  });
+
+  test('a resident can be moved out, freeing the apartment for the next', async () => {
+    const app = makeApp();
+    const auth = await adminAuthFor(app);
+    const first = await auth('/api/residents', { method: 'POST', body: resident('Apto 888', 'A') });
+    const { id } = (await first.json()) as { id: string };
+
+    expect((await auth(`/api/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
+    // now the apartment is free again
+    const next = await auth('/api/residents', { method: 'POST', body: resident('Apto 888', 'B') });
+    expect(next.status).toBe(201);
+    // the active-residents list shows the new occupant, not the old one
+    const listed = (await (await auth('/api/residents')).json()) as { name: string; apt: string }[];
+    const at888 = listed.filter((r) => r.apt === 'Apto 888');
+    expect(at888.map((r) => r.name)).toEqual(['B']);
+  });
+
+  test("an admin reads an apartment's full receipt ledger", async () => {
+    const app = makeApp();
+    const auth = await adminAuthFor(app);
+    // fixtures seed r-1 (Apto 302) with receipts under apartment apt-r-1
+    const res = await auth('/api/apartments/apt-r-1/receipts');
+    expect(res.status).toBe(200);
+    const receipts = (await res.json()) as { residentId: string }[];
+    expect(receipts.length).toBeGreaterThan(0);
+    expect(receipts.every((r) => r.residentId === 'r-1')).toBe(true);
+  });
+
+  test('the apartment ledger is admin-only', async () => {
+    const app = makeApp();
+    const token = await tokenFor(app, residentCredentials);
+    const res = await app.request('/api/apartments/apt-r-1/receipts', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('Morada API — admin provisions resident logins', () => {
-  async function adminAuth(app: ReturnType<typeof buildApp>) {
-    const token = await tokenFor(app, adminCredentials);
-    return (path: string, init: RequestInit = {}) =>
-      app.request(path, {
-        ...init,
-        headers: {
-          ...(init.headers ?? {}),
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-  }
+  const adminAuth = adminAuthFor;
 
   test('an admin creates a login and the new resident can log in with the temp password', async () => {
     const app = makeApp();

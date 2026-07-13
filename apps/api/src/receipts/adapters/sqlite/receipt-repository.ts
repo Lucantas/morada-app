@@ -2,7 +2,7 @@ import type { Db } from '../../../platform/db';
 import { receiptSchema, type Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
-const COLUMNS = 'id, ref, title, due_label, value_cents, status, method, resident_id';
+const COLUMNS = 'id, ref, title, due_label, value_cents, status, method, resident_id, apartment_id';
 
 interface ReceiptRow {
   id: unknown;
@@ -13,10 +13,12 @@ interface ReceiptRow {
   status: unknown;
   method: unknown;
   resident_id: unknown;
+  apartment_id: unknown;
 }
 
 function toReceipt(row: unknown): Receipt {
-  const { id, ref, title, due_label, value_cents, status, method, resident_id } = row as ReceiptRow;
+  const { id, ref, title, due_label, value_cents, status, method, resident_id, apartment_id } =
+    row as ReceiptRow;
   return receiptSchema.parse({
     id,
     ref,
@@ -26,6 +28,7 @@ function toReceipt(row: unknown): Receipt {
     status,
     method: method ?? undefined,
     residentId: resident_id ?? undefined,
+    apartmentId: apartment_id ?? undefined,
   });
 }
 
@@ -33,15 +36,21 @@ export class SqliteReceiptRepository implements ReceiptRepository {
   constructor(private readonly db: Db) {}
 
   list(): Receipt[] {
-    const rows = this.db.prepare(`SELECT ${COLUMNS} FROM receipts`).all();
-    return rows.map(toReceipt);
+    return this.db.prepare(`SELECT ${COLUMNS} FROM receipts`).all().map(toReceipt);
   }
 
   listByResident(residentId: string): Receipt[] {
-    const rows = this.db
+    return this.db
       .prepare(`SELECT ${COLUMNS} FROM receipts WHERE resident_id = ?`)
-      .all(residentId);
-    return rows.map(toReceipt);
+      .all(residentId)
+      .map(toReceipt);
+  }
+
+  listByApartment(apartmentId: string): Receipt[] {
+    return this.db
+      .prepare(`SELECT ${COLUMNS} FROM receipts WHERE apartment_id = ?`)
+      .all(apartmentId)
+      .map(toReceipt);
   }
 
   getById(id: string): Receipt | null {
@@ -53,13 +62,18 @@ export class SqliteReceiptRepository implements ReceiptRepository {
     this.db
       .prepare(
         `INSERT INTO receipts (${COLUMNS})
-         VALUES (@id, @ref, @title, @dueLabel, @valueCents, @status, @method, @residentId)
+         VALUES (@id, @ref, @title, @dueLabel, @valueCents, @status, @method, @residentId, @apartmentId)
          ON CONFLICT(id) DO UPDATE SET
            ref = @ref, title = @title, due_label = @dueLabel,
            value_cents = @valueCents, status = @status, method = @method,
-           resident_id = @residentId`,
+           resident_id = @residentId, apartment_id = @apartmentId`,
       )
-      .run({ ...receipt, method: receipt.method ?? null, residentId: receipt.residentId ?? null });
+      .run({
+        ...receipt,
+        method: receipt.method ?? null,
+        residentId: receipt.residentId ?? null,
+        apartmentId: receipt.apartmentId ?? null,
+      });
     return receipt;
   }
 }

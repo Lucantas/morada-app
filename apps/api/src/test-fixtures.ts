@@ -5,18 +5,18 @@ import type { Db } from './platform/db';
 import { insertAll } from './seed-data';
 
 // Rich demo data for the test suite ONLY. Production seeds just the admin login
-// (see seed-data.ts); the resident login + residents/accounts/receipts/notices/
-// threads below back the integration tests.
+// (see seed-data.ts). Residents are modelled as person + apartment + occupancy;
+// each apartment id here is `apt-<residentId>` and each occupancy `occ-<residentId>`.
 
-// A pre-provisioned resident login, seeded only for tests (in production the
-// admin creates resident logins in-app).
+// A pre-provisioned resident login, seeded only for tests.
 export const residentCredentials = {
   username: 'maria302',
   password: 'morada-demo',
   residentId: 'r-1',
 } as const;
 
-const residents = [
+// Source data (person + the apartment label they occupy).
+const people = [
   {
     id: 'r-1',
     name: 'Maria Ribeiro',
@@ -75,48 +75,7 @@ const residents = [
   },
 ];
 
-const accounts = [
-  {
-    id: 'a-1',
-    description: 'Água — abril',
-    category: 'Utilidades',
-    date_label: '05/04',
-    value_cents: 124000,
-    status: 'pago',
-  },
-  {
-    id: 'a-2',
-    description: 'Energia — áreas comuns',
-    category: 'Utilidades',
-    date_label: '03/04',
-    value_cents: 89000,
-    status: 'pago',
-  },
-  {
-    id: 'a-3',
-    description: 'Limpeza',
-    category: 'Serviços',
-    date_label: '02/04',
-    value_cents: 150000,
-    status: 'pago',
-  },
-  {
-    id: 'a-4',
-    description: 'Jardinagem',
-    category: 'Serviços',
-    date_label: '12/04',
-    value_cents: 45000,
-    status: 'pendente',
-  },
-  {
-    id: 'a-5',
-    description: 'Reparo portão',
-    category: 'Manutenção',
-    date_label: '15/04',
-    value_cents: 30000,
-    status: 'atrasado',
-  },
-];
+const apartmentId = (residentId: string) => `apt-${residentId}`;
 
 const receipts = [
   {
@@ -185,6 +144,49 @@ const receipts = [
       resident_id: residentId,
     })),
   ),
+].map((r) => ({ ...r, apartment_id: apartmentId(r.resident_id) }));
+
+const accounts = [
+  {
+    id: 'a-1',
+    description: 'Água — abril',
+    category: 'Utilidades',
+    date_label: '05/04',
+    value_cents: 124000,
+    status: 'pago',
+  },
+  {
+    id: 'a-2',
+    description: 'Energia — áreas comuns',
+    category: 'Utilidades',
+    date_label: '03/04',
+    value_cents: 89000,
+    status: 'pago',
+  },
+  {
+    id: 'a-3',
+    description: 'Limpeza',
+    category: 'Serviços',
+    date_label: '02/04',
+    value_cents: 150000,
+    status: 'pago',
+  },
+  {
+    id: 'a-4',
+    description: 'Jardinagem',
+    category: 'Serviços',
+    date_label: '12/04',
+    value_cents: 45000,
+    status: 'pendente',
+  },
+  {
+    id: 'a-5',
+    description: 'Reparo portão',
+    category: 'Manutenção',
+    date_label: '15/04',
+    value_cents: 30000,
+    status: 'atrasado',
+  },
 ];
 
 const notices = [
@@ -250,7 +252,29 @@ const threads = [
 ];
 
 export function seedFixtures(db: Db): void {
-  insertAll(db, 'residents', ['id', 'name', 'apt', 'phone', 'email', 'status'], residents);
+  insertAll(
+    db,
+    'apartments',
+    ['id', 'label'],
+    people.map((p) => ({ id: apartmentId(p.id), label: p.apt })),
+  );
+  insertAll(
+    db,
+    'residents',
+    ['id', 'name', 'phone', 'email', 'status'],
+    people.map(({ id, name, phone, email, status }) => ({ id, name, phone, email, status })),
+  );
+  insertAll(
+    db,
+    'apartment_residents',
+    ['id', 'apartment_id', 'resident_id', 'active'],
+    people.map((p) => ({
+      id: `occ-${p.id}`,
+      apartment_id: apartmentId(p.id),
+      resident_id: p.id,
+      active: 1,
+    })),
+  );
   insertAll(
     db,
     'users',
@@ -274,7 +298,17 @@ export function seedFixtures(db: Db): void {
   insertAll(
     db,
     'receipts',
-    ['id', 'ref', 'title', 'due_label', 'value_cents', 'status', 'method', 'resident_id'],
+    [
+      'id',
+      'ref',
+      'title',
+      'due_label',
+      'value_cents',
+      'status',
+      'method',
+      'resident_id',
+      'apartment_id',
+    ],
     receipts,
   );
   insertAll(

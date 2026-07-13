@@ -6,7 +6,9 @@ import { ChargeResidentNotFoundError, ReceiptValidationError } from '../domain/e
 import { receiptSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
-export type ResidentGuard = (residentId: string) => boolean;
+// Resolves the apartment a resident occupies, so the charge is anchored to both
+// the resident and their apartment. Returns null when the resident is unknown.
+export type ResidentApartmentLookup = (residentId: string) => { apartmentId: string } | null;
 
 const inputSchema = z.object({
   residentId: z.string().min(1).max(64),
@@ -18,14 +20,18 @@ const inputSchema = z.object({
 
 export function createReceipt(
   repo: ReceiptRepository,
-  residentExists: ResidentGuard,
+  residentApartment: ResidentApartmentLookup,
   input: unknown,
 ): Receipt {
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) throw new ReceiptValidationError('Dados da cobrança inválidos');
-  if (!residentExists(parsed.data.residentId)) {
-    throw new ChargeResidentNotFoundError(parsed.data.residentId);
-  }
-  const receipt = receiptSchema.parse({ ...parsed.data, id: randomUUID(), status: 'pendente' });
+  const apartment = residentApartment(parsed.data.residentId);
+  if (!apartment) throw new ChargeResidentNotFoundError(parsed.data.residentId);
+  const receipt = receiptSchema.parse({
+    ...parsed.data,
+    id: randomUUID(),
+    status: 'pendente',
+    apartmentId: apartment.apartmentId,
+  });
   return repo.save(receipt);
 }

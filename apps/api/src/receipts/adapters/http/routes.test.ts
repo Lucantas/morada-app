@@ -11,6 +11,7 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
   return {
     list: () => [...map.values()],
     listByResident: (rid) => [...map.values()].filter((r) => r.residentId === rid),
+    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
     getById: (id) => map.get(id) ?? null,
     save: (r) => {
       map.set(r.id, r);

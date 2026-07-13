@@ -10,12 +10,19 @@ monthly fee, and reads notices. Two roles, one phone-framed UI.
 **Domain vocabulary (use these exact names, never synonyms):**
 
 - `Session` — the logged-in role: `admin` or `resident`
-- `Resident` — a person in an apartment (`Apto`), with a payment status
+- `Apartment` — the stable unit and ledger anchor (`Apto 302`); survives resident
+  turnover. **The apartment is the key, never the resident's name/login.**
+- `Resident` — a person; belongs to an apartment via an `Occupancy`
+- `Occupancy` (`apartment_residents`) — the apartment↔resident link with an
+  `active` flag; **at most one active resident per apartment** (DB-enforced)
 - `Account` — a condominium expense/lançamento (água, energia, …) with a status
-- `Receipt` — a monthly fee charge for a resident (`pago` / `pendente`)
+- `Receipt` — a monthly fee charge tied to an `Apartment` **and** the `Resident`
+  charged (`pago` / `pendente`); listable per-resident (own) or per-apartment (history)
 - `Notice` — a communication the admin sends to residents (`aviso`)
 - `Message` — a resident→admin message in the admin inbox
 - `CondoBalance` — condominium financial summary (saldo, entradas, contas pagas)
+
+See [docs/DATA-MODEL.md](docs/DATA-MODEL.md) for the apartment/resident/occupancy spec.
 
 **Status vocabulary (exact):** `pago` · `pendente` · `atrasado`.
 

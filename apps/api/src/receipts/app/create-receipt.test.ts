@@ -10,6 +10,7 @@ function fakeRepo(): ReceiptRepository & { saved: Receipt[] } {
     saved,
     list: () => saved,
     listByResident: (rid) => saved.filter((r) => r.residentId === rid),
+    listByApartment: (aid) => saved.filter((r) => r.apartmentId === aid),
     getById: (id) => saved.find((r) => r.id === id) ?? null,
     save: (r) => {
       saved.push(r);
@@ -29,30 +30,31 @@ const validInput = {
 describe('createReceipt', () => {
   test('creates a pending receipt for the resident with a generated id', () => {
     const repo = fakeRepo();
-    const receipt = createReceipt(repo, () => true, validInput);
+    const receipt = createReceipt(repo, () => ({ apartmentId: 'ap-1' }), validInput);
 
     expect(receipt.id).toMatch(/.+/);
     expect(receipt.status).toBe('pendente');
     expect(receipt.residentId).toBe('r-1');
+    expect(receipt.apartmentId).toBe('ap-1');
     expect(receipt.valueCents).toBe(45000);
     expect(repo.getById(receipt.id)).toEqual(receipt);
   });
 
   test('rejects a charge for a resident that does not exist', () => {
-    expect(() => createReceipt(fakeRepo(), () => false, validInput)).toThrow(
+    expect(() => createReceipt(fakeRepo(), () => null, validInput)).toThrow(
       ChargeResidentNotFoundError,
     );
   });
 
   test('rejects invalid input', () => {
-    expect(() => createReceipt(fakeRepo(), () => true, { residentId: 'r-1' })).toThrow(
-      ReceiptValidationError,
-    );
+    expect(() =>
+      createReceipt(fakeRepo(), () => ({ apartmentId: 'ap-1' }), { residentId: 'r-1' }),
+    ).toThrow(ReceiptValidationError);
   });
 
   test('rejects a negative value', () => {
-    expect(() => createReceipt(fakeRepo(), () => true, { ...validInput, valueCents: -1 })).toThrow(
-      ReceiptValidationError,
-    );
+    expect(() =>
+      createReceipt(fakeRepo(), () => ({ apartmentId: 'ap-1' }), { ...validInput, valueCents: -1 }),
+    ).toThrow(ReceiptValidationError);
   });
 });
