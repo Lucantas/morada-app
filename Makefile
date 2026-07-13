@@ -8,7 +8,7 @@ API_URL = http://localhost:$(API_PORT)
 WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 
-.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check clean api-dev api-test api-typecheck api-lint api-check
+.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -54,6 +54,9 @@ format-check: ## Check formatting without writing (repo-wide)
 	pnpm format:check
 
 check: typecheck lint format-check coverage ## Run every web gate (what the hooks run)
+
+reset-db: ## Delete the local SQLite DB so the next start seeds fresh (admin only)
+	rm -f apps/api/morada.db apps/api/morada.db-wal apps/api/morada.db-shm
 
 clean: ## Remove caches and coverage output
 	rm -rf apps/web/coverage apps/web/dist node_modules/.cache
