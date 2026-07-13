@@ -40,6 +40,17 @@ export async function login(username: string, password: string): Promise<Role> {
   return data.role;
 }
 
+/** Admin-only: issue a pending charge (receipt) to a resident. */
+export async function issueCharge(input: {
+  residentId: string;
+  ref: string;
+  title: string;
+  valueCents: number;
+  dueLabel: string;
+}): Promise<void> {
+  await apiClient.post('/api/receipts', input);
+}
+
 /** Admin-only: provision a resident login. The API generates and returns the
  *  one-time temp password. */
 export async function provisionResidentLogin(input: {

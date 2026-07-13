@@ -20,9 +20,16 @@ type Props = {
   residentId?: string;
   onBack: () => void;
   onCreateLogin?: () => void;
+  onIssueCharge?: () => void;
 };
 
-export function ResidentEditScreen({ repository, residentId, onBack, onCreateLogin }: Props) {
+export function ResidentEditScreen({
+  repository,
+  residentId,
+  onBack,
+  onCreateLogin,
+  onIssueCharge,
+}: Props) {
   const existing = useQuery({
     queryKey: [...residentsQueryKey, residentId],
     queryFn: () => getResident(repository, residentId as string),
@@ -175,6 +182,28 @@ export function ResidentEditScreen({ repository, residentId, onBack, onCreateLog
               }}
             >
               Criar acesso do morador
+            </button>
+          )}
+
+          {onIssueCharge && (
+            <button
+              type="button"
+              onClick={onIssueCharge}
+              style={{
+                width: '100%',
+                minHeight: 50,
+                marginTop: 12,
+                borderRadius: 'var(--r-md)',
+                border: '1.5px solid var(--petrol-600)',
+                background: 'var(--surface)',
+                color: 'var(--petrol-800)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              Emitir cobrança
             </button>
           )}
         </div>
