@@ -3,29 +3,22 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { accountRoutes } from './accounts/adapters/http/routes';
-import { SqliteAccountRepository } from './accounts/adapters/sqlite/account-repository';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
-import { SqliteDashboardRepository } from './dashboard/adapters/sqlite/dashboard-repository';
 import { threadRoutes } from './messages/adapters/http/routes';
-import { SqliteThreadRepository } from './messages/adapters/sqlite/thread-repository';
 import { noticeRoutes } from './notices/adapters/http/routes';
-import { SqliteNoticeRepository } from './notices/adapters/sqlite/notice-repository';
 import { authMiddleware, requireRole, signSession, type ApiEnv, type Role } from './platform/auth';
 import { config } from './platform/config';
-import { createDb, type Db } from './platform/db';
+import { createRepositories, type Repositories } from './platform/repositories';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
-import { SqliteReceiptRepository } from './receipts/adapters/sqlite/receipt-repository';
 import { createReceipt } from './receipts/app/create-receipt';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
-import { SqliteResidentRepository } from './residents/adapters/sqlite/resident-repository';
-import { seedDatabase } from './seed-data';
+import { seedAdmin } from './seed-data';
 import { generateTempPassword } from './platform/temp-password';
 import { createResidentLogin } from './users/app/create-resident-login';
 import { verifyCredentials } from './users/app/verify-credentials';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
-import { SqliteUserRepository } from './users/adapters/sqlite/user-repository';
 import { usernameSchema } from './users/domain/user';
 
 const loginSchema = z.object({
@@ -45,16 +38,10 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   return group;
 }
 
-export function buildApp(db: Db) {
-  seedDatabase(db);
-  const residents = new SqliteResidentRepository(db);
-  const accounts = new SqliteAccountRepository(db);
-  const receipts = new SqliteReceiptRepository(db);
-  const notices = new SqliteNoticeRepository(db);
-  const threads = new SqliteThreadRepository(db);
-  const dashboard = new SqliteDashboardRepository(db);
-  const users = new SqliteUserRepository(db);
+export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
+  const { residents, accounts, receipts, notices, threads, dashboard, users } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
+  await seedAdmin(users, hasher);
 
   const app = new Hono<ApiEnv>();
   app.onError(onError);
@@ -150,6 +137,7 @@ export function buildApp(db: Db) {
   return app;
 }
 
-export function createApp() {
-  return buildApp(createDb(config.dbPath));
+export async function createApp(): Promise<Hono<ApiEnv>> {
+  const { repos } = await createRepositories(config);
+  return buildApp(repos);
 }

@@ -1,7 +1,7 @@
-import bcrypt from 'bcryptjs';
-
-import { config } from './platform/config';
 import type { Db } from './platform/db';
+import type { PasswordHasher } from './users/domain/password-hasher';
+import type { User } from './users/domain/user';
+import type { UserRepository } from './users/domain/user-repository';
 
 /**
  * The ONLY seeded login: the admin (síndico). Everything else — residents, their
@@ -10,23 +10,18 @@ import type { Db } from './platform/db';
  */
 export const adminCredentials = { username: 'admin', password: 'morada-admin' } as const;
 
-const USER_COLUMNS = ['id', 'username', 'password_hash', 'role', 'resident_id'];
-
-function seedUsers(): Record<string, unknown>[] {
-  return [
-    {
-      id: 'u-admin',
-      username: adminCredentials.username,
-      password_hash: bcrypt.hashSync(adminCredentials.password, config.bcryptCost),
-      role: 'admin',
-      resident_id: null,
-    },
-  ];
-}
-
-export function isEmpty(db: Db, table: string): boolean {
-  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
-  return row.n === 0;
+// Seeds only the admin login, through the repository so it works on any driver.
+// Idempotent: a no-op once the admin exists.
+export async function seedAdmin(users: UserRepository, hasher: PasswordHasher): Promise<void> {
+  if (await users.findByUsername(adminCredentials.username)) return;
+  const admin: User = {
+    id: 'u-admin',
+    username: adminCredentials.username,
+    passwordHash: await hasher.hash(adminCredentials.password),
+    role: 'admin',
+    residentId: null,
+  };
+  await users.save(admin);
 }
 
 export function insertAll(
@@ -41,9 +36,4 @@ export function insertAll(
     for (const item of items) stmt.run(item);
   });
   tx(rows);
-}
-
-// Seeds only the admin login. Residents (and their logins) are created in-app.
-export function seedDatabase(db: Db): void {
-  if (isEmpty(db, 'users')) insertAll(db, 'users', USER_COLUMNS, seedUsers());
 }
