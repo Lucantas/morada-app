@@ -26,4 +26,11 @@ export class InMemoryResidentRepository implements ResidentRepository {
     this.residents = new Map(this.residents).set(resident.id, resident);
     return resident;
   }
+
+  async deactivate(id: string): Promise<void> {
+    const resident = this.residents.get(id);
+    if (resident) {
+      this.residents = new Map(this.residents).set(id, { ...resident, active: false });
+    }
+  }
 }

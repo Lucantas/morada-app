@@ -39,4 +39,8 @@ export class HttpResidentRepository implements ResidentRepository {
     // PUT upserts by the (client-generated) id, so create and update share a path.
     return residentSchema.parse(await this.api.put(`/api/residents/${resident.id}`, resident));
   }
+
+  async deactivate(id: string): Promise<void> {
+    await this.api.post(`/api/residents/${id}/deactivate`);
+  }
 }

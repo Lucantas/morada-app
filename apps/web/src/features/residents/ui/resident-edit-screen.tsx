@@ -10,7 +10,7 @@ import type { ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
 import { residentStatusView } from './resident-status-view';
-import { residentsQueryKey, useSaveResident } from './use-residents';
+import { residentsQueryKey, useDeactivateResident, useSaveResident } from './use-residents';
 
 const STATUSES: ResidentStatus[] = ['em_dia', 'pendente', 'atrasado'];
 const EMPTY = { name: '', apt: '', phone: '', email: '', status: 'em_dia' as ResidentStatus };
@@ -36,6 +36,7 @@ export function ResidentEditScreen({
     enabled: residentId !== undefined,
   });
   const save = useSaveResident(repository);
+  const deactivate = useDeactivateResident(repository);
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
@@ -51,6 +52,17 @@ export function ResidentEditScreen({
   const submit = () => {
     save.mutate({ ...form, id: residentId }, { onSuccess: onBack });
   };
+
+  const moveOut = () => {
+    if (residentId) deactivate.mutate(residentId, { onSuccess: onBack });
+  };
+
+  const saveError = save.isError
+    ? save.error instanceof Error
+      ? save.error.message
+      : 'Não foi possível salvar.'
+    : null;
+  const isActive = existing.data?.active !== false;
 
   const title = residentId ? (existing.data?.name ?? 'Editar morador') : 'Novo morador';
 
@@ -159,6 +171,12 @@ export function ResidentEditScreen({
             })}
           </div>
 
+          {saveError && (
+            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '0 0 12px' }}>
+              {saveError}
+            </p>
+          )}
+
           <PrimaryButton icon="check" onClick={submit}>
             {residentId ? 'Salvar alterações' : 'Cadastrar morador'}
           </PrimaryButton>
@@ -204,6 +222,28 @@ export function ResidentEditScreen({
               }}
             >
               Emitir cobrança
+            </button>
+          )}
+
+          {residentId && isActive && (
+            <button
+              type="button"
+              onClick={moveOut}
+              style={{
+                width: '100%',
+                minHeight: 50,
+                marginTop: 12,
+                borderRadius: 'var(--r-md)',
+                border: '1.5px solid var(--atraso-line)',
+                background: 'var(--surface)',
+                color: 'var(--atraso-700)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+            >
+              {deactivate.isPending ? 'Registrando saída…' : 'Morador saiu (liberar apartamento)'}
             </button>
           )}
         </div>

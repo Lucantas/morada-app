@@ -18,3 +18,11 @@ export function useSaveResident(repository: ResidentRepository) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: residentsQueryKey }),
   });
 }
+
+export function useDeactivateResident(repository: ResidentRepository) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repository.deactivate(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: residentsQueryKey }),
+  });
+}
