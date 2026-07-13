@@ -3,7 +3,8 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 
 import type { ApiEnv } from '../../../platform/auth';
-import { getThread } from '../../app/get-thread';
+import { ThreadNotFoundError } from '../../domain/errors';
+import type { Thread } from '../../domain/message';
 import { listThreads } from '../../app/list-threads';
 import { markRead } from '../../app/mark-read';
 import { postMessage } from '../../app/post-message';
@@ -12,6 +13,10 @@ import type { ThreadRepository } from '../../domain/thread-repository';
 // `text` only — the author is derived from the verified JWT role, never trusted
 // from the client (prevents impersonating the admin).
 const postMessageSchema = z.object({ text: z.string().min(1).max(2000) });
+
+// Resolves the resident behind a thread id, so a thread can be materialised
+// on demand with the resident's real name/apt (a resident's thread id is their id).
+export type ThreadResidentLookup = (residentId: string) => { name: string; apt: string } | null;
 
 /**
  * A resident may only touch their own thread (their JWT `sub`). Admins are
@@ -27,28 +32,42 @@ function denyForeignThread(c: Context<ApiEnv>, threadId: string): Response | nul
   return null;
 }
 
-export function threadRoutes(repo: ThreadRepository) {
+export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResidentLookup) {
   const app = new Hono<ApiEnv>();
+
+  // A thread is created lazily the first time it is opened/written, so residents
+  // start with an empty conversation rather than a 404.
+  function loadOrEmpty(id: string): Thread {
+    const existing = repo.getById(id);
+    if (existing) return existing;
+    const resident = residentLookup(id);
+    if (!resident) throw new ThreadNotFoundError(id);
+    return { id, residentName: resident.name, apt: resident.apt, unread: false, messages: [] };
+  }
 
   app.get('/', (c) => c.json(listThreads(repo)));
 
   app.get('/:id', (c) => {
-    const denied = denyForeignThread(c, c.req.param('id'));
-    return denied ?? c.json(getThread(repo, c.req.param('id')));
+    const id = c.req.param('id');
+    const denied = denyForeignThread(c, id);
+    return denied ?? c.json(loadOrEmpty(id));
   });
 
   app.post('/:id/messages', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
+    if (!repo.getById(id)) repo.save(loadOrEmpty(id));
     const { text } = postMessageSchema.parse(await c.req.json());
     const author = c.get('role') ?? 'resident';
     return c.json(postMessage(repo, id, author, text));
   });
 
   app.post('/:id/read', (c) => {
-    const denied = denyForeignThread(c, c.req.param('id'));
-    return denied ?? c.json(markRead(repo, c.req.param('id')));
+    const id = c.req.param('id');
+    const denied = denyForeignThread(c, id);
+    if (denied) return denied;
+    return c.json(repo.getById(id) ? markRead(repo, id) : loadOrEmpty(id));
   });
 
   return app;

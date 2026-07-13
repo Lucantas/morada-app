@@ -16,6 +16,7 @@ import { createDb, type Db } from './platform/db';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { SqliteReceiptRepository } from './receipts/adapters/sqlite/receipt-repository';
+import { createReceipt } from './receipts/app/create-receipt';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { SqliteResidentRepository } from './residents/adapters/sqlite/resident-repository';
@@ -104,7 +105,15 @@ export function buildApp(db: Db) {
   api.route('/residents', guarded('admin', residentRoutes(residents)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
 
-  // Any authenticated user.
+  // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
+  api.post('/receipts', requireRole('admin'), async (c) =>
+    c.json(
+      createReceipt(receipts, (id) => residents.getById(id) !== null, await c.req.json()),
+      201,
+    ),
+  );
+
+  // Any authenticated user (reads are scoped to the caller inside the routes).
   api.route('/receipts', receiptRoutes(receipts));
   api.route('/dashboard', dashboardRoutes(dashboard));
 
@@ -115,8 +124,15 @@ export function buildApp(db: Db) {
   api.route('/notices', noticeRoutes(notices));
 
   // Threads: listing all conversations is admin-only; per-thread access stays open.
+  // A resident's thread is created lazily from their record on first use.
   api.on('GET', '/threads', requireRole('admin'));
-  api.route('/threads', threadRoutes(threads));
+  api.route(
+    '/threads',
+    threadRoutes(threads, (id) => {
+      const resident = residents.getById(id);
+      return resident ? { name: resident.name, apt: resident.apt } : null;
+    }),
+  );
 
   app.route('/api', api);
 

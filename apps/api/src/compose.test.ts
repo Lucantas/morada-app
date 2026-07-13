@@ -284,6 +284,66 @@ describe('Morada API — authorization wiring', () => {
     expect(((await pay.json()) as { status: string }).status).toBe('pago');
   });
 
+  test('an admin issues a charge and the resident then sees it (pending)', async () => {
+    const app = makeApp();
+    const adminToken = await tokenFor(app, demoCredentials.admin);
+    const issue = await app.request('/api/receipts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        residentId: 'r-1',
+        ref: '05/2026',
+        title: 'Taxa condominial',
+        valueCents: 45000,
+        dueLabel: 'Venc. 10/05/2026',
+      }),
+    });
+    expect(issue.status).toBe(201);
+    const created = (await issue.json()) as { id: string; status: string };
+    expect(created.status).toBe('pendente');
+
+    const residentToken = await tokenFor(app, demoCredentials.resident);
+    const mine = await app.request('/api/receipts', {
+      headers: { Authorization: `Bearer ${residentToken}` },
+    });
+    const ids = ((await mine.json()) as { id: string }[]).map((r) => r.id);
+    expect(ids).toContain(created.id);
+  });
+
+  test('issuing a charge is admin-only', async () => {
+    const app = makeApp();
+    const token = await tokenFor(app, demoCredentials.resident);
+    const res = await app.request('/api/receipts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        residentId: 'r-1',
+        ref: '05/2026',
+        title: 'Taxa',
+        valueCents: 1000,
+        dueLabel: 'x',
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('issuing a charge for a nonexistent resident is rejected with 404', async () => {
+    const app = makeApp();
+    const token = await tokenFor(app, demoCredentials.admin);
+    const res = await app.request('/api/receipts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        residentId: 'r-nope',
+        ref: '05/2026',
+        title: 'Taxa',
+        valueCents: 1000,
+        dueLabel: 'x',
+      }),
+    });
+    expect(res.status).toBe(404);
+  });
+
   test('notices are readable by residents but writable only by admins', async () => {
     const resident = await withCreds(demoCredentials.resident);
     expect((await resident.auth('/api/notices')).status).toBe(200);

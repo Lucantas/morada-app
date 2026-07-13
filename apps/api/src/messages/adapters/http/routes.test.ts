@@ -26,9 +26,15 @@ const build = (over: Partial<Thread>): Thread => ({
   ...over,
 });
 
-function mount(repo: ThreadRepository) {
+function mount(
+  repo: ThreadRepository,
+  lookup: (id: string) => { name: string; apt: string } | null = () => ({
+    name: 'Morador',
+    apt: 'Apto',
+  }),
+) {
   const app = new Hono();
-  app.route('/threads', threadRoutes(repo));
+  app.route('/threads', threadRoutes(repo, lookup));
   return app;
 }
 
@@ -40,6 +46,26 @@ describe('threadRoutes', () => {
     const body = (await res.json()) as Thread[];
     expect(body).toHaveLength(1);
     expect(body[0]?.residentName).toBe('Ana');
+  });
+
+  test('GET /:id materialises an empty thread when none exists yet', async () => {
+    const app = mount(fakeRepo([]), () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const res = await app.request('/threads/r-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Thread;
+    expect(body).toMatchObject({ id: 'r-1', residentName: 'Maria', messages: [] });
+  });
+
+  test('POST /:id/messages creates the thread on the first message', async () => {
+    const repo = fakeRepo([]);
+    const app = mount(repo, () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const res = await app.request('/threads/r-1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'Primeira mensagem' }),
+    });
+    expect(res.status).toBe(200);
+    expect(repo.getById('r-1')?.messages).toHaveLength(1);
   });
 
   test('POST /:id/messages appends a message', async () => {
