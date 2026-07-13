@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton } from '@/shared/ui/primitives';
 
 import { getReceipt } from '../domain/get-receipt';

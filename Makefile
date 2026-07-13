@@ -3,7 +3,7 @@ WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 API_URL ?= http://localhost:8787
 
-.PHONY: help install dev dev-api dev-web build test test-watch coverage typecheck lint format format-check check check-api clean
+.PHONY: help install dev dev-api dev-web start build test test-watch coverage typecheck lint format format-check check check-api clean
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -19,6 +19,13 @@ dev-api: ## Start the API (Hono + SQLite) on :8787
 
 dev-web: ## Start the web pointed at the live API (run `make dev-api` in another shell first)
 	VITE_API_URL=$(API_URL) $(WEB) dev --port 5173 --strictPort
+
+start: ## Start API (:8787) + web (:5173, wired to the live API) together; Ctrl-C stops both
+	@echo "▸ API → http://localhost:8787   ▸ Web → http://localhost:5173   (Ctrl-C stops both)"
+	@trap 'kill 0' INT TERM EXIT; \
+	$(API) dev & \
+	VITE_API_URL=$(API_URL) $(WEB) dev --port 5173 --strictPort & \
+	wait
 
 build: ## Production build
 	$(WEB) build

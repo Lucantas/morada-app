@@ -23,7 +23,7 @@ import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
-import { PhoneFrame } from '@/shared/ui/phone-frame';
+import { AppShell } from '@/shared/ui/app-shell';
 
 import {
   accountRepository,
@@ -63,9 +63,9 @@ const RESIDENT_TAB: Partial<Record<View, string>> = {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PhoneFrame>
+      <AppShell>
         <Router />
-      </PhoneFrame>
+      </AppShell>
     </QueryClientProvider>
   );
 }

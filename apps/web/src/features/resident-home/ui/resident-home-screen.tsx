@@ -5,7 +5,7 @@ import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
 import { formatBRL } from '@/shared/lib/money';
 import type { IconName } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { TopBar } from '@/shared/ui/top-bar';
 

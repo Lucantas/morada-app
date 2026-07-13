@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
 import type { NoticeKind } from '../domain/notice';

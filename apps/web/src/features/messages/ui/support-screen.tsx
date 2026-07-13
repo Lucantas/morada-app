@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import type { ThreadRepository } from '../domain/thread-repository';

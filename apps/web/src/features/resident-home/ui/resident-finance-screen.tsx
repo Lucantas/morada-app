@@ -7,7 +7,7 @@ import type {
 } from '@/features/dashboard/domain/dashboard';
 import type { DashboardRepository } from '@/features/dashboard/domain/dashboard-repository';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { TopBar } from '@/shared/ui/top-bar';
 

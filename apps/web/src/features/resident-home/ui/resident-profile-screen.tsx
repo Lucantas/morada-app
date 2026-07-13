@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { TopBar } from '@/shared/ui/top-bar';
 

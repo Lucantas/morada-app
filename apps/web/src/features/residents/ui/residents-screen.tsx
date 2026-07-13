@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton, SectionLabel, StatCard, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
 import { TopBar } from '@/shared/ui/top-bar';
