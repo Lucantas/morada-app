@@ -1,7 +1,7 @@
 import { buildApp } from './compose';
 import { createTestDb } from './platform/db';
-import { demoCredentials } from './seed-data';
-import { seedFixtures } from './test-fixtures';
+import { adminCredentials } from './seed-data';
+import { residentCredentials, seedFixtures } from './test-fixtures';
 
 function makeApp() {
   const db = createTestDb();
@@ -45,7 +45,7 @@ describe('Morada API', () => {
 
   test('forbids a resident from admin-only resources', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.resident);
+    const token = await tokenFor(app, residentCredentials);
     const res = await app.request('/api/residents', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -54,7 +54,7 @@ describe('Morada API', () => {
 
   test('lets an admin list seeded residents', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.admin);
+    const token = await tokenFor(app, adminCredentials);
     const res = await app.request('/api/residents', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -65,7 +65,7 @@ describe('Morada API', () => {
 
   test('an admin can create a resident (201) and read it back', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.admin);
+    const token = await tokenFor(app, adminCredentials);
     const create = await app.request('/api/residents', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -99,11 +99,7 @@ describe('Morada API', () => {
 
 describe('Morada API — real credentials', () => {
   test('valid demo credentials return a token and role', async () => {
-    const res = await login(
-      makeApp(),
-      demoCredentials.admin.username,
-      demoCredentials.admin.password,
-    );
+    const res = await login(makeApp(), adminCredentials.username, adminCredentials.password);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { token: string; role: string };
     expect(body.token).toMatch(/.+/);
@@ -111,24 +107,24 @@ describe('Morada API — real credentials', () => {
   });
 
   test('a wrong password is rejected with 401', async () => {
-    const res = await login(makeApp(), demoCredentials.admin.username, 'senha-errada');
+    const res = await login(makeApp(), adminCredentials.username, 'senha-errada');
     expect(res.status).toBe(401);
   });
 
   test('an unknown username is rejected with 401', async () => {
-    const res = await login(makeApp(), 'ninguem', demoCredentials.admin.password);
+    const res = await login(makeApp(), 'ninguem', adminCredentials.password);
     expect(res.status).toBe(401);
   });
 
   test('a resident reads their own record via GET /api/residents/me', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.resident);
+    const token = await tokenFor(app, residentCredentials);
     const res = await app.request('/api/residents/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status).toBe(200);
     const me = (await res.json()) as { id: string; name: string };
-    expect(me.id).toBe(demoCredentials.resident.residentId);
+    expect(me.id).toBe(residentCredentials.residentId);
     expect(me.name).toBe('Maria Ribeiro');
   });
 
@@ -139,11 +135,11 @@ describe('Morada API — real credentials', () => {
 
   test("a resident token is scoped to that resident's own id", async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.resident);
+    const token = await tokenFor(app, residentCredentials);
     const auth = (path: string) =>
       app.request(path, { headers: { Authorization: `Bearer ${token}` } });
 
-    const own = await auth(`/api/threads/${demoCredentials.resident.residentId}`);
+    const own = await auth(`/api/threads/${residentCredentials.residentId}`);
     expect(own.status).toBe(200);
 
     const foreign = await auth('/api/threads/t-2');
@@ -153,7 +149,7 @@ describe('Morada API — real credentials', () => {
 
 describe('Morada API — admin provisions resident logins', () => {
   async function adminAuth(app: ReturnType<typeof buildApp>) {
-    const token = await tokenFor(app, demoCredentials.admin);
+    const token = await tokenFor(app, adminCredentials);
     return (path: string, init: RequestInit = {}) =>
       app.request(path, {
         ...init,
@@ -185,7 +181,7 @@ describe('Morada API — admin provisions resident logins', () => {
 
   test('provisioning a resident login is admin-only', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.resident);
+    const token = await tokenFor(app, residentCredentials);
     const res = await app.request('/api/users', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -199,7 +195,7 @@ describe('Morada API — admin provisions resident logins', () => {
     const auth = await adminAuth(app);
     const res = await auth('/api/users', {
       method: 'POST',
-      body: JSON.stringify({ username: demoCredentials.resident.username, residentId: 'r-5' }),
+      body: JSON.stringify({ username: residentCredentials.username, residentId: 'r-5' }),
     });
     expect(res.status).toBe(409);
   });
@@ -221,7 +217,7 @@ describe('Morada API — admin provisions resident logins', () => {
       method: 'POST',
       body: JSON.stringify({
         username: 'maria-alt',
-        residentId: demoCredentials.resident.residentId,
+        residentId: residentCredentials.residentId,
       }),
     });
     expect(res.status).toBe(409);
@@ -241,20 +237,20 @@ describe('Morada API — authorization wiring', () => {
   }
 
   test('accounts are admin-only', async () => {
-    const resident = await withCreds(demoCredentials.resident);
+    const resident = await withCreds(residentCredentials);
     expect((await resident.auth('/api/accounts')).status).toBe(403);
-    const admin = await withCreds(demoCredentials.admin);
+    const admin = await withCreds(adminCredentials);
     expect((await admin.auth('/api/accounts')).status).toBe(200);
   });
 
   test('receipts and dashboard are open to any authenticated user', async () => {
-    const { auth } = await withCreds(demoCredentials.resident);
+    const { auth } = await withCreds(residentCredentials);
     expect((await auth('/api/receipts')).status).toBe(200);
     expect((await auth('/api/dashboard')).status).toBe(200);
   });
 
   test('a resident lists only their own receipts', async () => {
-    const { auth } = await withCreds(demoCredentials.resident); // r-1
+    const { auth } = await withCreds(residentCredentials); // r-1
     const res = await auth('/api/receipts');
     const receipts = (await res.json()) as { id: string; residentId?: string }[];
     expect(receipts.length).toBeGreaterThan(0);
@@ -263,7 +259,7 @@ describe('Morada API — authorization wiring', () => {
   });
 
   test('a resident cannot read or pay another resident receipt (403)', async () => {
-    const { auth } = await withCreds(demoCredentials.resident); // r-1
+    const { auth } = await withCreds(residentCredentials); // r-1
     expect((await auth('/api/receipts/rc-5')).status).toBe(403); // rc-5 is r-3's
     const pay = await auth('/api/receipts/rc-5/pay', {
       method: 'POST',
@@ -274,7 +270,7 @@ describe('Morada API — authorization wiring', () => {
   });
 
   test('a resident can pay their own receipt', async () => {
-    const { auth } = await withCreds(demoCredentials.resident); // r-1 owns rc-1
+    const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1
     const pay = await auth('/api/receipts/rc-1/pay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -286,7 +282,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('an admin issues a charge and the resident then sees it (pending)', async () => {
     const app = makeApp();
-    const adminToken = await tokenFor(app, demoCredentials.admin);
+    const adminToken = await tokenFor(app, adminCredentials);
     const issue = await app.request('/api/receipts', {
       method: 'POST',
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -302,7 +298,7 @@ describe('Morada API — authorization wiring', () => {
     const created = (await issue.json()) as { id: string; status: string };
     expect(created.status).toBe('pendente');
 
-    const residentToken = await tokenFor(app, demoCredentials.resident);
+    const residentToken = await tokenFor(app, residentCredentials);
     const mine = await app.request('/api/receipts', {
       headers: { Authorization: `Bearer ${residentToken}` },
     });
@@ -312,7 +308,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('issuing a charge is admin-only', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.resident);
+    const token = await tokenFor(app, residentCredentials);
     const res = await app.request('/api/receipts', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -329,7 +325,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('issuing a charge for a nonexistent resident is rejected with 404', async () => {
     const app = makeApp();
-    const token = await tokenFor(app, demoCredentials.admin);
+    const token = await tokenFor(app, adminCredentials);
     const res = await app.request('/api/receipts', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -345,7 +341,7 @@ describe('Morada API — authorization wiring', () => {
   });
 
   test('notices are readable by residents but writable only by admins', async () => {
-    const resident = await withCreds(demoCredentials.resident);
+    const resident = await withCreds(residentCredentials);
     expect((await resident.auth('/api/notices')).status).toBe(200);
     const write = (a: typeof resident.auth) =>
       a('/api/notices', {
@@ -354,28 +350,28 @@ describe('Morada API — authorization wiring', () => {
         body: JSON.stringify({ title: 'Aviso', body: 'Corpo', kind: 'aviso', audience: 'Todos' }),
       });
     expect((await write(resident.auth)).status).toBe(403);
-    const admin = await withCreds(demoCredentials.admin);
+    const admin = await withCreds(adminCredentials);
     expect((await write(admin.auth)).status).toBe(201);
   });
 
   test('a resident can dismiss a notice but cannot delete one', async () => {
-    const { auth } = await withCreds(demoCredentials.resident);
+    const { auth } = await withCreds(residentCredentials);
     expect((await auth('/api/notices/n-1/dismiss', { method: 'POST' })).status).toBe(200);
     expect((await auth('/api/notices/n-1', { method: 'DELETE' })).status).toBe(403);
   });
 
   test('listing all threads is admin-only, but a resident can read their own thread', async () => {
-    const resident = await withCreds(demoCredentials.resident);
+    const resident = await withCreds(residentCredentials);
     expect((await resident.auth('/api/threads')).status).toBe(403);
-    expect(
-      (await resident.auth(`/api/threads/${demoCredentials.resident.residentId}`)).status,
-    ).toBe(200);
-    const admin = await withCreds(demoCredentials.admin);
+    expect((await resident.auth(`/api/threads/${residentCredentials.residentId}`)).status).toBe(
+      200,
+    );
+    const admin = await withCreds(adminCredentials);
     expect((await admin.auth('/api/threads')).status).toBe(200);
   });
 
   test('a resident cannot read or write another resident thread (IDOR blocked)', async () => {
-    const { auth } = await withCreds(demoCredentials.resident);
+    const { auth } = await withCreds(residentCredentials);
     expect((await auth('/api/threads/t-2')).status).toBe(403);
     const post = await auth('/api/threads/t-2/messages', {
       method: 'POST',
@@ -386,8 +382,8 @@ describe('Morada API — authorization wiring', () => {
   });
 
   test('message author is derived from the token role, not the request body', async () => {
-    const { auth } = await withCreds(demoCredentials.resident);
-    const res = await auth(`/api/threads/${demoCredentials.resident.residentId}/messages`, {
+    const { auth } = await withCreds(residentCredentials);
+    const res = await auth(`/api/threads/${residentCredentials.residentId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author: 'admin', text: 'tentativa de spoof' }),

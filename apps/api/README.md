@@ -32,15 +32,19 @@ Env: `PORT`, `JWT_SECRET` (required in production — startup fails without it),
   logged in plaintext); message `author` is derived from the verified role
   (never trusted from the body); `POST` never accepts a client id.
 
-## Demo logins (seeded)
+## Seeded login
 
-The database seeds two documented logins so the demo works out of the box —
-**change or remove these before any real deployment** (they are intentionally weak):
+The database seeds **only the admin login** — **change it before any real
+deployment** (it is intentionally weak). Every resident, their login, and all
+accounts/receipts/notices are created through the app.
 
-| Role     | Username   | Password       |
-| -------- | ---------- | -------------- |
-| Admin    | `admin`    | `morada-admin` |
-| Resident | `maria302` | `morada-demo`  |
+| Role  | Username | Password       |
+| ----- | -------- | -------------- |
+| Admin | `admin`  | `morada-admin` |
+
+To onboard a resident: the admin creates the resident, provisions a login
+(`POST /api/users`, which returns a one-time temp password), and hands over the
+credentials. The resident then logs in normally.
 
 ## Still deferred (post-auth hardening)
 

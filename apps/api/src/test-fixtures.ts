@@ -1,12 +1,30 @@
+import bcrypt from 'bcryptjs';
+
+import { config } from './platform/config';
 import type { Db } from './platform/db';
 import { insertAll } from './seed-data';
 
-// Rich demo data for the test suite ONLY. Production seeds just the login
-// essentials (see seed-data.ts); the residents/accounts/receipts/notices/threads
-// below back the integration tests. The demo resident r-1 is seeded by
-// seedDatabase, so it is intentionally absent from `residents` here.
+// Rich demo data for the test suite ONLY. Production seeds just the admin login
+// (see seed-data.ts); the resident login + residents/accounts/receipts/notices/
+// threads below back the integration tests.
+
+// A pre-provisioned resident login, seeded only for tests (in production the
+// admin creates resident logins in-app).
+export const residentCredentials = {
+  username: 'maria302',
+  password: 'morada-demo',
+  residentId: 'r-1',
+} as const;
 
 const residents = [
+  {
+    id: 'r-1',
+    name: 'Maria Ribeiro',
+    apt: 'Apto 302',
+    phone: '(11) 90000-0001',
+    email: 'maria@email.com',
+    status: 'em_dia',
+  },
   {
     id: 'r-2',
     name: 'João Pereira',
@@ -233,6 +251,20 @@ const threads = [
 
 export function seedFixtures(db: Db): void {
   insertAll(db, 'residents', ['id', 'name', 'apt', 'phone', 'email', 'status'], residents);
+  insertAll(
+    db,
+    'users',
+    ['id', 'username', 'password_hash', 'role', 'resident_id'],
+    [
+      {
+        id: 'u-maria',
+        username: residentCredentials.username,
+        password_hash: bcrypt.hashSync(residentCredentials.password, config.bcryptCost),
+        role: 'resident',
+        resident_id: residentCredentials.residentId,
+      },
+    ],
+  );
   insertAll(
     db,
     'accounts',
