@@ -1,81 +1,33 @@
-import { InMemoryAccountRepository } from '@/features/accounts/data/in-memory-account-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
-import { InMemoryDashboardRepository } from '@/features/dashboard/data/in-memory-dashboard-repository';
 import { HttpDashboardRepository } from '@/features/dashboard/data/http-dashboard-repository';
-import { InMemoryThreadRepository } from '@/features/messages/data/in-memory-thread-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
-import { InMemoryNoticeRepository } from '@/features/notices/data/in-memory-notice-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
-import { InMemoryReceiptRepository } from '@/features/receipts/data/in-memory-receipt-repository';
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
-import { InMemoryResidentRepository } from '@/features/residents/data/in-memory-resident-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
-import { resolveDemoLogin } from '@/features/session/domain/demo-login';
 import type { Role } from '@/features/session/domain/session';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
 import { decodeJwtSubject } from '@/shared/lib/jwt';
 
-import {
-  accountSeed,
-  dashboardSeed,
-  noticeSeed,
-  receiptSeed,
-  residentSeed,
-  threadSeed,
-} from './seed';
+// The app always talks to the real API. Point it elsewhere with VITE_API_URL;
+// it defaults to the local API from `make start` / `make start-backend`.
+const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
 
-const apiUrl = import.meta.env.VITE_API_URL;
+const apiClient = createApiClient({
+  baseUrl: apiUrl,
+  getToken: () => useSessionStore.getState().token,
+});
 
-/** Live API client (null in offline/in-memory mode). Reused by the HTTP
- *  repositories and by admin login provisioning. */
-const apiClient = apiUrl
-  ? createApiClient({ baseUrl: apiUrl, getToken: () => useSessionStore.getState().token })
-  : null;
+export const residentRepository = new HttpResidentRepository(apiClient);
+export const accountRepository = new HttpAccountRepository(apiClient);
+export const receiptRepository = new HttpReceiptRepository(apiClient);
+export const noticeRepository = new HttpNoticeRepository(apiClient);
+export const threadRepository = new HttpThreadRepository(apiClient);
+export const dashboardRepository = new HttpDashboardRepository(apiClient);
 
-/** When VITE_API_URL is set the app runs against the live API; otherwise it uses
- *  seeded in-memory repositories (default for local demo and all tests). */
-function buildRepositories() {
-  if (apiClient) {
-    const api = apiClient;
-    return {
-      residentRepository: new HttpResidentRepository(api),
-      accountRepository: new HttpAccountRepository(api),
-      receiptRepository: new HttpReceiptRepository(api),
-      noticeRepository: new HttpNoticeRepository(api),
-      threadRepository: new HttpThreadRepository(api),
-      dashboardRepository: new HttpDashboardRepository(api),
-    };
-  }
-  return {
-    residentRepository: new InMemoryResidentRepository(residentSeed),
-    accountRepository: new InMemoryAccountRepository(accountSeed),
-    receiptRepository: new InMemoryReceiptRepository(receiptSeed),
-    noticeRepository: new InMemoryNoticeRepository(noticeSeed),
-    threadRepository: new InMemoryThreadRepository(threadSeed),
-    dashboardRepository: new InMemoryDashboardRepository(dashboardSeed),
-  };
-}
-
-export const {
-  residentRepository,
-  accountRepository,
-  receiptRepository,
-  noticeRepository,
-  threadRepository,
-  dashboardRepository,
-} = buildRepositories();
-
-/** Authenticate with a username and password, returning the resolved role.
- *  In API mode this calls POST /auth/login and stores the JWT (with the real
- *  subject decoded from it); offline it checks the seeded demo credentials. */
+/** Authenticate with a username and password against the API, storing the JWT
+ *  (with the real subject decoded from it) and returning the resolved role. */
 export async function login(username: string, password: string): Promise<Role> {
-  if (!apiUrl) {
-    const resolved = resolveDemoLogin(username, password);
-    if (!resolved) throw new Error('Usuário ou senha inválidos.');
-    useSessionStore.getState().signInAs(resolved.role, resolved.subject);
-    return resolved.role;
-  }
   const res = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -88,25 +40,15 @@ export async function login(username: string, password: string): Promise<Role> {
   return data.role;
 }
 
-/** Admin-only: provision a resident login. In API mode this calls the live
- *  endpoint (which generates and returns a one-time temp password). Offline it
- *  returns a locally generated temp password so the demo flow still works. */
+/** Admin-only: provision a resident login. The API generates and returns the
+ *  one-time temp password. */
 export async function provisionResidentLogin(input: {
   username: string;
   residentId: string;
 }): Promise<{ username: string; tempPassword: string }> {
-  if (!apiClient) {
-    return { username: input.username, tempPassword: offlineTempPassword() };
-  }
   const data = (await apiClient.post('/api/users', input)) as {
     username: string;
     tempPassword: string;
   };
   return { username: data.username, tempPassword: data.tempPassword };
-}
-
-function offlineTempPassword(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }

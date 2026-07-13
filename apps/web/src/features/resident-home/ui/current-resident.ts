@@ -1,17 +1,3 @@
-export type CurrentResident = {
-  name: string;
-  apt: string;
-  phone: string;
-  email: string;
-};
-
-export const DEFAULT_RESIDENT: CurrentResident = {
-  name: 'Maria Ribeiro',
-  apt: 'Apto 302',
-  phone: '(21) 99876-5432',
-  email: 'maria.ribeiro@email.com',
-};
-
 export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }

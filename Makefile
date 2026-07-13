@@ -8,7 +8,7 @@ API_URL = http://localhost:$(API_PORT)
 WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 
-.PHONY: help install start start-backend start-app dev build test test-watch coverage typecheck lint format format-check check clean api-dev api-test api-typecheck api-lint api-check
+.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check clean api-dev api-test api-typecheck api-lint api-check
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -28,9 +28,6 @@ start-backend: ## Start only the API (SQLite) on :$(API_PORT)
 
 start-app: ## Start only the web app (:$(WEB_PORT)) pointed at the live API
 	VITE_API_URL=$(API_URL) $(WEB) dev --port $(WEB_PORT) --strictPort
-
-dev: ## Start the web app offline (seeded in-memory, no backend) on :$(WEB_PORT)
-	$(WEB) dev
 
 build: ## Production build (web)
 	$(WEB) build

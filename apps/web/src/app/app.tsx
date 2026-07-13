@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
@@ -16,7 +16,6 @@ import { ReceiptsScreen } from '@/features/receipts/ui/receipts-screen';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
-import { DEFAULT_RESIDENT } from '@/features/resident-home/ui/current-resident';
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
@@ -24,7 +23,7 @@ import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
-import { AppShell } from '@/shared/ui/app-shell';
+import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 
 import {
   accountRepository,
@@ -212,8 +211,16 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
 
 function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {
   const currentResident = useCurrentResident(residentRepository, subject ?? null);
-  const resident = currentResident.data ?? DEFAULT_RESIDENT;
   const nav = <BottomNav items={residentNav(view, go)} />;
+
+  if (currentResident.isPending) {
+    return <StatusScreen message="Carregando…" bottomNav={nav} />;
+  }
+  if (currentResident.isError || !currentResident.data) {
+    return <StatusScreen message="Não foi possível carregar seus dados." bottomNav={nav} />;
+  }
+  const resident = currentResident.data;
+
   switch (view) {
     case 'r-receipts':
       return (
@@ -262,6 +269,19 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
         />
       );
   }
+}
+
+function StatusScreen({ message, bottomNav }: { message: string; bottomNav: ReactNode }) {
+  return (
+    <Screen>
+      <ScreenBody>
+        <div style={{ display: 'grid', placeItems: 'center', minHeight: '60%' }}>
+          <p style={{ color: 'var(--ink-500)' }}>{message}</p>
+        </div>
+      </ScreenBody>
+      {bottomNav}
+    </Screen>
+  );
 }
 
 function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavItem[] {

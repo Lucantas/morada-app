@@ -13,9 +13,8 @@ pnpm monorepo:
 
 Both sides validate with Zod at every boundary, are test-gated (≥80% coverage),
 and share the same domain vocabulary. The web `data/` layer talks to the API
-through HTTP repositories behind the same domain interfaces — so the app runs
-either fully offline (seeded in-memory) or against the live API, with no domain
-or UI changes.
+through HTTP repositories behind the same domain interfaces (the in-memory
+implementations back the test suite). The app always runs against the real API.
 
 ## Quickstart
 
@@ -28,7 +27,6 @@ make start           # API on :8787 + web on :5173 wired to it (Ctrl-C stops bot
 # Or run the pieces separately:
 make start-backend   # API on :8787 (creates + seeds morada.db)
 make start-app       # web on :5173 pointed at the live API (real login)
-make dev             # web on :5173 offline (seeded in-memory, no backend)
 
 # Gates:
 make check           # web: typecheck + lint(boundaries) + prettier + coverage
