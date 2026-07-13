@@ -5,11 +5,11 @@ import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
 import { formatBRL } from '@/shared/lib/money';
 import type { IconName } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { TopBar } from '@/shared/ui/top-bar';
 
-import { DEFAULT_RESIDENT, firstName } from './current-resident';
+import { firstName } from './current-resident';
 import { useResidentHome } from './use-resident-home';
 
 type Props = {
@@ -23,7 +23,7 @@ type Props = {
 
 export function ResidentHomeScreen({
   receiptRepository,
-  resident = DEFAULT_RESIDENT,
+  resident,
   onGoReceipts,
   onGoFinance,
   onGoNotices,

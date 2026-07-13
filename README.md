@@ -13,30 +13,29 @@ pnpm monorepo:
 
 Both sides validate with Zod at every boundary, are test-gated (≥80% coverage),
 and share the same domain vocabulary. The web `data/` layer talks to the API
-through HTTP repositories behind the same domain interfaces — so the app runs
-either fully offline (seeded in-memory) or against the live API, with no domain
-or UI changes.
+through HTTP repositories behind the same domain interfaces (the in-memory
+implementations back the test suite). The app always runs against the real API.
 
 ## Quickstart
 
 ```bash
 make install         # deps + git hooks
 
-# Offline demo (seeded in-memory, no backend):
-make dev             # web on :5173
+# Full stack (one command):
+make start           # API on :8787 + web on :5173 wired to it (Ctrl-C stops both)
 
-# Full stack (two shells):
-make dev-api         # API on :8787 (creates + seeds morada.db)
-make dev-web         # web on :5173 pointed at the API (real login)
+# Or run the pieces separately:
+make start-backend   # API on :8787 (creates + seeds morada.db)
+make start-app       # web on :5173 pointed at the live API (real login)
 
 # Gates:
 make check           # web: typecheck + lint(boundaries) + prettier + coverage
-make check-api       # api: typecheck + lint(boundaries) + coverage
+make api-check       # api: typecheck + lint(boundaries) + coverage
 ```
 
-Log in by picking a role (Administrador / Morador). See
-[apps/api/README.md](apps/api/README.md) for the auth model and its demo-only
-caveats.
+Log in with a username and password. See
+[apps/api/README.md](apps/api/README.md) for the auth model and the seeded demo
+logins.
 
 ## Docs
 

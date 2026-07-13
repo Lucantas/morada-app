@@ -16,6 +16,8 @@ import { createDb, type Db } from './platform/db';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { SqliteReceiptRepository } from './receipts/adapters/sqlite/receipt-repository';
+import { createReceipt } from './receipts/app/create-receipt';
+import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { SqliteResidentRepository } from './residents/adapters/sqlite/resident-repository';
 import { seedDatabase } from './seed-data';
@@ -95,22 +97,48 @@ export function buildApp(db: Db) {
     );
   });
 
+  // A resident reads their own record by their JWT subject (before the
+  // admin-only group below, which would otherwise 403 this).
+  api.get('/residents/me', (c) => c.json(getResident(residents, c.get('sub'))));
+
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
 
-  // Any authenticated user.
+  // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
+  api.post('/receipts', requireRole('admin'), async (c) =>
+    c.json(
+      createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
+      201,
+    ),
+  );
+
+  // Admin: an apartment's full receipt ledger, across every resident who has
+  // occupied it (the resident-facing view stays scoped to their own receipts).
+  api.get('/apartments/:id/receipts', requireRole('admin'), (c) =>
+    c.json(receipts.listByApartment(c.req.param('id'))),
+  );
+
+  // Any authenticated user (reads are scoped to the caller inside the routes).
   api.route('/receipts', receiptRoutes(receipts));
   api.route('/dashboard', dashboardRoutes(dashboard));
 
-  // Notices: reads open to any authenticated user, writes admin-only.
-  api.on(['POST', 'DELETE'], '/notices/*', requireRole('admin'));
+  // Notices: reads and per-resident dismiss are open to any authenticated user;
+  // creating and deleting notices is admin-only.
   api.on('POST', '/notices', requireRole('admin'));
+  api.on('DELETE', '/notices/*', requireRole('admin'));
   api.route('/notices', noticeRoutes(notices));
 
   // Threads: listing all conversations is admin-only; per-thread access stays open.
+  // A resident's thread is created lazily from their record on first use.
   api.on('GET', '/threads', requireRole('admin'));
-  api.route('/threads', threadRoutes(threads));
+  api.route(
+    '/threads',
+    threadRoutes(threads, (id) => {
+      const resident = residents.getById(id);
+      return resident ? { name: resident.name, apt: resident.apt } : null;
+    }),
+  );
 
   app.route('/api', api);
 

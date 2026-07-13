@@ -8,11 +8,21 @@ import { saveResident } from './save-resident';
 function fakeRepo(): ResidentRepository {
   const map = new Map<string, Resident>();
   return {
-    list: () => [...map.values()],
+    list: () => [...map.values()].filter((r) => r.active),
     getById: (id) => map.get(id) ?? null,
-    save: (r) => {
-      map.set(r.id, r);
-      return r;
+    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
+    apartmentOf: (id) => {
+      const r = map.get(id);
+      return r ? { apartmentId: r.apartmentId, apt: r.apt } : null;
+    },
+    save: (input) => {
+      const resident: Resident = { ...input, apartmentId: `ap-${input.apt}`, active: true };
+      map.set(input.id, resident);
+      return resident;
+    },
+    deactivate: (id) => {
+      const r = map.get(id);
+      if (r) map.set(id, { ...r, active: false });
     },
   };
 }

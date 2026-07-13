@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
 import { TopBar } from '@/shared/ui/top-bar';
@@ -10,23 +10,26 @@ import { TopBar } from '@/shared/ui/top-bar';
 import { pendingReceipt } from '../domain/pending-receipt';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
+import { buildReceiptProof, proofFileName } from '../domain/receipt-proof';
 
 import { methodLabel, receiptStatusView } from './receipt-status-view';
 import { useReceipts } from './use-receipts';
 
 type Props = {
   repository: ReceiptRepository;
+  resident: { name: string; apt: string };
   onPay: (id: string) => void;
   bottomNav: ReactNode;
 };
 
-export function ReceiptsScreen({ repository, onPay, bottomNav }: Props) {
+export function ReceiptsScreen({ repository, resident, onPay, bottomNav }: Props) {
   const receipts = useReceipts(repository);
+  const firstName = resident.name.trim().split(/\s+/)[0] ?? resident.name;
 
   return (
     <Screen>
       <TopBar
-        eyebrow="Olá, Maria · Apto 302 · Bloco 2"
+        eyebrow={`Olá, ${firstName} · ${resident.apt} · Bloco 2`}
         title="Meus recibos"
         right={
           <span
@@ -49,7 +52,9 @@ export function ReceiptsScreen({ repository, onPay, bottomNav }: Props) {
         {receipts.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os recibos.</p>
         )}
-        {receipts.isSuccess && <ReceiptsContent receipts={receipts.data} onPay={onPay} />}
+        {receipts.isSuccess && (
+          <ReceiptsContent receipts={receipts.data} resident={resident} onPay={onPay} />
+        )}
       </ScreenBody>
       {bottomNav}
     </Screen>
@@ -58,9 +63,11 @@ export function ReceiptsScreen({ repository, onPay, bottomNav }: Props) {
 
 function ReceiptsContent({
   receipts,
+  resident,
   onPay,
 }: {
   receipts: Receipt[];
+  resident: { name: string; apt: string };
   onPay: (id: string) => void;
 }) {
   const pending = pendingReceipt(receipts);
@@ -92,14 +99,36 @@ function ReceiptsContent({
       <SectionLabel>2026</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {receipts.map((receipt) => (
-          <ReceiptTicket key={receipt.id} receipt={receipt} onPay={onPay} />
+          <ReceiptTicket key={receipt.id} receipt={receipt} resident={resident} onPay={onPay} />
         ))}
       </div>
     </>
   );
 }
 
-function ReceiptTicket({ receipt, onPay }: { receipt: Receipt; onPay: (id: string) => void }) {
+function downloadProof(receipt: Receipt, resident: { name: string; apt: string }): void {
+  const blob = new Blob([buildReceiptProof(receipt, resident)], {
+    type: 'text/plain;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = proofFileName(receipt);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function ReceiptTicket({
+  receipt,
+  resident,
+  onPay,
+}: {
+  receipt: Receipt;
+  resident: { name: string; apt: string };
+  onPay: (id: string) => void;
+}) {
   const view = receiptStatusView(receipt.status);
   return (
     <SurfaceCard style={{ overflow: 'hidden' }}>
@@ -153,6 +182,7 @@ function ReceiptTicket({ receipt, onPay }: { receipt: Receipt; onPay: (id: strin
             </div>
             <button
               type="button"
+              onClick={() => downloadProof(receipt, resident)}
               style={{
                 marginTop: 10,
                 display: 'inline-flex',

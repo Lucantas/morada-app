@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
@@ -16,18 +16,20 @@ import { ReceiptsScreen } from '@/features/receipts/ui/receipts-screen';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
-import { DEFAULT_RESIDENT } from '@/features/resident-home/ui/current-resident';
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
+import { IssueChargeScreen } from '@/features/residents/ui/issue-charge-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
+import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
-import { PhoneFrame } from '@/shared/ui/phone-frame';
+import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 
 import {
   accountRepository,
   dashboardRepository,
+  issueCharge,
   login,
   noticeRepository,
   provisionResidentLogin,
@@ -40,8 +42,6 @@ import { useNavStore, type View } from './nav-store';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
 });
-
-const CURRENT_RESIDENT = DEFAULT_RESIDENT;
 
 const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-home': 'home',
@@ -63,9 +63,9 @@ const RESIDENT_TAB: Partial<Record<View, string>> = {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PhoneFrame>
+      <AppShell>
         <Router />
-      </PhoneFrame>
+      </AppShell>
     </QueryClientProvider>
   );
 }
@@ -141,6 +141,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           residentId={residentId}
           onBack={() => go('a-residents')}
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
+          onIssueCharge={residentId ? () => go('a-resident-charge', { residentId }) : undefined}
         />
       );
     case 'a-resident-login':
@@ -148,6 +149,20 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
         <CreateLoginScreen
           residentId={residentId}
           provision={provisionResidentLogin}
+          onBack={() => go('a-resident-edit', { residentId })}
+        />
+      ) : (
+        <ResidentsScreen
+          repository={residentRepository}
+          onOpenResident={(id) => go('a-resident-edit', { residentId: id })}
+          bottomNav={nav}
+        />
+      );
+    case 'a-resident-charge':
+      return residentId !== undefined ? (
+        <IssueChargeScreen
+          residentId={residentId}
+          issue={issueCharge}
           onBack={() => go('a-resident-edit', { residentId })}
         />
       ) : (
@@ -212,12 +227,23 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
 }
 
 function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {
+  const currentResident = useCurrentResident(residentRepository, subject ?? null);
   const nav = <BottomNav items={residentNav(view, go)} />;
+
+  if (currentResident.isPending) {
+    return <StatusScreen message="Carregando…" bottomNav={nav} />;
+  }
+  if (currentResident.isError || !currentResident.data) {
+    return <StatusScreen message="Não foi possível carregar seus dados." bottomNav={nav} />;
+  }
+  const resident = currentResident.data;
+
   switch (view) {
     case 'r-receipts':
       return (
         <ReceiptsScreen
           repository={receiptRepository}
+          resident={resident}
           onPay={(id) => go('r-pay', { residentId: id })}
           bottomNav={nav}
         />
@@ -232,6 +258,7 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
       ) : (
         <ReceiptsScreen
           repository={receiptRepository}
+          resident={resident}
           onPay={(id) => go('r-pay', { residentId: id })}
           bottomNav={nav}
         />
@@ -245,15 +272,13 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
         <SupportScreen repository={threadRepository} threadId={subject ?? 'r-1'} bottomNav={nav} />
       );
     case 'r-profile':
-      return (
-        <ResidentProfileScreen resident={CURRENT_RESIDENT} onSignOut={signOut} bottomNav={nav} />
-      );
+      return <ResidentProfileScreen resident={resident} onSignOut={signOut} bottomNav={nav} />;
     case 'r-home':
     default:
       return (
         <ResidentHomeScreen
           receiptRepository={receiptRepository}
-          resident={CURRENT_RESIDENT}
+          resident={resident}
           onGoReceipts={() => go('r-receipts')}
           onGoFinance={() => go('r-finance')}
           onGoNotices={() => go('r-notices')}
@@ -261,6 +286,19 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
         />
       );
   }
+}
+
+function StatusScreen({ message, bottomNav }: { message: string; bottomNav: ReactNode }) {
+  return (
+    <Screen>
+      <ScreenBody>
+        <div style={{ display: 'grid', placeItems: 'center', minHeight: '60%' }}>
+          <p style={{ color: 'var(--ink-500)' }}>{message}</p>
+        </div>
+      </ScreenBody>
+      {bottomNav}
+    </Screen>
+  );
 }
 
 function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavItem[] {

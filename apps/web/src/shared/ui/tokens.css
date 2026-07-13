@@ -47,6 +47,12 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
@@ -54,6 +60,22 @@ body {
   color: var(--ink-900);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Full-bleed responsive app shell — fills the viewport at every width, no fixed
+   size and no device chrome. */
+.app-shell,
+.app-viewport {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sand);
+}
+
+.app-viewport {
+  position: relative;
+  overflow: hidden;
 }
 
 a {

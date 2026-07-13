@@ -7,12 +7,23 @@ export const condoBalanceSchema = z.object({
 });
 export type CondoBalance = z.infer<typeof condoBalanceSchema>;
 
+export const dashIconSchema = z.enum([
+  'water',
+  'bolt',
+  'wrench',
+  'building2',
+  'building',
+  'receipt',
+  'card',
+]);
+export type DashIcon = z.infer<typeof dashIconSchema>;
+
 export const paidItemSchema = z.object({
   id: z.string().min(1),
   label: z.string(),
   dateLabel: z.string(),
   valueCents: z.number(),
-  icon: z.enum(['water', 'bolt']),
+  icon: dashIconSchema,
 });
 export type PaidItem = z.infer<typeof paidItemSchema>;
 
@@ -20,7 +31,7 @@ export const maintenanceSchema = z.object({
   id: z.string().min(1),
   title: z.string(),
   detail: z.string(),
-  icon: z.enum(['wrench', 'building2']),
+  icon: dashIconSchema,
 });
 export type Maintenance = z.infer<typeof maintenanceSchema>;
 

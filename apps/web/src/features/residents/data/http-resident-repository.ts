@@ -24,8 +24,23 @@ export class HttpResidentRepository implements ResidentRepository {
     }
   }
 
+  // The server resolves the current resident from the JWT subject, so the
+  // subject argument is unused here (kept to satisfy the repository interface).
+  async getCurrent(): Promise<Resident | null> {
+    try {
+      return residentSchema.parse(await this.api.get('/api/residents/me'));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
   async save(resident: Resident): Promise<Resident> {
     // PUT upserts by the (client-generated) id, so create and update share a path.
     return residentSchema.parse(await this.api.put(`/api/residents/${resident.id}`, resident));
+  }
+
+  async deactivate(id: string): Promise<void> {
+    await this.api.post(`/api/residents/${id}/deactivate`);
   }
 }

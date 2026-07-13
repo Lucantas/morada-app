@@ -3,17 +3,28 @@ import Database from 'better-sqlite3';
 export type Db = Database.Database;
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS apartments (
+  id TEXT PRIMARY KEY, label TEXT NOT NULL UNIQUE
+);
 CREATE TABLE IF NOT EXISTS residents (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, apt TEXT NOT NULL,
+  id TEXT PRIMARY KEY, name TEXT NOT NULL,
   phone TEXT NOT NULL, email TEXT NOT NULL, status TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS apartment_residents (
+  id TEXT PRIMARY KEY, apartment_id TEXT NOT NULL, resident_id TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (apartment_id, resident_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_resident_per_apartment
+  ON apartment_residents (apartment_id) WHERE active = 1;
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, description TEXT NOT NULL, category TEXT NOT NULL,
   date_label TEXT NOT NULL, value_cents INTEGER NOT NULL, status TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS receipts (
   id TEXT PRIMARY KEY, ref TEXT NOT NULL, title TEXT NOT NULL,
-  due_label TEXT NOT NULL, value_cents INTEGER NOT NULL, status TEXT NOT NULL, method TEXT
+  due_label TEXT NOT NULL, value_cents INTEGER NOT NULL, status TEXT NOT NULL, method TEXT,
+  resident_id TEXT, apartment_id TEXT
 );
 CREATE TABLE IF NOT EXISTS notices (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, kind TEXT NOT NULL,
@@ -22,9 +33,6 @@ CREATE TABLE IF NOT EXISTS notices (
 CREATE TABLE IF NOT EXISTS threads (
   id TEXT PRIMARY KEY, resident_name TEXT NOT NULL, apt TEXT NOT NULL,
   unread INTEGER NOT NULL, messages TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS dashboard (
-  id TEXT PRIMARY KEY, data TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,

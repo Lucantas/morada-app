@@ -20,7 +20,14 @@ function setup() {
     }),
   ]);
   const onPay = jest.fn();
-  renderWithClient(<ReceiptsScreen repository={repository} onPay={onPay} bottomNav={null} />);
+  renderWithClient(
+    <ReceiptsScreen
+      repository={repository}
+      resident={{ name: 'Maria Ribeiro', apt: 'Apto 302' }}
+      onPay={onPay}
+      bottomNav={null}
+    />,
+  );
   return { onPay };
 }
 

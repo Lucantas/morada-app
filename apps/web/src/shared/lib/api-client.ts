@@ -18,6 +18,7 @@ export type ApiClient = {
 export function createApiClient(opts: {
   baseUrl: string;
   getToken: () => string | null;
+  onUnauthorized?: () => void;
 }): ApiClient {
   const request = async (method: string, path: string, body?: unknown): Promise<unknown> => {
     const token = opts.getToken();
@@ -30,6 +31,8 @@ export function createApiClient(opts: {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) {
+      // An expired/rejected token ends the session so the app returns to login.
+      if (res.status === 401) opts.onUnauthorized?.();
       let message = `Erro ${res.status}`;
       try {
         const data = (await res.json()) as { error?: unknown };

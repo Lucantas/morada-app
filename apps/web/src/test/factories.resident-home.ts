@@ -1,6 +1,11 @@
-import type { CurrentResident } from '@/features/resident-home/ui/current-resident';
+type ResidentProfile = {
+  name: string;
+  apt: string;
+  phone: string;
+  email: string;
+};
 
-export function buildCurrentResident(overrides: Partial<CurrentResident> = {}): CurrentResident {
+export function buildCurrentResident(overrides: Partial<ResidentProfile> = {}): ResidentProfile {
   return {
     name: 'Maria Ribeiro',
     apt: 'Apto 302',

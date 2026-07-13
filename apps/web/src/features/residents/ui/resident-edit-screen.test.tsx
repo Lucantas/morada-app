@@ -34,4 +34,20 @@ describe('ResidentEditScreen', () => {
     expect(await screen.findByDisplayValue('Diego Reis')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Apto 202')).toBeInTheDocument();
   });
+
+  test('moving a resident out deactivates them and navigates back', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apt: 'Apto 202', active: true }),
+    ]);
+    const onBack = jest.fn();
+    renderWithClient(
+      <ResidentEditScreen repository={repository} residentId="r-7" onBack={onBack} />,
+    );
+
+    await screen.findByDisplayValue('Diego Reis');
+    await userEvent.click(screen.getByRole('button', { name: /morador saiu/i }));
+
+    await waitFor(() => expect(onBack).toHaveBeenCalled());
+    expect((await repository.getById('r-7'))?.active).toBe(false);
+  });
 });

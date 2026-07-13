@@ -52,4 +52,14 @@ describe('ResidentsScreen', () => {
 
     await waitFor(() => expect(onOpenResident).toHaveBeenCalledWith('r-1'));
   });
+
+  test('the search box filters the list by name', async () => {
+    setup();
+    await screen.findByText('Ana Souza');
+
+    await userEvent.type(screen.getByLabelText('Buscar morador ou apartamento'), 'bruno');
+
+    expect(screen.getByText('Bruno Lima')).toBeInTheDocument();
+    expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument();
+  });
 });

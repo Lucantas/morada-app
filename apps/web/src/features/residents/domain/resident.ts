@@ -7,9 +7,11 @@ export const residentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   apt: z.string().min(1),
+  apartmentId: z.string().optional(),
   phone: z.string(),
   email: z.string(),
   status: residentStatusSchema,
+  active: z.boolean().optional(),
 });
 export type Resident = z.infer<typeof residentSchema>;
 

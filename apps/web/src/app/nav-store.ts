@@ -5,6 +5,7 @@ export type View =
   | 'a-residents'
   | 'a-resident-edit'
   | 'a-resident-login'
+  | 'a-resident-charge'
   | 'a-accounts'
   | 'a-account-edit'
   | 'a-notice'

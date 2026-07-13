@@ -66,4 +66,18 @@ describe('SqliteReceiptRepository', () => {
   test('getById returns null when missing', () => {
     expect(new SqliteReceiptRepository(createTestDb()).getById('nope')).toBeNull();
   });
+
+  test('listByResident returns only that resident receipts and round-trips residentId', () => {
+    const repo = new SqliteReceiptRepository(createTestDb());
+    const base = { ref: '2024-01', title: 'Taxa', dueLabel: '10/01', valueCents: 1000 };
+    repo.save({ ...base, id: 'a1', status: 'pendente', residentId: 'r-1' });
+    repo.save({ ...base, id: 'a2', status: 'pago', method: 'pix', residentId: 'r-1' });
+    repo.save({ ...base, id: 'b1', status: 'pendente', residentId: 'r-2' });
+
+    const mine = repo.listByResident('r-1');
+    expect(mine.map((r) => r.id).sort()).toEqual(['a1', 'a2']);
+    expect(mine.every((r) => r.residentId === 'r-1')).toBe(true);
+    expect(repo.listByResident('r-2')).toHaveLength(1);
+    expect(repo.listByResident('r-9')).toHaveLength(0);
+  });
 });

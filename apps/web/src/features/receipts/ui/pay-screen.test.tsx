@@ -35,4 +35,20 @@ describe('PayScreen', () => {
     expect(saved?.status).toBe('pago');
     expect(saved?.method).toBe('boleto');
   });
+
+  test('copying the Pix code writes the payload to the clipboard', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const repository = new InMemoryReceiptRepository([
+      buildReceipt({ id: 'rc-1', ref: '04/2026', valueCents: 45000, status: 'pendente' }),
+    ]);
+    renderWithClient(<PayScreen repository={repository} receiptId="rc-1" onDone={jest.fn()} />);
+
+    await screen.findByText('REF · 04/2026');
+    await userEvent.click(screen.getByRole('button', { name: 'Copiar código Pix' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toContain('MORADA042026');
+    expect(await screen.findByRole('button', { name: 'Código Pix copiado!' })).toBeInTheDocument();
+  });
 });

@@ -6,11 +6,21 @@ import { listResidents } from './list-residents';
 function fakeRepo(list: Resident[]): ResidentRepository {
   const map = new Map(list.map((r) => [r.id, r]));
   return {
-    list: () => [...map.values()],
+    list: () => [...map.values()].filter((r) => r.active),
     getById: (id) => map.get(id) ?? null,
-    save: (r) => {
-      map.set(r.id, r);
-      return r;
+    listByApartment: (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
+    apartmentOf: (id) => {
+      const r = map.get(id);
+      return r ? { apartmentId: r.apartmentId, apt: r.apt } : null;
+    },
+    save: (input) => {
+      const resident: Resident = { ...input, apartmentId: `ap-${input.apt}`, active: true };
+      map.set(input.id, resident);
+      return resident;
+    },
+    deactivate: (id) => {
+      const r = map.get(id);
+      if (r) map.set(id, { ...r, active: false });
     },
   };
 }
@@ -19,9 +29,11 @@ const build = (over: Partial<Resident>): Resident => ({
   id: 'x',
   name: 'Nome',
   apt: 'Apto 1',
+  apartmentId: 'ap-1',
   phone: '',
   email: '',
   status: 'em_dia',
+  active: true,
   ...over,
 });
 

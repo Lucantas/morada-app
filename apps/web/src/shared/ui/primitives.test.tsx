@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { PhoneFrame } from './phone-frame';
+import { AppShell } from './app-shell';
 import { PrimaryButton, StatCard, SurfaceCard } from './primitives';
 
 describe('shared primitives', () => {
-  test('PhoneFrame renders its children', () => {
-    render(<PhoneFrame>conteúdo</PhoneFrame>);
+  test('AppShell renders its children', () => {
+    render(<AppShell>conteúdo</AppShell>);
     expect(screen.getByText('conteúdo')).toBeInTheDocument();
   });
 

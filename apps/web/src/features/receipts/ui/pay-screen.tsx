@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { QRCodeSVG } from 'qrcode.react';
 
 import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
-import { Screen, ScreenBody } from '@/shared/ui/phone-frame';
+import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton } from '@/shared/ui/primitives';
 
 import { getReceipt } from '../domain/get-receipt';
+import { pixCopyPaste } from '../domain/pix-code';
 import type { ReceiptMethod } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
@@ -28,9 +30,16 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
   });
   const pay = usePayReceipt(repository);
   const [method, setMethod] = useState<ReceiptMethod>('pix');
+  const [pixCopied, setPixCopied] = useState(false);
 
   const confirm = () => {
     pay.mutate({ id: receiptId, method }, { onSuccess: onDone });
+  };
+
+  const copyPix = async () => {
+    if (!receipt.data) return;
+    await navigator.clipboard.writeText(pixCopyPaste(receipt.data));
+    setPixCopied(true);
   };
 
   return (
@@ -147,7 +156,7 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
               })}
             </div>
 
-            {method === 'pix' && (
+            {method === 'pix' && receipt.data && (
               <div
                 style={{
                   display: 'flex',
@@ -158,34 +167,18 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
                 }}
               >
                 <div
-                  aria-hidden="true"
                   style={{
-                    width: 160,
-                    height: 160,
+                    padding: 12,
                     border: '1px solid var(--line)',
                     borderRadius: 'var(--r-md)',
-                    background:
-                      'repeating-conic-gradient(var(--petrol-900) 0% 25%, var(--surface) 0% 50%) 50% / 20px 20px',
-                    display: 'grid',
-                    placeItems: 'center',
+                    background: '#fff',
                   }}
                 >
-                  <span
-                    className="fraunces"
-                    style={{
-                      fontSize: '1.4rem',
-                      fontWeight: 700,
-                      color: 'var(--petrol-900)',
-                      background: 'var(--surface)',
-                      padding: '2px 10px',
-                      borderRadius: 6,
-                    }}
-                  >
-                    QR
-                  </span>
+                  <QRCodeSVG value={pixCopyPaste(receipt.data)} size={136} />
                 </div>
                 <button
                   type="button"
+                  onClick={() => void copyPix()}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -201,7 +194,7 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
                     cursor: 'pointer',
                   }}
                 >
-                  Copiar código Pix
+                  {pixCopied ? 'Código Pix copiado!' : 'Copiar código Pix'}
                 </button>
               </div>
             )}
