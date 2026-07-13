@@ -124,6 +124,7 @@ const receipts = [
     value_cents: 45000,
     status: 'pendente',
     method: null,
+    resident_id: 'r-1',
   },
   {
     id: 'rc-2',
@@ -133,6 +134,7 @@ const receipts = [
     value_cents: 45000,
     status: 'pago',
     method: 'pix',
+    resident_id: 'r-1',
   },
   {
     id: 'rc-3',
@@ -142,6 +144,7 @@ const receipts = [
     value_cents: 45000,
     status: 'pago',
     method: 'boleto',
+    resident_id: 'r-1',
   },
   {
     id: 'rc-4',
@@ -151,6 +154,17 @@ const receipts = [
     value_cents: 45000,
     status: 'pago',
     method: 'pix',
+    resident_id: 'r-1',
+  },
+  {
+    id: 'rc-5',
+    ref: '04/2026',
+    title: 'Taxa condominial',
+    due_label: 'Venc. 10/04/2026',
+    value_cents: 45000,
+    status: 'pendente',
+    method: null,
+    resident_id: 'r-3',
   },
 ];
 
@@ -276,7 +290,7 @@ export function seedDatabase(db: Db): void {
     insertAll(
       db,
       'receipts',
-      ['id', 'ref', 'title', 'due_label', 'value_cents', 'status', 'method'],
+      ['id', 'ref', 'title', 'due_label', 'value_cents', 'status', 'method', 'resident_id'],
       receipts,
     );
   if (isEmpty(db, 'notices'))

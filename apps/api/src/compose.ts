@@ -16,6 +16,7 @@ import { createDb, type Db } from './platform/db';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { SqliteReceiptRepository } from './receipts/adapters/sqlite/receipt-repository';
+import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { SqliteResidentRepository } from './residents/adapters/sqlite/resident-repository';
 import { seedDatabase } from './seed-data';
@@ -95,6 +96,10 @@ export function buildApp(db: Db) {
     );
   });
 
+  // A resident reads their own record by their JWT subject (before the
+  // admin-only group below, which would otherwise 403 this).
+  api.get('/residents/me', (c) => c.json(getResident(residents, c.get('sub'))));
+
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
@@ -103,9 +108,10 @@ export function buildApp(db: Db) {
   api.route('/receipts', receiptRoutes(receipts));
   api.route('/dashboard', dashboardRoutes(dashboard));
 
-  // Notices: reads open to any authenticated user, writes admin-only.
-  api.on(['POST', 'DELETE'], '/notices/*', requireRole('admin'));
+  // Notices: reads and per-resident dismiss are open to any authenticated user;
+  // creating and deleting notices is admin-only.
   api.on('POST', '/notices', requireRole('admin'));
+  api.on('DELETE', '/notices/*', requireRole('admin'));
   api.route('/notices', noticeRoutes(notices));
 
   // Threads: listing all conversations is admin-only; per-thread access stays open.

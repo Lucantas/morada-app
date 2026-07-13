@@ -2,7 +2,7 @@ import type { Db } from '../../../platform/db';
 import { receiptSchema, type Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
-const COLUMNS = 'id, ref, title, due_label, value_cents, status, method';
+const COLUMNS = 'id, ref, title, due_label, value_cents, status, method, resident_id';
 
 interface ReceiptRow {
   id: unknown;
@@ -12,10 +12,11 @@ interface ReceiptRow {
   value_cents: unknown;
   status: unknown;
   method: unknown;
+  resident_id: unknown;
 }
 
 function toReceipt(row: unknown): Receipt {
-  const { id, ref, title, due_label, value_cents, status, method } = row as ReceiptRow;
+  const { id, ref, title, due_label, value_cents, status, method, resident_id } = row as ReceiptRow;
   return receiptSchema.parse({
     id,
     ref,
@@ -24,6 +25,7 @@ function toReceipt(row: unknown): Receipt {
     valueCents: value_cents,
     status,
     method: method ?? undefined,
+    residentId: resident_id ?? undefined,
   });
 }
 
@@ -32,6 +34,13 @@ export class SqliteReceiptRepository implements ReceiptRepository {
 
   list(): Receipt[] {
     const rows = this.db.prepare(`SELECT ${COLUMNS} FROM receipts`).all();
+    return rows.map(toReceipt);
+  }
+
+  listByResident(residentId: string): Receipt[] {
+    const rows = this.db
+      .prepare(`SELECT ${COLUMNS} FROM receipts WHERE resident_id = ?`)
+      .all(residentId);
     return rows.map(toReceipt);
   }
 
@@ -44,12 +53,13 @@ export class SqliteReceiptRepository implements ReceiptRepository {
     this.db
       .prepare(
         `INSERT INTO receipts (${COLUMNS})
-         VALUES (@id, @ref, @title, @dueLabel, @valueCents, @status, @method)
+         VALUES (@id, @ref, @title, @dueLabel, @valueCents, @status, @method, @residentId)
          ON CONFLICT(id) DO UPDATE SET
            ref = @ref, title = @title, due_label = @dueLabel,
-           value_cents = @valueCents, status = @status, method = @method`,
+           value_cents = @valueCents, status = @status, method = @method,
+           resident_id = @residentId`,
       )
-      .run({ ...receipt, method: receipt.method ?? null });
+      .run({ ...receipt, method: receipt.method ?? null, residentId: receipt.residentId ?? null });
     return receipt;
   }
 }

@@ -14,5 +14,6 @@ export const receiptSchema = z.object({
   valueCents: z.number().int(),
   status: receiptStatusSchema,
   method: receiptMethodSchema.optional(),
+  residentId: z.string().min(1).max(64).optional(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;

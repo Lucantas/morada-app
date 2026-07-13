@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 CREATE TABLE IF NOT EXISTS receipts (
   id TEXT PRIMARY KEY, ref TEXT NOT NULL, title TEXT NOT NULL,
-  due_label TEXT NOT NULL, value_cents INTEGER NOT NULL, status TEXT NOT NULL, method TEXT
+  due_label TEXT NOT NULL, value_cents INTEGER NOT NULL, status TEXT NOT NULL, method TEXT,
+  resident_id TEXT
 );
 CREATE TABLE IF NOT EXISTS notices (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL, kind TEXT NOT NULL,

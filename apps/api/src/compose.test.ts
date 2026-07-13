@@ -116,6 +116,23 @@ describe('Morada API — real credentials', () => {
     expect(res.status).toBe(401);
   });
 
+  test('a resident reads their own record via GET /api/residents/me', async () => {
+    const app = makeApp();
+    const token = await tokenFor(app, demoCredentials.resident);
+    const res = await app.request('/api/residents/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const me = (await res.json()) as { id: string; name: string };
+    expect(me.id).toBe(demoCredentials.resident.residentId);
+    expect(me.name).toBe('Maria Ribeiro');
+  });
+
+  test('GET /api/residents/me still requires authentication', async () => {
+    const res = await makeApp().request('/api/residents/me');
+    expect(res.status).toBe(401);
+  });
+
   test("a resident token is scoped to that resident's own id", async () => {
     const app = makeApp();
     const token = await tokenFor(app, demoCredentials.resident);
@@ -232,6 +249,37 @@ describe('Morada API — authorization wiring', () => {
     expect((await auth('/api/dashboard')).status).toBe(200);
   });
 
+  test('a resident lists only their own receipts', async () => {
+    const { auth } = await withCreds(demoCredentials.resident); // r-1
+    const res = await auth('/api/receipts');
+    const receipts = (await res.json()) as { id: string; residentId?: string }[];
+    expect(receipts.length).toBeGreaterThan(0);
+    expect(receipts.every((r) => r.residentId === 'r-1')).toBe(true);
+    expect(receipts.some((r) => r.id === 'rc-5')).toBe(false); // rc-5 belongs to r-3
+  });
+
+  test('a resident cannot read or pay another resident receipt (403)', async () => {
+    const { auth } = await withCreds(demoCredentials.resident); // r-1
+    expect((await auth('/api/receipts/rc-5')).status).toBe(403); // rc-5 is r-3's
+    const pay = await auth('/api/receipts/rc-5/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'pix' }),
+    });
+    expect(pay.status).toBe(403);
+  });
+
+  test('a resident can pay their own receipt', async () => {
+    const { auth } = await withCreds(demoCredentials.resident); // r-1 owns rc-1
+    const pay = await auth('/api/receipts/rc-1/pay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'pix' }),
+    });
+    expect(pay.status).toBe(200);
+    expect(((await pay.json()) as { status: string }).status).toBe('pago');
+  });
+
   test('notices are readable by residents but writable only by admins', async () => {
     const resident = await withCreds(demoCredentials.resident);
     expect((await resident.auth('/api/notices')).status).toBe(200);
@@ -244,6 +292,12 @@ describe('Morada API — authorization wiring', () => {
     expect((await write(resident.auth)).status).toBe(403);
     const admin = await withCreds(demoCredentials.admin);
     expect((await write(admin.auth)).status).toBe(201);
+  });
+
+  test('a resident can dismiss a notice but cannot delete one', async () => {
+    const { auth } = await withCreds(demoCredentials.resident);
+    expect((await auth('/api/notices/n-1/dismiss', { method: 'POST' })).status).toBe(200);
+    expect((await auth('/api/notices/n-1', { method: 'DELETE' })).status).toBe(403);
   });
 
   test('listing all threads is admin-only, but a resident can read their own thread', async () => {

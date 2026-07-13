@@ -8,6 +8,7 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
   const map = new Map(list.map((r) => [r.id, r]));
   return {
     list: () => [...map.values()],
+    listByResident: (rid) => [...map.values()].filter((r) => r.residentId === rid),
     getById: (id) => map.get(id) ?? null,
     save: (r) => {
       map.set(r.id, r);
