@@ -1,9 +1,13 @@
 import { buildApp } from './compose';
 import { createTestDb } from './platform/db';
 import { demoCredentials } from './seed-data';
+import { seedFixtures } from './test-fixtures';
 
 function makeApp() {
-  return buildApp(createTestDb());
+  const db = createTestDb();
+  const app = buildApp(db);
+  seedFixtures(db);
+  return app;
 }
 
 async function login(
