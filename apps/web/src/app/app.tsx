@@ -22,6 +22,7 @@ import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
+import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell } from '@/shared/ui/app-shell';
 
@@ -40,8 +41,6 @@ import { useNavStore, type View } from './nav-store';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000 } },
 });
-
-const CURRENT_RESIDENT = DEFAULT_RESIDENT;
 
 const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-home': 'home',
@@ -212,12 +211,15 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
 }
 
 function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {
+  const currentResident = useCurrentResident(residentRepository, subject ?? null);
+  const resident = currentResident.data ?? DEFAULT_RESIDENT;
   const nav = <BottomNav items={residentNav(view, go)} />;
   switch (view) {
     case 'r-receipts':
       return (
         <ReceiptsScreen
           repository={receiptRepository}
+          resident={resident}
           onPay={(id) => go('r-pay', { residentId: id })}
           bottomNav={nav}
         />
@@ -232,6 +234,7 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
       ) : (
         <ReceiptsScreen
           repository={receiptRepository}
+          resident={resident}
           onPay={(id) => go('r-pay', { residentId: id })}
           bottomNav={nav}
         />
@@ -245,15 +248,13 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
         <SupportScreen repository={threadRepository} threadId={subject ?? 'r-1'} bottomNav={nav} />
       );
     case 'r-profile':
-      return (
-        <ResidentProfileScreen resident={CURRENT_RESIDENT} onSignOut={signOut} bottomNav={nav} />
-      );
+      return <ResidentProfileScreen resident={resident} onSignOut={signOut} bottomNav={nav} />;
     case 'r-home':
     default:
       return (
         <ResidentHomeScreen
           receiptRepository={receiptRepository}
-          resident={CURRENT_RESIDENT}
+          resident={resident}
           onGoReceipts={() => go('r-receipts')}
           onGoFinance={() => go('r-finance')}
           onGoNotices={() => go('r-notices')}

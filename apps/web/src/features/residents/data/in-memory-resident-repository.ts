@@ -18,6 +18,10 @@ export class InMemoryResidentRepository implements ResidentRepository {
     return this.residents.get(id) ?? null;
   }
 
+  async getCurrent(subject: string): Promise<Resident | null> {
+    return this.getById(subject);
+  }
+
   async save(resident: Resident): Promise<Resident> {
     this.residents = new Map(this.residents).set(resident.id, resident);
     return resident;

@@ -8,6 +8,7 @@ function fakeRepo(residents: Resident[]): ResidentRepository {
   return {
     list: async () => residents,
     getById: async (id) => residents.find((r) => r.id === id) ?? null,
+    getCurrent: async (subject) => residents.find((r) => r.id === subject) ?? null,
     save: async (r) => r,
   };
 }

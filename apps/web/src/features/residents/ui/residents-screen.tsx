@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -6,6 +6,7 @@ import { PrimaryButton, SectionLabel, StatCard, SurfaceCard } from '@/shared/ui/
 import { StatusPill } from '@/shared/ui/status-pill';
 import { TopBar } from '@/shared/ui/top-bar';
 
+import { filterResidents } from '../domain/filter-residents';
 import { initials, type Resident } from '../domain/resident';
 import { residentStats } from '../domain/resident-stats';
 import type { ResidentRepository } from '../domain/resident-repository';
@@ -21,6 +22,7 @@ type Props = {
 
 export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props) {
   const residents = useResidents(repository);
+  const [query, setQuery] = useState('');
 
   return (
     <Screen>
@@ -34,6 +36,9 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
           />
           <input
             placeholder="Buscar morador ou apartamento"
+            aria-label="Buscar morador ou apartamento"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             style={{
               width: '100%',
               minHeight: 46,
@@ -54,7 +59,11 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os moradores.</p>
         )}
         {residents.isSuccess && (
-          <ResidentsContent residents={residents.data} onOpenResident={onOpenResident} />
+          <ResidentsContent
+            residents={residents.data}
+            filtered={filterResidents(residents.data, query)}
+            onOpenResident={onOpenResident}
+          />
         )}
       </ScreenBody>
       {bottomNav}
@@ -64,9 +73,11 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
 
 function ResidentsContent({
   residents,
+  filtered,
   onOpenResident,
 }: {
   residents: Resident[];
+  filtered: Resident[];
   onOpenResident: (id?: string) => void;
 }) {
   const stats = residentStats(residents);
@@ -83,15 +94,19 @@ function ResidentsContent({
         </PrimaryButton>
       </div>
       <SectionLabel>Lista de moradores</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {residents.map((resident) => (
-          <ResidentRow
-            key={resident.id}
-            resident={resident}
-            onClick={() => onOpenResident(resident.id)}
-          />
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <p style={{ color: 'var(--ink-500)', padding: '4px 2px' }}>Nenhum morador encontrado.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map((resident) => (
+            <ResidentRow
+              key={resident.id}
+              resident={resident}
+              onClick={() => onOpenResident(resident.id)}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }
