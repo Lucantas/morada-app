@@ -19,7 +19,7 @@ const build = (over: Partial<Account>): Account => ({
   id: 'x',
   description: 'Conta',
   category: 'Geral',
-  dateLabel: '2026-07-10',
+  date: '2026-04-05',
   valueCents: 1000,
   status: 'pendente',
   ...over,

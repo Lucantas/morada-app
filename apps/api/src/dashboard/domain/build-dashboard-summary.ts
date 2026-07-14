@@ -4,9 +4,15 @@ export interface LedgerAccount {
   id: string;
   description: string;
   category: string;
-  dateLabel: string;
+  date: string | null;
   valueCents: number;
   status: string;
+}
+
+// ISO (YYYY-MM-DD) -> BR (DD/MM/YYYY) for display. Callers guard against null.
+function formatBrDate(date: string): string {
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 export interface LedgerReceipt {
@@ -32,12 +38,6 @@ function iconForAccount(account: LedgerAccount): DashIcon {
   return 'receipt';
 }
 
-// Later month/day first; dateLabels are "DD/MM".
-function dateKey(dateLabel: string): number {
-  const [day, month] = dateLabel.split('/').map((n) => Number(n));
-  return (month || 0) * 100 + (day || 0);
-}
-
 function sum(values: { valueCents: number }[]): number {
   return values.reduce((total, v) => total + v.valueCents, 0);
 }
@@ -51,12 +51,12 @@ export function buildDashboardSummary(
   const paidCents = sum(paidAccounts);
 
   const recentPaid = [...paidAccounts]
-    .sort((a, b) => dateKey(b.dateLabel) - dateKey(a.dateLabel))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
     .slice(0, RECENT_PAID_LIMIT)
     .map((a) => ({
       id: a.id,
       label: a.description,
-      dateLabel: `Paga em ${a.dateLabel}`,
+      dateLabel: a.date ? `Paga em ${formatBrDate(a.date)}` : 'Paga',
       valueCents: a.valueCents,
       icon: iconForAccount(a),
     }));
@@ -66,7 +66,7 @@ export function buildDashboardSummary(
     .map((a) => ({
       id: a.id,
       title: a.description,
-      detail: `${STATUS_LABELS[a.status] ?? a.status} · ${a.dateLabel}`,
+      detail: `${STATUS_LABELS[a.status] ?? a.status}${a.date ? ` · ${formatBrDate(a.date)}` : ''}`,
       icon: 'wrench' as const,
     }));
 

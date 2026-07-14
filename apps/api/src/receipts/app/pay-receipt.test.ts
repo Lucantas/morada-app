@@ -22,7 +22,7 @@ const pending: Receipt = {
   id: 'r-1',
   ref: '2024-01',
   title: 'Boleto',
-  dueLabel: '10/01',
+  dueDate: '2026-05-10',
   valueCents: 1000,
   status: 'pendente',
 };
@@ -49,5 +49,23 @@ describe('payReceipt', () => {
 
   test('rejects an invalid method', async () => {
     await expect(payReceipt(fakeRepo([pending]), 'r-1', 'dinheiro')).rejects.toThrow(PaymentError);
+  });
+
+  test('records the given payment date (admin registering a past payment)', async () => {
+    const repo = fakeRepo([pending]);
+    const paid = await payReceipt(repo, 'r-1', 'pix', '2026-05-08');
+    expect(paid.paidAt).toBe('2026-05-08');
+  });
+
+  test('defaults the payment date to today when none is given', async () => {
+    const repo = fakeRepo([pending]);
+    const paid = await payReceipt(repo, 'r-1', 'pix');
+    expect(paid.paidAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('rejects an invalid payment date', async () => {
+    await expect(payReceipt(fakeRepo([pending]), 'r-1', 'pix', '10/05/2026')).rejects.toThrow(
+      PaymentError,
+    );
   });
 });

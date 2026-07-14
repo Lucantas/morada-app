@@ -12,7 +12,7 @@ interface AccountRow {
   id: string;
   description: string;
   category: string;
-  date_label: string;
+  date: string | null;
   value_cents: number;
   status: string;
 }
@@ -29,13 +29,13 @@ export class PostgresDashboardRepository implements DashboardRepository {
 
   async getSummary(): Promise<DashboardSummary> {
     const accountsResult = await this.pool.query<AccountRow>(
-      'SELECT id, description, category, date_label, value_cents, status FROM accounts',
+      'SELECT id, description, category, date::text AS date, value_cents, status FROM accounts',
     );
     const accounts: LedgerAccount[] = accountsResult.rows.map((row) => ({
       id: row.id,
       description: row.description,
       category: row.category,
-      dateLabel: row.date_label,
+      date: row.date,
       valueCents: row.value_cents,
       status: row.status,
     }));

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { ChargeResidentNotFoundError, ReceiptValidationError } from '../domain/errors';
-import { receiptSchema, type Receipt } from '../domain/receipt';
+import { isoDateSchema, receiptSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
 // Resolves the apartment a resident occupies, so the charge is anchored to both
@@ -17,7 +17,7 @@ const inputSchema = z.object({
   ref: z.string().min(1).max(40),
   title: z.string().min(1).max(120),
   valueCents: z.number().int().min(0).max(1_000_000_000),
-  dueLabel: z.string().min(1).max(60),
+  dueDate: isoDateSchema,
 });
 
 export async function createReceipt(

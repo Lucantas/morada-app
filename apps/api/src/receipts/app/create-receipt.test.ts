@@ -24,7 +24,7 @@ const validInput = {
   ref: '05/2026',
   title: 'Taxa condominial',
   valueCents: 45000,
-  dueLabel: 'Venc. 10/05/2026',
+  dueDate: '2026-05-10',
 };
 
 describe('createReceipt', () => {

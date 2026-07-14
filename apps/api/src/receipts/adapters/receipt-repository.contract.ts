@@ -13,7 +13,7 @@ export function runReceiptRepositoryContract(
         id: 'r-1',
         ref: '2024-01',
         title: 'Boleto',
-        dueLabel: '10/01',
+        dueDate: '2026-05-10',
         valueCents: 1000,
         status: 'pago' as const,
         method: 'pix' as const,
@@ -30,7 +30,7 @@ export function runReceiptRepositoryContract(
         id: 'r-2',
         ref: '2024-02',
         title: 'Boleto',
-        dueLabel: '10/02',
+        dueDate: '2026-05-10',
         valueCents: 2000,
         status: 'pendente' as const,
       };
@@ -48,7 +48,7 @@ export function runReceiptRepositoryContract(
         id: 'r-1',
         ref: '2024-01',
         title: 'Boleto',
-        dueLabel: '10/01',
+        dueDate: '2026-05-10',
         valueCents: 1000,
         status: 'pendente',
       });
@@ -56,7 +56,7 @@ export function runReceiptRepositoryContract(
         id: 'r-1',
         ref: '2024-01',
         title: 'Boleto',
-        dueLabel: '10/01',
+        dueDate: '2026-05-10',
         valueCents: 1000,
         status: 'pago',
         method: 'cartao',
@@ -74,7 +74,7 @@ export function runReceiptRepositoryContract(
 
     test('listByResident returns only that resident receipts and round-trips residentId', async () => {
       const repo = await makeRepo();
-      const base = { ref: '2024-01', title: 'Taxa', dueLabel: '10/01', valueCents: 1000 };
+      const base = { ref: '2024-01', title: 'Taxa', dueDate: '2026-05-10', valueCents: 1000 };
       await repo.save({ ...base, id: 'a1', status: 'pendente', residentId: 'r-1' });
       await repo.save({ ...base, id: 'a2', status: 'pago', method: 'pix', residentId: 'r-1' });
       await repo.save({ ...base, id: 'b1', status: 'pendente', residentId: 'r-2' });

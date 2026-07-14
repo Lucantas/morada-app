@@ -9,7 +9,7 @@ const accounts: LedgerAccount[] = [
     id: 'a-1',
     description: 'Água — abril',
     category: 'Utilidades',
-    dateLabel: '05/04',
+    date: '2026-04-05',
     valueCents: 124000,
     status: 'pago',
   },
@@ -17,7 +17,7 @@ const accounts: LedgerAccount[] = [
     id: 'a-2',
     description: 'Energia — áreas comuns',
     category: 'Utilidades',
-    dateLabel: '03/04',
+    date: '2026-04-03',
     valueCents: 89000,
     status: 'pago',
   },
@@ -25,7 +25,7 @@ const accounts: LedgerAccount[] = [
     id: 'a-3',
     description: 'Limpeza',
     category: 'Serviços',
-    dateLabel: '02/04',
+    date: '2026-04-02',
     valueCents: 150000,
     status: 'pago',
   },
@@ -33,7 +33,7 @@ const accounts: LedgerAccount[] = [
     id: 'a-4',
     description: 'Jardinagem',
     category: 'Serviços',
-    dateLabel: '12/04',
+    date: '2026-04-12',
     valueCents: 45000,
     status: 'pendente',
   },
@@ -41,7 +41,7 @@ const accounts: LedgerAccount[] = [
     id: 'a-5',
     description: 'Reparo portão',
     category: 'Manutenção',
-    dateLabel: '15/04',
+    date: '2026-04-15',
     valueCents: 30000,
     status: 'atrasado',
   },
@@ -71,7 +71,7 @@ describe('buildDashboardSummary', () => {
     expect(recentPaid.map((p) => p.id)).toEqual(['a-1', 'a-2', 'a-3']);
     expect(recentPaid[0]).toMatchObject({
       label: 'Água — abril',
-      dateLabel: 'Paga em 05/04',
+      dateLabel: 'Paga em 05/04/2026',
       icon: 'water',
     });
     expect(recentPaid[1]?.icon).toBe('bolt');
@@ -82,9 +82,27 @@ describe('buildDashboardSummary', () => {
     expect(maintenances).toHaveLength(1);
     expect(maintenances[0]).toMatchObject({
       title: 'Reparo portão',
-      detail: 'Atrasado · 15/04',
+      detail: 'Atrasado · 15/04/2026',
       icon: 'wrench',
     });
+  });
+
+  test('paid accounts and maintenances without a date omit it gracefully', () => {
+    const summary = buildDashboardSummary(
+      [
+        {
+          id: 'a-x',
+          description: 'Reparo sem data',
+          category: 'Manutenção',
+          date: null,
+          valueCents: 1000,
+          status: 'pago',
+        },
+      ],
+      [],
+    );
+    expect(summary.recentPaid[0]?.dateLabel).toBe('Paga');
+    expect(summary.maintenances[0]?.detail).toBe('Pago');
   });
 
   test('handles an empty ledger', () => {

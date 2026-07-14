@@ -51,14 +51,14 @@ const build = (over: Partial<Resident>): Resident => ({
 });
 
 describe('listResidents', () => {
-  test('returns residents sorted by name', async () => {
+  test('returns residents ordered by apartment number (numeric, not lexical)', async () => {
     const repo = fakeRepo([
-      build({ id: 'b', name: 'Bruno' }),
-      build({ id: 'a', name: 'Ana' }),
-      build({ id: 'c', name: 'Carla' }),
+      build({ id: 'b', name: 'Bruno', apt: 'Apto 10' }),
+      build({ id: 'a', name: 'Ana', apt: 'Apto 2' }),
+      build({ id: 'c', name: 'Carla', apt: 'Apto 100' }),
     ]);
     const residents = await listResidents(repo, fakeReceipts([]));
-    expect(residents.map((r) => r.name)).toEqual(['Ana', 'Bruno', 'Carla']);
+    expect(residents.map((r) => r.apt)).toEqual(['Apto 2', 'Apto 10', 'Apto 100']);
   });
 
   test('derives pendente for a resident with a pending receipt, em_dia otherwise', async () => {

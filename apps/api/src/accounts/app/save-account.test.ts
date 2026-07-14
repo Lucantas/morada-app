@@ -23,7 +23,7 @@ describe('saveAccount', () => {
     const saved = await saveAccount(repo, {
       description: 'Energia',
       category: 'Utilidades',
-      dateLabel: '2026-07-10',
+      date: '2026-04-05',
       valueCents: 5000,
       status: 'pendente',
     });
@@ -37,7 +37,7 @@ describe('saveAccount', () => {
       id: 'a-1',
       description: 'Água',
       category: 'Utilidades',
-      dateLabel: '2026-07-10',
+      date: '2026-04-05',
       valueCents: 3000,
       status: 'pago',
     });
@@ -49,7 +49,7 @@ describe('saveAccount', () => {
       saveAccount(fakeRepo(), {
         description: '',
         category: 'Utilidades',
-        dateLabel: '2026-07-10',
+        date: '2026-04-05',
         valueCents: 3000,
         status: 'pendente',
       }),

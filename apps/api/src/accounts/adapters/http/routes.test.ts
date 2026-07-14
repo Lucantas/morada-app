@@ -31,7 +31,7 @@ describe('accountRoutes', () => {
       id: 'a-1',
       description: 'Energia',
       category: 'Utilidades',
-      dateLabel: '2026-07-10',
+      date: '2026-04-05',
       valueCents: 5000,
       status: 'pendente',
     });
@@ -53,7 +53,7 @@ describe('accountRoutes', () => {
       body: JSON.stringify({
         description: 'Água',
         category: 'Utilidades',
-        dateLabel: '2026-07-10',
+        date: '2026-04-05',
         valueCents: 3000,
         status: 'pago',
       }),
@@ -71,7 +71,7 @@ describe('accountRoutes', () => {
       id: 'a-9',
       description: 'Gás',
       category: 'Utilidades',
-      dateLabel: '2026-07-10',
+      date: '2026-04-05',
       valueCents: 1200,
       status: 'atrasado',
     });

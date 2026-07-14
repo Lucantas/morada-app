@@ -86,4 +86,17 @@ CREATE UNIQUE INDEX idx_users_resident_id
   ON users (resident_id) WHERE resident_id IS NOT NULL;
 `,
   },
+  {
+    // Dates as real DATE columns (was free-text labels) so they store cleanly and
+    // report well: receipts get a due date + a payment date; accounts get a date.
+    id: '002_dates',
+    sql: `
+ALTER TABLE receipts DROP COLUMN due_label;
+ALTER TABLE receipts ADD COLUMN due_date DATE;
+ALTER TABLE receipts ADD COLUMN paid_at DATE;
+
+ALTER TABLE accounts DROP COLUMN date_label;
+ALTER TABLE accounts ADD COLUMN date DATE;
+`,
+  },
 ];

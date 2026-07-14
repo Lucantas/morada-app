@@ -6,7 +6,7 @@ const build = (over: Partial<Receipt>): Receipt => ({
   id: 'x',
   ref: '2024-01',
   title: 'Boleto',
-  dueLabel: '10/01',
+  dueDate: '2026-05-10',
   valueCents: 1000,
   status: 'pago',
   ...over,

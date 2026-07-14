@@ -10,7 +10,13 @@ import { payReceipt } from '../../app/pay-receipt';
 import type { Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
-const paySchema = z.object({ method: z.enum(['pix', 'boleto', 'cartao']) });
+const paySchema = z.object({
+  method: z.enum(['pix', 'boleto', 'cartao']),
+  paidAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
 
 // A resident may only see/pay their own receipts; admins are unrestricted.
 function denyForeignReceipt(c: Context<ApiEnv>, receipt: Receipt): Response | null {
@@ -41,8 +47,10 @@ export function receiptRoutes(repo: ReceiptRepository) {
     const receipt = await getReceipt(repo, c.req.param('id'));
     const denied = denyForeignReceipt(c, receipt);
     if (denied) return denied;
-    const { method } = paySchema.parse(await c.req.json());
-    return c.json(await payReceipt(repo, c.req.param('id'), method));
+    const { method, paidAt } = paySchema.parse(await c.req.json());
+    // Only the admin may back-date a payment; a resident's own payment is dated now.
+    const effectivePaidAt = c.get('role') === 'admin' ? paidAt : undefined;
+    return c.json(await payReceipt(repo, c.req.param('id'), method, effectivePaidAt));
   });
 
   return app;

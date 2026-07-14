@@ -385,7 +385,7 @@ describe('Morada API — authorization wiring', () => {
         ref: '05/2026',
         title: 'Taxa condominial',
         valueCents: 45000,
-        dueLabel: 'Venc. 10/05/2026',
+        dueDate: '2026-05-10',
       }),
     });
     expect(issue.status).toBe(201);
@@ -411,7 +411,7 @@ describe('Morada API — authorization wiring', () => {
         ref: '05/2026',
         title: 'Taxa',
         valueCents: 1000,
-        dueLabel: 'x',
+        dueDate: '2026-05-10',
       }),
     });
     expect(res.status).toBe(403);
@@ -428,7 +428,7 @@ describe('Morada API — authorization wiring', () => {
         ref: '05/2026',
         title: 'Taxa',
         valueCents: 1000,
-        dueLabel: 'x',
+        dueDate: '2026-05-10',
       }),
     });
     expect(res.status).toBe(404);
