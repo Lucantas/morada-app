@@ -206,6 +206,31 @@ describe('Morada API — apartments & occupancy', () => {
     expect(at888.map((r) => r.name)).toEqual(['B']);
   });
 
+  test("an admin reads an apartment's occupant history (current + former, active-first)", async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const first = await auth('/api/residents', { method: 'POST', body: resident('Apto 777', 'A') });
+    const { id, apartmentId } = (await first.json()) as { id: string; apartmentId: string };
+    expect((await auth(`/api/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
+    await auth('/api/residents', { method: 'POST', body: resident('Apto 777', 'B') });
+
+    const res = await auth(`/api/apartments/${apartmentId}/residents`);
+    expect(res.status).toBe(200);
+    const history = (await res.json()) as { name: string; active: boolean }[];
+    expect(history.map((r) => r.name).sort()).toEqual(['A', 'B']);
+    expect(history[0]?.name).toBe('B'); // active occupant first
+    expect(history[0]?.active).toBe(true);
+  });
+
+  test('the apartment occupant history is admin-only', async () => {
+    const app = await makeApp();
+    const token = await tokenFor(app, residentCredentials);
+    const res = await app.request('/api/apartments/apt-r-1/residents', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(403);
+  });
+
   test("an admin reads an apartment's full receipt ledger", async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);

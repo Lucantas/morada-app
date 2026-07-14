@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
+import type { ReceiptRepository } from '../../../receipts/domain/receipt-repository';
 import { deactivateResident } from '../../app/deactivate-resident';
 import { getResident } from '../../app/get-resident';
 import { listResidents } from '../../app/list-residents';
@@ -8,12 +9,12 @@ import { saveResident } from '../../app/save-resident';
 import { residentDraftSchema } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
 
-export function residentRoutes(repo: ResidentRepository) {
+export function residentRoutes(repo: ResidentRepository, receipts: ReceiptRepository) {
   const app = new Hono<ApiEnv>();
 
-  app.get('/', async (c) => c.json(await listResidents(repo)));
+  app.get('/', async (c) => c.json(await listResidents(repo, receipts)));
 
-  app.get('/:id', async (c) => c.json(await getResident(repo, c.req.param('id'))));
+  app.get('/:id', async (c) => c.json(await getResident(repo, receipts, c.req.param('id'))));
 
   app.post('/', async (c) => {
     const draft = residentDraftSchema.parse(await c.req.json());

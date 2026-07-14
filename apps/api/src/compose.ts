@@ -95,10 +95,12 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   // A resident reads their own record by their JWT subject (before the
   // admin-only group below, which would otherwise 403 this).
-  api.get('/residents/me', async (c) => c.json(await getResident(residents, c.get('sub'))));
+  api.get('/residents/me', async (c) =>
+    c.json(await getResident(residents, receipts, c.get('sub'))),
+  );
 
   // Admin-only resources.
-  api.route('/residents', guarded('admin', residentRoutes(residents)));
+  api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
 
   // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
@@ -113,6 +115,12 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // occupied it (the resident-facing view stays scoped to their own receipts).
   api.get('/apartments/:id/receipts', requireRole('admin'), async (c) =>
     c.json(await receipts.listByApartment(c.req.param('id'))),
+  );
+
+  // Admin: an apartment's occupant history — the current resident plus everyone
+  // who has moved out (active-first). Powers the "moradores antigos" view.
+  api.get('/apartments/:id/residents', requireRole('admin'), async (c) =>
+    c.json(await residents.listByApartment(c.req.param('id'))),
   );
 
   // Any authenticated user (reads are scoped to the caller inside the routes).

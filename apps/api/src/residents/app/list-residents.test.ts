@@ -1,3 +1,5 @@
+import type { Receipt } from '../../receipts/domain/receipt';
+import type { ReceiptRepository } from '../../receipts/domain/receipt-repository';
 import type { Resident } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
@@ -25,6 +27,17 @@ function fakeRepo(list: Resident[]): ResidentRepository {
   };
 }
 
+function fakeReceipts(rows: Pick<Receipt, 'residentId' | 'status'>[]): ReceiptRepository {
+  const all = rows as Receipt[];
+  return {
+    list: async () => all,
+    listByResident: async (id) => all.filter((r) => r.residentId === id),
+    listByApartment: async () => [],
+    getById: async () => null,
+    save: async (r) => r,
+  };
+}
+
 const build = (over: Partial<Resident>): Resident => ({
   id: 'x',
   name: 'Nome',
@@ -44,6 +57,18 @@ describe('listResidents', () => {
       build({ id: 'a', name: 'Ana' }),
       build({ id: 'c', name: 'Carla' }),
     ]);
-    expect((await listResidents(repo)).map((r) => r.name)).toEqual(['Ana', 'Bruno', 'Carla']);
+    const residents = await listResidents(repo, fakeReceipts([]));
+    expect(residents.map((r) => r.name)).toEqual(['Ana', 'Bruno', 'Carla']);
+  });
+
+  test('derives pendente for a resident with a pending receipt, em_dia otherwise', async () => {
+    const repo = fakeRepo([build({ id: 'a', name: 'Ana' }), build({ id: 'b', name: 'Bruno' })]);
+    const receipts = fakeReceipts([
+      { residentId: 'a', status: 'pendente' },
+      { residentId: 'b', status: 'pago' },
+    ]);
+    const byId = new Map((await listResidents(repo, receipts)).map((r) => [r.id, r.status]));
+    expect(byId.get('a')).toBe('pendente');
+    expect(byId.get('b')).toBe('em_dia');
   });
 });
