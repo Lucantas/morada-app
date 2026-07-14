@@ -138,6 +138,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
       return (
         <ResidentEditScreen
           repository={residentRepository}
+          receiptRepository={receiptRepository}
           residentId={residentId}
           onBack={() => go('a-residents')}
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
@@ -313,7 +314,7 @@ function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavIt
     },
     {
       key: 'residents',
-      label: 'Moradores',
+      label: 'Apartamentos',
       icon: 'residents',
       active: active === 'residents',
       onClick: () => go('a-residents'),

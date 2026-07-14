@@ -31,6 +31,16 @@ describe('HttpResidentRepository', () => {
     expect(await new HttpResidentRepository(api).getById('nope')).toBeNull();
   });
 
+  test('listByApartment parses the apartment occupant-history response', async () => {
+    const resident = buildResident({ id: 'r-1', apartmentId: 'apt-9' });
+    const api = fakeApi({ get: jest.fn().mockResolvedValue([resident]) });
+
+    const result = await new HttpResidentRepository(api).listByApartment('apt-9');
+
+    expect(api.get).toHaveBeenCalledWith('/api/apartments/apt-9/residents');
+    expect(result).toEqual([resident]);
+  });
+
   test('getById rethrows non-404 errors', async () => {
     const api = fakeApi({ get: jest.fn().mockRejectedValue(new ApiError(500, 'boom')) });
 

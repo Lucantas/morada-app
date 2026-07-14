@@ -14,6 +14,10 @@ export class InMemoryReceiptRepository implements ReceiptRepository {
     return [...this.receipts.values()];
   }
 
+  async listByApartment(apartmentId: string): Promise<Receipt[]> {
+    return [...this.receipts.values()].filter((r) => r.apartmentId === apartmentId);
+  }
+
   async getById(id: string): Promise<Receipt | null> {
     return this.receipts.get(id) ?? null;
   }

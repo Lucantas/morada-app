@@ -30,6 +30,16 @@ describe('InMemoryReceiptRepository', () => {
     expect(before).toHaveLength(1);
   });
 
+  test('listByApartment returns only the given apartment ledger', async () => {
+    const repo = new InMemoryReceiptRepository([
+      buildReceipt({ id: 'a', apartmentId: 'apt-1' }),
+      buildReceipt({ id: 'b', apartmentId: 'apt-2' }),
+      buildReceipt({ id: 'c', apartmentId: 'apt-1' }),
+    ]);
+
+    expect((await repo.listByApartment('apt-1')).map((r) => r.id).sort()).toEqual(['a', 'c']);
+  });
+
   test('rejects malformed seed data at the boundary', () => {
     expect(() => new InMemoryReceiptRepository([{ id: 'a', ref: 'X' }])).toThrow();
   });

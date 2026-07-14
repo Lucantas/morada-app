@@ -26,7 +26,7 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Moradores">
+      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Apartamentos">
         <div style={{ position: 'relative', marginTop: 14 }}>
           <Icon
             name="search"
@@ -54,9 +54,9 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
         </div>
       </TopBar>
       <ScreenBody>
-        {residents.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando moradores…</p>}
+        {residents.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando apartamentos…</p>}
         {residents.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os moradores.</p>
+          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os apartamentos.</p>
         )}
         {residents.isSuccess && (
           <ResidentsContent
@@ -84,18 +84,20 @@ function ResidentsContent({
   return (
     <>
       <div style={{ display: 'flex', gap: 10, marginBottom: 6 }}>
-        <StatCard value={stats.total} label="Moradores" />
+        <StatCard value={stats.total} label="Apartamentos" />
         <StatCard value={stats.emDia} label="Em dia" valueColor="var(--pago-700)" />
         <StatCard value={stats.pendencias} label="Pendências" valueColor="var(--atraso-700)" />
       </div>
       <div style={{ marginTop: 12 }}>
         <PrimaryButton icon="userPlus" onClick={() => onOpenResident()}>
-          Cadastrar morador
+          Cadastrar apartamento
         </PrimaryButton>
       </div>
-      <SectionLabel>Lista de moradores</SectionLabel>
+      <SectionLabel>Lista de apartamentos</SectionLabel>
       {filtered.length === 0 ? (
-        <p style={{ color: 'var(--ink-500)', padding: '4px 2px' }}>Nenhum morador encontrado.</p>
+        <p style={{ color: 'var(--ink-500)', padding: '4px 2px' }}>
+          Nenhum apartamento encontrado.
+        </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((resident) => (
@@ -135,8 +137,8 @@ function ResidentRow({ resident, onClick }: { resident: Resident; onClick: () =>
         {initials(resident.name)}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: '1rem' }}>{resident.name}</div>
-        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>{resident.apt} · Bloco 2</div>
+        <div style={{ fontWeight: 600, fontSize: '1rem' }}>{resident.apt}</div>
+        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>{resident.name} · Bloco 2</div>
       </div>
       <StatusPill tone={view.tone} label={view.label} />
       <Icon name="chevronRight" size={18} color="var(--ink-300)" style={{ flex: 'none' }} />

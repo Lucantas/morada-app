@@ -1,22 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import type { Receipt } from '@/features/receipts/domain/receipt';
+import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
+import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
-import { Field, PrimaryButton } from '@/shared/ui/primitives';
+import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
+import { StatusPill } from '@/shared/ui/status-pill';
 
 import { getResident } from '../domain/get-resident';
 import type { ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
 import { residentStatusView } from './resident-status-view';
-import { residentsQueryKey, useDeactivateResident, useSaveResident } from './use-residents';
+import {
+  residentsQueryKey,
+  useApartmentReceipts,
+  useApartmentResidents,
+  useDeactivateResident,
+  useSaveResident,
+} from './use-residents';
 
-const STATUSES: ResidentStatus[] = ['em_dia', 'pendente', 'atrasado'];
 const EMPTY = { name: '', apt: '', phone: '', email: '', status: 'em_dia' as ResidentStatus };
 
 type Props = {
   repository: ResidentRepository;
+  receiptRepository: ReceiptRepository;
   residentId?: string;
   onBack: () => void;
   onCreateLogin?: () => void;
@@ -25,6 +35,7 @@ type Props = {
 
 export function ResidentEditScreen({
   repository,
+  receiptRepository,
   residentId,
   onBack,
   onCreateLogin,
@@ -38,6 +49,12 @@ export function ResidentEditScreen({
   const save = useSaveResident(repository);
   const deactivate = useDeactivateResident(repository);
   const [form, setForm] = useState(EMPTY);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const apartmentId = existing.data?.apartmentId;
+  const history = useApartmentResidents(repository, apartmentId);
+  const receipts = useApartmentReceipts(receiptRepository, apartmentId);
+  const archived = (history.data ?? []).filter((r) => !r.active && r.id !== residentId);
 
   useEffect(() => {
     if (existing.data) {
@@ -49,10 +66,7 @@ export function ResidentEditScreen({
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const submit = () => {
-    save.mutate({ ...form, id: residentId }, { onSuccess: onBack });
-  };
-
+  const submit = () => save.mutate({ ...form, id: residentId }, { onSuccess: onBack });
   const moveOut = () => {
     if (residentId) deactivate.mutate(residentId, { onSuccess: onBack });
   };
@@ -63,8 +77,9 @@ export function ResidentEditScreen({
       : 'Não foi possível salvar.'
     : null;
   const isActive = existing.data?.active !== false;
-
-  const title = residentId ? (existing.data?.name ?? 'Editar morador') : 'Novo morador';
+  const statusView = existing.data ? residentStatusView(existing.data.status) : null;
+  const title = residentId ? (existing.data?.apt ?? 'Apartamento') : 'Novo apartamento';
+  const moradorSubtitle = residentId && isActive ? 'Morador atual' : 'Morador';
 
   return (
     <Screen>
@@ -98,156 +113,238 @@ export function ResidentEditScreen({
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Moradores · Bloco 2
+            Apartamentos · Bloco 2
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             {title}
           </div>
         </div>
+        {residentId && statusView && <StatusPill tone={statusView.tone} label={statusView.label} />}
       </div>
       <ScreenBody>
-        <div style={{ paddingTop: 2 }}>
-          <Field
-            label="Nome completo"
-            value={form.name}
-            onChange={set('name')}
-            placeholder="Ex.: Maria Ribeiro"
-          />
-          <Field
-            label="Apartamento"
-            value={form.apt}
-            onChange={set('apt')}
-            placeholder="Ex.: Apto 302"
-          />
-          <Field
-            label="Telefone"
-            value={form.phone}
-            onChange={set('phone')}
-            placeholder="(11) 90000-0000"
-          />
-          <Field
-            label="E-mail"
-            value={form.email}
-            onChange={set('email')}
-            placeholder="morador@email.com"
-            type="email"
-          />
-
-          <label
+        <label style={{ display: 'block', marginBottom: 18 }}>
+          <span
             style={{
               display: 'block',
               fontWeight: 600,
               fontSize: '.9rem',
-              marginBottom: 9,
+              marginBottom: 7,
               color: 'var(--ink-900)',
             }}
           >
-            Situação
-          </label>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {STATUSES.map((status) => {
-              const view = residentStatusView(status);
-              const active = form.status === status;
-              return (
-                <button
-                  key={status}
-                  onClick={() => setForm((prev) => ({ ...prev, status }))}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    borderRadius: 'var(--r-sm)',
-                    border: `1.5px solid ${active ? 'var(--petrol-600)' : 'var(--line)'}`,
-                    background: active ? 'var(--petrol-50)' : 'var(--surface)',
-                    color: active ? 'var(--petrol-800)' : 'var(--ink-500)',
-                    fontFamily: "'Inter', sans-serif",
-                    fontWeight: 600,
-                    fontSize: '.86rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {view.label}
-                </button>
-              );
-            })}
-          </div>
+            Número do apartamento
+          </span>
+          <input
+            value={form.apt}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => set('apt')(e.target.value)}
+            placeholder="Ex.: Apto 302"
+            style={{
+              width: '100%',
+              minHeight: 54,
+              border: '1.5px solid var(--petrol-100)',
+              borderRadius: 'var(--r-md)',
+              padding: '0 16px',
+              fontFamily: "'Fraunces', serif",
+              fontWeight: 600,
+              fontSize: '1.35rem',
+              color: 'var(--petrol-900)',
+              background: 'var(--surface)',
+            }}
+          />
+        </label>
 
-          {saveError && (
-            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '0 0 12px' }}>
-              {saveError}
-            </p>
-          )}
+        <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 4px' }} />
 
+        <SectionLabel
+          right={
+            residentId && isActive ? (
+              <button type="button" onClick={moveOut} style={archiveButtonStyle}>
+                <Icon name="logout" size={15} />
+                {deactivate.isPending ? 'Arquivando…' : 'Arquivar morador'}
+              </button>
+            ) : undefined
+          }
+        >
+          {moradorSubtitle}
+        </SectionLabel>
+
+        <Field
+          label="Nome completo"
+          value={form.name}
+          onChange={set('name')}
+          placeholder="Ex.: Maria Ribeiro"
+        />
+        <Field
+          label="Telefone"
+          value={form.phone}
+          onChange={set('phone')}
+          placeholder="(11) 90000-0000"
+        />
+        <Field
+          label="E-mail"
+          value={form.email}
+          onChange={set('email')}
+          placeholder="morador@email.com"
+          type="email"
+        />
+
+        {apartmentId && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              style={archiveButtonStyle}
+            >
+              <Icon name="clock" size={15} />
+              Ver moradores antigos
+            </button>
+            {showArchived && (
+              <div style={{ marginTop: 12 }}>
+                {archived.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 16,
+                      textAlign: 'center',
+                      fontSize: '.86rem',
+                      color: 'var(--ink-500)',
+                      background: 'var(--surface-2)',
+                      border: '1px dashed var(--line)',
+                      borderRadius: 'var(--r-md)',
+                    }}
+                  >
+                    Nenhum morador antigo registrado.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {archived.map((r) => (
+                      <SurfaceCard
+                        key={r.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{r.name}</div>
+                          <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>
+                            {r.phone}
+                          </div>
+                        </div>
+                      </SurfaceCard>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <ReceiptsSection receipts={receipts.data ?? []} onIssueCharge={onIssueCharge} />
+          </>
+        )}
+
+        {saveError && (
+          <p role="alert" style={{ color: 'var(--atraso-700)', margin: '16px 0 12px' }}>
+            {saveError}
+          </p>
+        )}
+
+        <div style={{ marginTop: 20 }}>
           <PrimaryButton icon="check" onClick={submit}>
-            {residentId ? 'Salvar alterações' : 'Cadastrar morador'}
+            {residentId ? 'Salvar alterações' : 'Cadastrar apartamento'}
           </PrimaryButton>
-
-          {onCreateLogin && (
-            <button
-              type="button"
-              onClick={onCreateLogin}
-              style={{
-                width: '100%',
-                minHeight: 50,
-                marginTop: 12,
-                borderRadius: 'var(--r-md)',
-                border: '1.5px solid var(--petrol-600)',
-                background: 'var(--surface)',
-                color: 'var(--petrol-800)',
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-              }}
-            >
-              Criar acesso do morador
-            </button>
-          )}
-
-          {onIssueCharge && (
-            <button
-              type="button"
-              onClick={onIssueCharge}
-              style={{
-                width: '100%',
-                minHeight: 50,
-                marginTop: 12,
-                borderRadius: 'var(--r-md)',
-                border: '1.5px solid var(--petrol-600)',
-                background: 'var(--surface)',
-                color: 'var(--petrol-800)',
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-              }}
-            >
-              Emitir cobrança
-            </button>
-          )}
-
-          {residentId && isActive && (
-            <button
-              type="button"
-              onClick={moveOut}
-              style={{
-                width: '100%',
-                minHeight: 50,
-                marginTop: 12,
-                borderRadius: 'var(--r-md)',
-                border: '1.5px solid var(--atraso-line)',
-                background: 'var(--surface)',
-                color: 'var(--atraso-700)',
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: '1rem',
-                cursor: 'pointer',
-              }}
-            >
-              {deactivate.isPending ? 'Registrando saída…' : 'Morador saiu (liberar apartamento)'}
-            </button>
-          )}
         </div>
+
+        {onCreateLogin && (
+          <button type="button" onClick={onCreateLogin} style={secondaryButtonStyle}>
+            Criar acesso do morador
+          </button>
+        )}
       </ScreenBody>
     </Screen>
   );
 }
+
+function ReceiptsSection({
+  receipts,
+  onIssueCharge,
+}: {
+  receipts: Receipt[];
+  onIssueCharge?: () => void;
+}) {
+  return (
+    <>
+      <SectionLabel
+        right={
+          onIssueCharge ? (
+            <button type="button" onClick={onIssueCharge} style={archiveButtonStyle}>
+              <Icon name="plus" size={15} />
+              Emitir cobrança
+            </button>
+          ) : undefined
+        }
+      >
+        Recibos de pagamento
+      </SectionLabel>
+      {receipts.length === 0 ? (
+        <p style={{ color: 'var(--ink-500)', padding: '4px 2px', fontSize: '.9rem' }}>
+          Nenhum recibo emitido para este apartamento.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {receipts.map((r) => (
+            <SurfaceCard
+              key={r.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{r.title}</div>
+                <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>REF · {r.ref}</div>
+              </div>
+              <span
+                className="fraunces"
+                style={{ fontWeight: 700, fontSize: '.98rem', fontVariantNumeric: 'tabular-nums' }}
+              >
+                R$ {formatBRL(r.valueCents)}
+              </span>
+              <StatusPill
+                tone={r.status === 'pago' ? 'pago' : 'pendente'}
+                label={r.status === 'pago' ? 'Pago' : 'Pendente'}
+              />
+            </SurfaceCard>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+const archiveButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 5,
+  minHeight: 34,
+  padding: '0 12px',
+  border: '1.5px solid var(--petrol-100)',
+  borderRadius: 'var(--r-sm)',
+  background: 'var(--petrol-50)',
+  color: 'var(--petrol-800)',
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 600,
+  fontSize: '.82rem',
+  cursor: 'pointer',
+} as const;
+
+const secondaryButtonStyle = {
+  width: '100%',
+  minHeight: 50,
+  marginTop: 12,
+  borderRadius: 'var(--r-md)',
+  border: '1.5px solid var(--petrol-600)',
+  background: 'var(--surface)',
+  color: 'var(--petrol-800)',
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 600,
+  fontSize: '1rem',
+  cursor: 'pointer',
+} as const;

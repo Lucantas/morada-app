@@ -30,6 +30,16 @@ describe('InMemoryResidentRepository', () => {
     expect(before).toHaveLength(1);
   });
 
+  test('listByApartment returns every occupant of the apartment', async () => {
+    const repo = new InMemoryResidentRepository([
+      buildResident({ id: 'a', apartmentId: 'apt-1', active: true }),
+      buildResident({ id: 'b', apartmentId: 'apt-1', active: false }),
+      buildResident({ id: 'c', apartmentId: 'apt-2', active: true }),
+    ]);
+
+    expect((await repo.listByApartment('apt-1')).map((r) => r.id).sort()).toEqual(['a', 'b']);
+  });
+
   test('rejects malformed seed data at the boundary', () => {
     expect(() => new InMemoryResidentRepository([{ id: 'a', name: 'X' }])).toThrow();
   });

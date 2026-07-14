@@ -25,6 +25,16 @@ describe('HttpReceiptRepository', () => {
     expect(result).toEqual([receipt]);
   });
 
+  test('listByApartment parses the apartment ledger response', async () => {
+    const receipt = buildReceipt({ id: 'rc-1', apartmentId: 'apt-9' });
+    const api = fakeApi({ get: jest.fn().mockResolvedValue([receipt]) });
+
+    const result = await new HttpReceiptRepository(api).listByApartment('apt-9');
+
+    expect(api.get).toHaveBeenCalledWith('/api/apartments/apt-9/receipts');
+    expect(result).toEqual([receipt]);
+  });
+
   test('getById returns null on a 404', async () => {
     const api = fakeApi({ get: jest.fn().mockRejectedValue(new ApiError(404, 'não encontrado')) });
 

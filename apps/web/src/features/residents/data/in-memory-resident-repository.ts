@@ -22,6 +22,10 @@ export class InMemoryResidentRepository implements ResidentRepository {
     return this.getById(subject);
   }
 
+  async listByApartment(apartmentId: string): Promise<Resident[]> {
+    return [...this.residents.values()].filter((r) => r.apartmentId === apartmentId);
+  }
+
   async save(resident: Resident): Promise<Resident> {
     this.residents = new Map(this.residents).set(resident.id, resident);
     return resident;

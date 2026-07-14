@@ -7,6 +7,7 @@ import type { ReceiptRepository } from './receipt-repository';
 function fakeRepo(receipts: Receipt[]): ReceiptRepository {
   return {
     list: async () => receipts,
+    listByApartment: async (aid) => receipts.filter((r) => r.apartmentId === aid),
     getById: async (id) => receipts.find((r) => r.id === id) ?? null,
     save: async (r) => r,
   };

@@ -10,8 +10,8 @@ import { ResidentsScreen } from './residents-screen';
 
 function setup() {
   const repository = new InMemoryResidentRepository([
-    buildResident({ id: 'r-1', name: 'Ana Souza', status: 'em_dia' }),
-    buildResident({ id: 'r-2', name: 'Bruno Lima', status: 'pendente' }),
+    buildResident({ id: 'r-1', name: 'Ana Souza', apt: 'Apto 101', status: 'em_dia' }),
+    buildResident({ id: 'r-2', name: 'Bruno Lima', apt: 'Apto 202', status: 'pendente' }),
   ]);
   const onOpenResident = jest.fn();
   renderWithClient(
@@ -21,45 +21,46 @@ function setup() {
 }
 
 describe('ResidentsScreen', () => {
-  test('renders the resident list once loaded', async () => {
+  test('renders each apartment with its resident once loaded', async () => {
     setup();
 
-    expect(await screen.findByText('Ana Souza')).toBeInTheDocument();
-    expect(screen.getByText('Bruno Lima')).toBeInTheDocument();
+    expect(await screen.findByText('Apto 101')).toBeInTheDocument();
+    expect(screen.getByText('Apto 202')).toBeInTheDocument();
+    expect(screen.getByText(/Ana Souza/)).toBeInTheDocument();
   });
 
-  test('shows the stat cards for total and pendências', async () => {
+  test('shows the stat cards for apartments and pendências', async () => {
     setup();
 
-    await screen.findByText('Ana Souza');
-    expect(screen.getAllByText('Moradores').length).toBeGreaterThanOrEqual(1);
+    await screen.findByText('Apto 101');
+    expect(screen.getAllByText('Apartamentos').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Pendências')).toBeInTheDocument();
   });
 
-  test('opening the new-resident form calls back with no id', async () => {
+  test('opening the new-apartment form calls back with no id', async () => {
     const { onOpenResident } = setup();
-    await screen.findByText('Ana Souza');
+    await screen.findByText('Apto 101');
 
-    await userEvent.click(screen.getByRole('button', { name: /cadastrar morador/i }));
+    await userEvent.click(screen.getByRole('button', { name: /cadastrar apartamento/i }));
 
     expect(onOpenResident).toHaveBeenCalledWith();
   });
 
-  test('clicking a resident opens it by id', async () => {
+  test('clicking an apartment opens it by id', async () => {
     const { onOpenResident } = setup();
 
-    await userEvent.click(await screen.findByText('Ana Souza'));
+    await userEvent.click(await screen.findByText(/Ana Souza/));
 
     await waitFor(() => expect(onOpenResident).toHaveBeenCalledWith('r-1'));
   });
 
-  test('the search box filters the list by name', async () => {
+  test('the search box filters the list by resident name', async () => {
     setup();
-    await screen.findByText('Ana Souza');
+    await screen.findByText(/Ana Souza/);
 
     await userEvent.type(screen.getByLabelText('Buscar morador ou apartamento'), 'bruno');
 
-    expect(screen.getByText('Bruno Lima')).toBeInTheDocument();
-    expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument();
+    expect(screen.getByText(/Bruno Lima/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ana Souza/)).not.toBeInTheDocument();
   });
 });

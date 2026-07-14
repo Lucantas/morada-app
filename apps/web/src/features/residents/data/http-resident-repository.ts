@@ -24,6 +24,10 @@ export class HttpResidentRepository implements ResidentRepository {
     }
   }
 
+  async listByApartment(apartmentId: string): Promise<Resident[]> {
+    return residentListSchema.parse(await this.api.get(`/api/apartments/${apartmentId}/residents`));
+  }
+
   // The server resolves the current resident from the JWT subject, so the
   // subject argument is unused here (kept to satisfy the repository interface).
   async getCurrent(): Promise<Resident | null> {

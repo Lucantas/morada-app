@@ -15,6 +15,10 @@ export class HttpReceiptRepository implements ReceiptRepository {
     return receiptListSchema.parse(await this.api.get('/api/receipts'));
   }
 
+  async listByApartment(apartmentId: string): Promise<Receipt[]> {
+    return receiptListSchema.parse(await this.api.get(`/api/apartments/${apartmentId}/receipts`));
+  }
+
   async getById(id: string): Promise<Receipt | null> {
     try {
       return receiptSchema.parse(await this.api.get(`/api/receipts/${id}`));
