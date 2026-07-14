@@ -8,7 +8,13 @@ API_URL = http://localhost:$(API_PORT)
 WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 
-.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down api-test-pg
+# The API runs on Postgres. Point DATABASE_URL elsewhere to use another database;
+# it defaults to the local docker Postgres from `make db-up`.
+DB_URL ?= postgres://morada:morada@localhost:5433/morada
+DATABASE_URL ?= $(DB_URL)
+export DATABASE_URL
+
+.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -16,14 +22,14 @@ help: ## List targets
 install: ## Install dependencies (also installs git hooks via lefthook)
 	pnpm install
 
-start: ## Start the API + web (wired to the API) together; Ctrl-C stops both
+start: db-up ## Start the API (Postgres) + web together; Ctrl-C stops both
 	@echo "==> Morada API on :$(API_PORT) + web on :$(WEB_PORT) (Ctrl-C stops both)"
 	@PORT=$(API_PORT) $(API) dev & \
 		API_PID=$$!; \
 		trap 'pkill -P $$API_PID 2>/dev/null; kill $$API_PID 2>/dev/null' INT TERM EXIT; \
 		VITE_API_URL=$(API_URL) $(WEB) dev --port $(WEB_PORT) --strictPort
 
-start-backend: ## Start only the API (SQLite) on :$(API_PORT)
+start-backend: db-up ## Start only the API (Postgres) on :$(API_PORT)
 	PORT=$(API_PORT) $(API) dev
 
 start-app: ## Start only the web app (:$(WEB_PORT)) pointed at the live API
@@ -55,16 +61,16 @@ format-check: ## Check formatting without writing (repo-wide)
 
 check: typecheck lint format-check coverage ## Run every web gate (what the hooks run)
 
-reset-db: ## Delete the local SQLite DB so the next start seeds fresh (admin only)
-	rm -f apps/api/morada.db apps/api/morada.db-wal apps/api/morada.db-shm
+reset-db: db-up ## Wipe the local Postgres so the next start re-migrates + seeds fresh
+	docker exec morada-postgres psql -U morada -d morada -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 clean: ## Remove caches and coverage output
 	rm -rf apps/web/coverage apps/web/dist node_modules/.cache
 
-api-dev: ## Start only the API (alias of start-backend)
+api-dev: db-up ## Start only the API (alias of start-backend)
 	PORT=$(API_PORT) $(API) dev
 
-api-test: ## Run API tests with coverage (gate = 80%)
+api-test: db-up ## Run API tests with coverage (gate = 80%) against local Postgres
 	$(API) test:coverage
 
 api-typecheck: ## Type-check the API with tsc
@@ -75,13 +81,8 @@ api-lint: ## Run ESLint on the API (includes architecture boundaries)
 
 api-check: api-typecheck api-lint api-test ## Run every API gate
 
-DB_URL ?= postgres://morada:morada@localhost:5433/morada
-
-db-up: ## Start the local Postgres (docker compose) used by the pg adapter tests
+db-up: ## Start the local Postgres (docker compose) the API + tests run against
 	docker compose up -d --wait
 
 db-down: ## Stop the local Postgres
 	docker compose down
-
-api-test-pg: ## Run the Postgres adapter contract tests against the local Postgres
-	DATABASE_URL=$(DB_URL) $(API) test:pg

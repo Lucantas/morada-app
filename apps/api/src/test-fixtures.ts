@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
+import type { Pool } from 'pg';
 
 import { config } from './platform/config';
-import type { Db } from './platform/db';
-import { insertAll } from './seed-data';
+import { insertRows } from './test-support/pg';
 
 // Rich demo data for the test suite ONLY. Production seeds just the admin login
 // (see seed-data.ts). Residents are modelled as person + apartment + occupancy;
@@ -197,7 +197,7 @@ const notices = [
     kind: 'manutencao',
     audience: 'Todos os moradores',
     date_label: 'Há 2 dias',
-    dismissed: 0,
+    dismissed: false,
   },
   {
     id: 'n-2',
@@ -206,7 +206,7 @@ const notices = [
     kind: 'aviso',
     audience: 'Bloco 2',
     date_label: 'Há 5 dias',
-    dismissed: 0,
+    dismissed: false,
   },
   {
     id: 'n-3',
@@ -215,7 +215,7 @@ const notices = [
     kind: 'urgente',
     audience: 'Todos os moradores',
     date_label: 'Há 1 semana',
-    dismissed: 0,
+    dismissed: false,
   },
 ];
 
@@ -224,7 +224,7 @@ const threads = [
     id: 'r-1',
     resident_name: 'Maria Ribeiro',
     apt: 'Apto 302',
-    unread: 0,
+    unread: false,
     messages: JSON.stringify([
       {
         id: 'm1',
@@ -244,39 +244,39 @@ const threads = [
     id: 't-2',
     resident_name: 'Ana Costa',
     apt: 'Apto 202',
-    unread: 1,
+    unread: true,
     messages: JSON.stringify([
       { id: 'm3', author: 'resident', text: 'Posso reservar o salão dia 22?', dateLabel: 'Há 3h' },
     ]),
   },
 ];
 
-export function seedFixtures(db: Db): void {
-  insertAll(
-    db,
+export async function seedFixtures(pool: Pool): Promise<void> {
+  await insertRows(
+    pool,
     'apartments',
     ['id', 'label'],
     people.map((p) => ({ id: apartmentId(p.id), label: p.apt })),
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'residents',
     ['id', 'name', 'phone', 'email', 'status'],
     people.map(({ id, name, phone, email, status }) => ({ id, name, phone, email, status })),
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'apartment_residents',
     ['id', 'apartment_id', 'resident_id', 'active'],
     people.map((p) => ({
       id: `occ-${p.id}`,
       apartment_id: apartmentId(p.id),
       resident_id: p.id,
-      active: 1,
+      active: true,
     })),
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'users',
     ['id', 'username', 'password_hash', 'role', 'resident_id'],
     [
@@ -289,14 +289,14 @@ export function seedFixtures(db: Db): void {
       },
     ],
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'accounts',
     ['id', 'description', 'category', 'date_label', 'value_cents', 'status'],
     accounts,
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'receipts',
     [
       'id',
@@ -311,11 +311,11 @@ export function seedFixtures(db: Db): void {
     ],
     receipts,
   );
-  insertAll(
-    db,
+  await insertRows(
+    pool,
     'notices',
     ['id', 'title', 'body', 'kind', 'audience', 'date_label', 'dismissed'],
     notices,
   );
-  insertAll(db, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);
+  await insertRows(pool, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);
 }

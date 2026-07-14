@@ -1,15 +1,30 @@
 import { buildApp } from './compose';
-import { createTestDb } from './platform/db';
-import { makeSqliteRepositories } from './platform/repositories';
+import { config } from './platform/config';
+import { migrate } from './platform/postgres/migrate';
+import { createPool } from './platform/postgres/pool';
+import { makePostgresRepositories } from './platform/repositories';
 import { adminCredentials } from './seed-data';
+import { resetPg } from './test-support/pg';
 import { residentCredentials, seedFixtures } from './test-fixtures';
+
+const pool = createPool(config.databaseUrl);
+
+beforeAll(async () => {
+  await migrate(pool);
+});
+
+afterAll(async () => {
+  await pool.end();
+});
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 
+// Each call resets to a fresh seeded state, so a test may build more than one app
+// (e.g. one per credential) against the shared Postgres without id collisions.
 async function makeApp(): Promise<App> {
-  const db = createTestDb();
-  const app = await buildApp(makeSqliteRepositories(db));
-  seedFixtures(db);
+  await resetPg(pool);
+  const app = await buildApp(makePostgresRepositories(pool));
+  await seedFixtures(pool);
   return app;
 }
 

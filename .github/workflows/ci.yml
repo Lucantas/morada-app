@@ -55,6 +55,5 @@ jobs:
       - run: pnpm --filter @morada/api typecheck
       - run: pnpm --filter @morada/api lint
       - run: pnpm --filter @morada/api test:coverage
-      - run: pnpm --filter @morada/api test:pg
         env:
           DATABASE_URL: postgres://morada:morada@localhost:5433/morada

@@ -1,12 +1,24 @@
 import { Hono } from 'hono';
 
-import { createTestDb } from '../../../platform/db';
-import { SqliteAccountRepository } from '../sqlite/account-repository';
+import type { Account } from '../../domain/account';
+import type { AccountRepository } from '../../domain/account-repository';
 
 import { accountRoutes } from './routes';
 
+function fakeRepo(): AccountRepository {
+  const map = new Map<string, Account>();
+  return {
+    list: async () => [...map.values()],
+    getById: async (id) => map.get(id) ?? null,
+    save: async (account) => {
+      map.set(account.id, account);
+      return account;
+    },
+  };
+}
+
 function mountApp() {
-  const repo = new SqliteAccountRepository(createTestDb());
+  const repo = fakeRepo();
   const app = new Hono();
   app.route('/', accountRoutes(repo));
   return { app, repo };

@@ -32,5 +32,4 @@ pre-push:
       root: apps/web/
       run: pnpm test:coverage
     api-test:
-      root: apps/api/
-      run: pnpm test:coverage
+      run: make api-test

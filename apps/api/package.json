@@ -9,20 +9,17 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:pg": "jest --config jest.pg.config.cjs --runInBand"
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.7.0",
     "hono": "^4.6.14",
     "pg": "^8.22.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.20.0",
