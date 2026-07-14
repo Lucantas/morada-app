@@ -14,7 +14,8 @@ function setup() {
     buildReceipt({
       id: 'rc-2',
       ref: '03/2026',
-      dueLabel: 'Pago em 08/03/2026',
+      dueDate: '2026-03-10',
+      paidAt: '2026-03-08',
       status: 'pago',
       method: 'pix',
     }),

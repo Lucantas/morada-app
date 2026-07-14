@@ -18,7 +18,7 @@ const STATUSES: AccountStatus[] = ['pago', 'pendente', 'atrasado'];
 const EMPTY = {
   description: '',
   category: '',
-  dateLabel: '',
+  date: '',
   value: '',
   status: 'pendente' as AccountStatus,
 };
@@ -40,8 +40,8 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
 
   useEffect(() => {
     if (existing.data) {
-      const { description, category, dateLabel, valueCents, status } = existing.data;
-      setForm({ description, category, dateLabel, value: formatBRL(valueCents), status });
+      const { description, category, date, valueCents, status } = existing.data;
+      setForm({ description, category, date: date ?? '', value: formatBRL(valueCents), status });
     }
   }, [existing.data]);
 
@@ -49,9 +49,14 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = () => {
-    const { value, ...rest } = form;
+    const { value, date, ...rest } = form;
     save.mutate(
-      { ...rest, valueCents: parseReaisToCents(value), id: accountId },
+      {
+        ...rest,
+        date: date === '' ? null : date,
+        valueCents: parseReaisToCents(value),
+        id: accountId,
+      },
       { onSuccess: onBack },
     );
   };
@@ -111,12 +116,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
             onChange={set('category')}
             placeholder="Ex.: Utilidades"
           />
-          <Field
-            label="Data"
-            value={form.dateLabel}
-            onChange={set('dateLabel')}
-            placeholder="Ex.: 05/04"
-          />
+          <Field label="Data" value={form.date} onChange={set('date')} type="date" />
           <Field
             label="Valor (R$)"
             value={form.value}

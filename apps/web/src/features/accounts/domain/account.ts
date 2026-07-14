@@ -7,7 +7,8 @@ export const accountSchema = z.object({
   id: z.string().min(1),
   description: z.string().min(1),
   category: z.string().min(1),
-  dateLabel: z.string().min(1),
+  // The expense date as ISO (YYYY-MM-DD); null only for legacy rows.
+  date: z.string().nullable(),
   valueCents: z.number().int().nonnegative(),
   status: accountStatusSchema,
 });

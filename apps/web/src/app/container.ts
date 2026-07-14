@@ -47,9 +47,21 @@ export async function issueCharge(input: {
   ref: string;
   title: string;
   valueCents: number;
-  dueLabel: string;
+  dueDate: string;
 }): Promise<void> {
   await apiClient.post('/api/receipts', input);
+}
+
+/** Admin-only: register a payment against a receipt, informing when it was paid. */
+export async function registerPayment(input: {
+  receiptId: string;
+  method: 'pix' | 'boleto' | 'cartao';
+  paidAt: string;
+}): Promise<void> {
+  await apiClient.post(`/api/receipts/${input.receiptId}/pay`, {
+    method: input.method,
+    paidAt: input.paidAt,
+  });
 }
 
 /** Admin-only: provision a resident login. The API generates and returns the

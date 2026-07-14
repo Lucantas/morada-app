@@ -9,7 +9,7 @@ type ChargeInput = {
   ref: string;
   title: string;
   valueCents: number;
-  dueLabel: string;
+  dueDate: string;
 };
 
 type Props = {
@@ -29,14 +29,14 @@ function parseReaisToCents(input: string): number {
 export function IssueChargeScreen({ residentId, residentName, issue, onBack }: Props) {
   const [ref, setRef] = useState('');
   const [valor, setValor] = useState('');
-  const [dueLabel, setDueLabel] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const submit = async () => {
     const valueCents = parseReaisToCents(valor);
-    if (!ref.trim() || !dueLabel.trim() || !Number.isFinite(valueCents) || valueCents <= 0) {
+    if (!ref.trim() || !dueDate || !Number.isFinite(valueCents) || valueCents <= 0) {
       setError('Preencha referência, valor e vencimento.');
       return;
     }
@@ -49,11 +49,11 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
         ref: ref.trim(),
         title: TITLE,
         valueCents,
-        dueLabel: dueLabel.trim(),
+        dueDate,
       });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível emitir a cobrança.');
+      setError(err instanceof Error ? err.message : 'Não foi possível adicionar o recibo.');
     } finally {
       setPending(false);
     }
@@ -91,10 +91,10 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Emitir cobrança · Bloco 2
+            Adicionar recibo · Bloco 2
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
-            {residentName ?? 'Nova cobrança'}
+            {residentName ?? 'Novo recibo'}
           </div>
         </div>
       </div>
@@ -102,26 +102,21 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
         {done ? (
           <SurfaceCard>
             <p style={{ fontWeight: 600, color: 'var(--ink-900)' }}>
-              Cobrança emitida. O morador já a vê como pendente em “Meus recibos”.
+              Recibo adicionado. O morador já o vê como pendente em “Meus recibos”.
             </p>
           </SurfaceCard>
         ) : (
           <div style={{ paddingTop: 2 }}>
             <Field label="Referência" value={ref} onChange={setRef} placeholder="Ex.: 05/2026" />
             <Field label="Valor (R$)" value={valor} onChange={setValor} placeholder="Ex.: 450,00" />
-            <Field
-              label="Vencimento"
-              value={dueLabel}
-              onChange={setDueLabel}
-              placeholder="Ex.: Venc. 10/05/2026"
-            />
+            <Field label="Vencimento" value={dueDate} onChange={setDueDate} type="date" />
             {error && (
               <p role="alert" style={{ color: 'var(--atraso-700)', marginBottom: 14 }}>
                 {error}
               </p>
             )}
             <PrimaryButton icon="receipt" onClick={() => void submit()}>
-              {pending ? 'Emitindo…' : 'Emitir cobrança'}
+              {pending ? 'Adicionando…' : 'Adicionar'}
             </PrimaryButton>
           </div>
         )}

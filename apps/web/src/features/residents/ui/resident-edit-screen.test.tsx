@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { InMemoryReceiptRepository } from '@/features/receipts/data/in-memory-receipt-repository';
@@ -24,7 +24,7 @@ describe('ResidentEditScreen', () => {
       />,
     );
 
-    await userEvent.type(screen.getByLabelText('Número do apartamento'), 'Apto 101');
+    await userEvent.type(screen.getByLabelText('Número do apartamento'), '101');
     await userEvent.type(screen.getByLabelText('Nome completo'), 'Carla Dias');
     await userEvent.click(screen.getByRole('button', { name: /cadastrar apartamento/i }));
 
@@ -48,7 +48,9 @@ describe('ResidentEditScreen', () => {
     );
 
     expect(await screen.findByDisplayValue('Diego Reis')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Apto 202')).toBeInTheDocument();
+    // The apartment field is numeric: it shows just the number, not the "Apto" label.
+    expect(screen.getByDisplayValue('202')).toBeInTheDocument();
+    expect(screen.getByLabelText('Número do apartamento')).toHaveValue('202');
   });
 
   test('archiving a resident deactivates them and navigates back', async () => {
@@ -110,5 +112,45 @@ describe('ResidentEditScreen', () => {
 
     expect(await screen.findByText('Recibos de pagamento')).toBeInTheDocument();
     expect(await screen.findByText('Taxa condominial')).toBeInTheDocument();
+  });
+
+  test('lets the admin register a payment (baixa) informing the method and date', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        status: 'pendente',
+      }),
+    ]);
+    const registerPayment = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+        registerPayment={registerPayment}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+    await userEvent.click(screen.getByRole('button', { name: /dar baixa/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pix' }));
+    fireEvent.change(screen.getByLabelText('Data do pagamento'), {
+      target: { value: '2026-05-08' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: /confirmar baixa/i }));
+
+    await waitFor(() =>
+      expect(registerPayment).toHaveBeenCalledWith({
+        receiptId: 'rc-1',
+        method: 'pix',
+        paidAt: '2026-05-08',
+      }),
+    );
   });
 });

@@ -3,5 +3,6 @@ import type { ResidentRepository } from './resident-repository';
 
 export async function listResidents(repository: ResidentRepository): Promise<Resident[]> {
   const residents = await repository.list();
-  return [...residents].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  // Order by apartment number (numeric, so "Apto 2" precedes "Apto 10").
+  return [...residents].sort((a, b) => a.apt.localeCompare(b.apt, 'pt-BR', { numeric: true }));
 }

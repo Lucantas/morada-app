@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { pendingReceipt } from '@/features/receipts/domain/pending-receipt';
 import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
+import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import type { IconName } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -110,7 +111,9 @@ function NextFeeHero({ receipt, onPay }: { receipt: Receipt; onPay: () => void }
         <span style={{ fontSize: '1.1rem', color: 'var(--brass-500)', fontWeight: 600 }}>R$</span>
         <span>{formatBRL(receipt.valueCents)}</span>
       </div>
-      <div style={{ fontSize: '.82rem', color: '#A9C6C9', marginTop: 6 }}>{receipt.dueLabel}</div>
+      <div style={{ fontSize: '.82rem', color: '#A9C6C9', marginTop: 6 }}>
+        {receipt.dueDate ? `Vence em ${formatIsoDate(receipt.dueDate)}` : ''}
+      </div>
       <div style={{ marginTop: 16 }}>
         <PrimaryButton icon="card" onClick={onPay}>
           Pagar taxa

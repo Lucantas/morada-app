@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -102,7 +103,8 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '1rem' }}>{account.description}</div>
         <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
-          {account.category} · {account.dateLabel}
+          {account.category}
+          {account.date ? ` · ${formatIsoDate(account.date)}` : ''}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>

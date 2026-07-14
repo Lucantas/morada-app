@@ -8,7 +8,7 @@ export function buildReceipt(overrides: Partial<Receipt> = {}): Receipt {
     id: nextId('receipt'),
     ref: '04/2026',
     title: 'Taxa condominial',
-    dueLabel: 'Venc. 10/04/2026',
+    dueDate: '2026-04-10',
     valueCents: 45000,
     status: 'pendente',
     ...overrides,

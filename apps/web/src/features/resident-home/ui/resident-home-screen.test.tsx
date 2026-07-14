@@ -13,7 +13,7 @@ function setup() {
     buildReceipt({
       id: 'rc-1',
       ref: '04/2026',
-      dueLabel: 'Venc. 10/04/2026',
+      dueDate: '2026-04-10',
       valueCents: 45000,
       status: 'pendente',
     }),

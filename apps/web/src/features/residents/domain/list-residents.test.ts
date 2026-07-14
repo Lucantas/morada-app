@@ -16,16 +16,16 @@ function fakeRepo(residents: Resident[]): ResidentRepository {
 }
 
 describe('listResidents', () => {
-  test('returns residents sorted by name', async () => {
+  test('orders residents by apartment number (numeric, not lexical)', async () => {
     const repo = fakeRepo([
-      buildResident({ name: 'Bruno' }),
-      buildResident({ name: 'Ana' }),
-      buildResident({ name: 'Carla' }),
+      buildResident({ name: 'Bruno', apt: 'Apto 10' }),
+      buildResident({ name: 'Ana', apt: 'Apto 2' }),
+      buildResident({ name: 'Carla', apt: 'Apto 100' }),
     ]);
 
     const result = await listResidents(repo);
 
-    expect(result.map((r) => r.name)).toEqual(['Ana', 'Bruno', 'Carla']);
+    expect(result.map((r) => r.apt)).toEqual(['Apto 2', 'Apto 10', 'Apto 100']);
   });
 
   test('returns an empty array when there are no residents', async () => {

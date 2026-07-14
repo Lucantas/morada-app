@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -14,6 +15,14 @@ import { buildReceiptProof, proofFileName } from '../domain/receipt-proof';
 
 import { methodLabel, receiptStatusView } from './receipt-status-view';
 import { useReceipts } from './use-receipts';
+
+// A paid receipt shows when it was paid; a pending one shows when it is due.
+function receiptDateLabel(receipt: Receipt): string {
+  if (receipt.status === 'pago') {
+    return receipt.paidAt ? `Pago em ${formatIsoDate(receipt.paidAt)}` : 'Pago';
+  }
+  return receipt.dueDate ? `Vence em ${formatIsoDate(receipt.dueDate)}` : '';
+}
 
 type Props = {
   repository: ReceiptRepository;
@@ -92,7 +101,7 @@ function ReceiptsContent({
             <div style={{ fontWeight: 600, fontSize: '.92rem' }}>
               Taxa de {pending.ref} pendente
             </div>
-            <div style={{ fontSize: '.82rem' }}>{pending.dueLabel}</div>
+            <div style={{ fontSize: '.82rem' }}>{receiptDateLabel(pending)}</div>
           </div>
         </div>
       )}
@@ -159,7 +168,9 @@ function ReceiptTicket({
             gap: 10,
           }}
         >
-          <span style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>{receipt.dueLabel}</span>
+          <span style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
+            {receiptDateLabel(receipt)}
+          </span>
           <span className="fraunces" style={{ fontSize: '1.2rem', fontWeight: 700 }}>
             R$ {formatBRL(receipt.valueCents)}
           </span>

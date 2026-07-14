@@ -10,7 +10,10 @@ export const receiptSchema = z.object({
   id: z.string().min(1),
   ref: z.string().min(1),
   title: z.string().min(1),
-  dueLabel: z.string().min(1),
+  // Due date and payment date as ISO (YYYY-MM-DD); dueDate is null only for
+  // legacy rows, paidAt is absent until the receipt is paid.
+  dueDate: z.string().nullable(),
+  paidAt: z.string().optional(),
   valueCents: z.number().int(),
   status: receiptStatusSchema,
   method: receiptMethodSchema.optional(),

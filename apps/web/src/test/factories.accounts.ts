@@ -8,7 +8,7 @@ export function buildAccount(overrides: Partial<Account> = {}): Account {
     id: nextId('account'),
     description: 'Água — abril',
     category: 'Utilidades',
-    dateLabel: '05/04',
+    date: '2026-04-05',
     valueCents: 124000,
     status: 'pago',
     ...overrides,

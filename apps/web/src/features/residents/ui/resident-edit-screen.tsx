@@ -1,14 +1,17 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { Receipt } from '@/features/receipts/domain/receipt';
+import type { Receipt, ReceiptMethod } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
+import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
+import { maskPhone } from '@/shared/lib/phone';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
 
+import { apartmentLabel, apartmentNumber } from '../domain/apartment';
 import { getResident } from '../domain/get-resident';
 import type { ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
@@ -24,6 +27,12 @@ import {
 
 const EMPTY = { name: '', apt: '', phone: '', email: '', status: 'em_dia' as ResidentStatus };
 
+type RegisterPayment = (input: {
+  receiptId: string;
+  method: ReceiptMethod;
+  paidAt: string;
+}) => Promise<void>;
+
 type Props = {
   repository: ResidentRepository;
   receiptRepository: ReceiptRepository;
@@ -31,6 +40,7 @@ type Props = {
   onBack: () => void;
   onCreateLogin?: () => void;
   onIssueCharge?: () => void;
+  registerPayment?: RegisterPayment;
 };
 
 export function ResidentEditScreen({
@@ -40,7 +50,17 @@ export function ResidentEditScreen({
   onBack,
   onCreateLogin,
   onIssueCharge,
+  registerPayment,
 }: Props) {
+  const queryClient = useQueryClient();
+  const registration = useMutation({
+    mutationFn: (input: { receiptId: string; method: ReceiptMethod; paidAt: string }) =>
+      (registerPayment ?? (async () => {}))(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    },
+  });
   const existing = useQuery({
     queryKey: [...residentsQueryKey, residentId],
     queryFn: () => getResident(repository, residentId as string),
@@ -59,14 +79,15 @@ export function ResidentEditScreen({
   useEffect(() => {
     if (existing.data) {
       const { name, apt, phone, email, status } = existing.data;
-      setForm({ name, apt, phone, email, status });
+      setForm({ name, apt: apartmentNumber(apt), phone, email, status });
     }
   }, [existing.data]);
 
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const submit = () => save.mutate({ ...form, id: residentId }, { onSuccess: onBack });
+  const submit = () =>
+    save.mutate({ ...form, apt: apartmentLabel(form.apt), id: residentId }, { onSuccess: onBack });
   const moveOut = () => {
     if (residentId) deactivate.mutate(residentId, { onSuccess: onBack });
   };
@@ -134,23 +155,42 @@ export function ResidentEditScreen({
           >
             Número do apartamento
           </span>
-          <input
-            value={form.apt}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => set('apt')(e.target.value)}
-            placeholder="Ex.: Apto 302"
-            style={{
-              width: '100%',
-              minHeight: 54,
-              border: '1.5px solid var(--petrol-100)',
-              borderRadius: 'var(--r-md)',
-              padding: '0 16px',
-              fontFamily: "'Fraunces', serif",
-              fontWeight: 600,
-              fontSize: '1.35rem',
-              color: 'var(--petrol-900)',
-              background: 'var(--surface)',
-            }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                left: 16,
+                fontFamily: "'Fraunces', serif",
+                fontWeight: 600,
+                fontSize: '1.35rem',
+                color: 'var(--ink-300)',
+              }}
+            >
+              Apto
+            </span>
+            <input
+              value={form.apt}
+              inputMode="numeric"
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                set('apt')(e.target.value.replace(/\D/g, ''))
+              }
+              placeholder="302"
+              aria-label="Número do apartamento"
+              style={{
+                width: '100%',
+                minHeight: 54,
+                border: '1.5px solid var(--petrol-100)',
+                borderRadius: 'var(--r-md)',
+                padding: '0 16px 0 74px',
+                fontFamily: "'Fraunces', serif",
+                fontWeight: 600,
+                fontSize: '1.35rem',
+                color: 'var(--petrol-900)',
+                background: 'var(--surface)',
+              }}
+            />
+          </div>
         </label>
 
         <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 4px' }} />
@@ -177,7 +217,7 @@ export function ResidentEditScreen({
         <Field
           label="Telefone"
           value={form.phone}
-          onChange={set('phone')}
+          onChange={(v) => set('phone')(maskPhone(v))}
           placeholder="(11) 90000-0000"
         />
         <Field
@@ -239,7 +279,14 @@ export function ResidentEditScreen({
               </div>
             )}
 
-            <ReceiptsSection receipts={receipts.data ?? []} onIssueCharge={onIssueCharge} />
+            <ReceiptsSection
+              receipts={receipts.data ?? []}
+              onIssueCharge={onIssueCharge}
+              onRegisterPayment={
+                registerPayment ? (input) => registration.mutate(input) : undefined
+              }
+              isRegistering={registration.isPending}
+            />
           </>
         )}
 
@@ -265,12 +312,35 @@ export function ResidentEditScreen({
   );
 }
 
+const METHODS: { value: ReceiptMethod; label: string }[] = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'cartao', label: 'Cartão' },
+];
+
+function receiptDateInfo(receipt: Receipt): string {
+  if (receipt.status === 'pago') {
+    return receipt.paidAt ? `Pago em ${formatIsoDate(receipt.paidAt)}` : 'Pago';
+  }
+  return receipt.dueDate ? `Vence ${formatIsoDate(receipt.dueDate)}` : '';
+}
+
+type RegisterPaymentHandler = (input: {
+  receiptId: string;
+  method: ReceiptMethod;
+  paidAt: string;
+}) => void;
+
 function ReceiptsSection({
   receipts,
   onIssueCharge,
+  onRegisterPayment,
+  isRegistering,
 }: {
   receipts: Receipt[];
   onIssueCharge?: () => void;
+  onRegisterPayment?: RegisterPaymentHandler;
+  isRegistering?: boolean;
 }) {
   return (
     <>
@@ -279,7 +349,7 @@ function ReceiptsSection({
           onIssueCharge ? (
             <button type="button" onClick={onIssueCharge} style={archiveButtonStyle}>
               <Icon name="plus" size={15} />
-              Emitir cobrança
+              Adicionar
             </button>
           ) : undefined
         }
@@ -293,29 +363,147 @@ function ReceiptsSection({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {receipts.map((r) => (
-            <SurfaceCard
+            <ReceiptLedgerRow
               key={r.id}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{r.title}</div>
-                <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>REF · {r.ref}</div>
-              </div>
-              <span
-                className="fraunces"
-                style={{ fontWeight: 700, fontSize: '.98rem', fontVariantNumeric: 'tabular-nums' }}
-              >
-                R$ {formatBRL(r.valueCents)}
-              </span>
-              <StatusPill
-                tone={r.status === 'pago' ? 'pago' : 'pendente'}
-                label={r.status === 'pago' ? 'Pago' : 'Pendente'}
-              />
-            </SurfaceCard>
+              receipt={r}
+              onRegisterPayment={onRegisterPayment}
+              isRegistering={isRegistering}
+            />
           ))}
         </div>
       )}
     </>
+  );
+}
+
+function ReceiptLedgerRow({
+  receipt,
+  onRegisterPayment,
+  isRegistering,
+}: {
+  receipt: Receipt;
+  onRegisterPayment?: RegisterPaymentHandler;
+  isRegistering?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [method, setMethod] = useState<ReceiptMethod>('boleto');
+  const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
+
+  return (
+    <SurfaceCard style={{ padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{receipt.title}</div>
+          <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>
+            REF · {receipt.ref}
+            {receiptDateInfo(receipt) ? ` · ${receiptDateInfo(receipt)}` : ''}
+          </div>
+        </div>
+        <span
+          className="fraunces"
+          style={{ fontWeight: 700, fontSize: '.98rem', fontVariantNumeric: 'tabular-nums' }}
+        >
+          R$ {formatBRL(receipt.valueCents)}
+        </span>
+        <StatusPill
+          tone={receipt.status === 'pago' ? 'pago' : 'pendente'}
+          label={receipt.status === 'pago' ? 'Pago' : 'Pendente'}
+        />
+      </div>
+
+      {canRegister && !open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          style={{ ...archiveButtonStyle, marginTop: 10 }}
+        >
+          <Icon name="check" size={15} />
+          Dar baixa
+        </button>
+      )}
+
+      {canRegister && open && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--ink-900)' }}>
+            Data do pagamento
+            <input
+              type="date"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+              aria-label="Data do pagamento"
+              style={{
+                display: 'block',
+                width: '100%',
+                minHeight: 44,
+                marginTop: 6,
+                border: '1.5px solid var(--line)',
+                borderRadius: 'var(--r-sm)',
+                padding: '0 12px',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '.95rem',
+                color: 'var(--ink-900)',
+                background: 'var(--surface)',
+              }}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {METHODS.map((m) => {
+              const active = method === m.value;
+              return (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMethod(m.value)}
+                  style={{
+                    flex: 1,
+                    minHeight: 40,
+                    borderRadius: 'var(--r-sm)',
+                    border: `1.5px solid ${active ? 'var(--petrol-600)' : 'var(--line)'}`,
+                    background: active ? 'var(--petrol-50)' : 'var(--surface)',
+                    color: active ? 'var(--petrol-800)' : 'var(--ink-500)',
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '.82rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              disabled={isRegistering || !paidAt}
+              onClick={() => onRegisterPayment?.({ receiptId: receipt.id, method, paidAt })}
+              style={{
+                flex: 1,
+                minHeight: 44,
+                border: 'none',
+                borderRadius: 'var(--r-sm)',
+                background: 'var(--brass-500)',
+                color: 'var(--petrol-900)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '.9rem',
+                cursor: 'pointer',
+              }}
+            >
+              {isRegistering ? 'Registrando…' : 'Confirmar baixa'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              style={{ ...archiveButtonStyle, minHeight: 44 }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </SurfaceCard>
   );
 }
 

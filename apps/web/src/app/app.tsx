@@ -34,6 +34,7 @@ import {
   noticeRepository,
   provisionResidentLogin,
   receiptRepository,
+  registerPayment,
   residentRepository,
   threadRepository,
 } from './container';
@@ -143,6 +144,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onBack={() => go('a-residents')}
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           onIssueCharge={residentId ? () => go('a-resident-charge', { residentId }) : undefined}
+          registerPayment={registerPayment}
         />
       );
     case 'a-resident-login':

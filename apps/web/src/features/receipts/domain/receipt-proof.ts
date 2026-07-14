@@ -1,3 +1,4 @@
+import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 
 import type { Receipt } from './receipt';
@@ -17,7 +18,8 @@ export function buildReceiptProof(
     `Valor: R$ ${formatBRL(receipt.valueCents)}`,
     `Situação: ${receipt.status === 'pago' ? 'Pago' : 'Pendente'}`,
     receipt.method ? `Forma de pagamento: ${receipt.method}` : '',
-    receipt.dueLabel,
+    receipt.dueDate ? `Vencimento: ${formatIsoDate(receipt.dueDate)}` : '',
+    receipt.paidAt ? `Pago em: ${formatIsoDate(receipt.paidAt)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
