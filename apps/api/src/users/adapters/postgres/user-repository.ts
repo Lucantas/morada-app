@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 
+import { ResidentLoginExistsError } from '../../domain/errors';
 import { userSchema, type User } from '../../domain/user';
 import type { UserRepository } from '../../domain/user-repository';
 
@@ -47,6 +48,13 @@ export class PostgresUserRepository implements UserRepository {
   }
 
   async save(user: User): Promise<User> {
+    if (user.residentId !== null) {
+      const taken = await this.pool.query(
+        'SELECT id FROM users WHERE resident_id = $1 AND id != $2',
+        [user.residentId, user.id],
+      );
+      if ((taken.rowCount ?? 0) > 0) throw new ResidentLoginExistsError(user.residentId);
+    }
     await this.pool.query(
       `INSERT INTO users (id, username, password_hash, role, resident_id)
        VALUES ($1, $2, $3, $4, $5)

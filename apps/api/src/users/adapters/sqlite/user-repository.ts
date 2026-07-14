@@ -1,4 +1,5 @@
 import type { Db } from '../../../platform/db';
+import { ResidentLoginExistsError } from '../../domain/errors';
 import { userSchema, type User } from '../../domain/user';
 import type { UserRepository } from '../../domain/user-repository';
 
@@ -44,6 +45,12 @@ export class SqliteUserRepository implements UserRepository {
   }
 
   async save(user: User): Promise<User> {
+    if (user.residentId !== null) {
+      const taken = this.db
+        .prepare('SELECT id FROM users WHERE resident_id = ? AND id != ?')
+        .get(user.residentId, user.id);
+      if (taken) throw new ResidentLoginExistsError(user.residentId);
+    }
     this.db
       .prepare(
         `INSERT INTO users (id, username, password_hash, role, resident_id)
