@@ -1,13 +1,13 @@
 # Roadmap & handoff
 
 > Where the project is and what's next. Start here if you're picking up the work.
-> Last updated 2026-07-14 (after the Postgres-adapter work landed on `main`).
+> Last updated 2026-07-14 (Postgres adapter landed, then SQLite removed entirely).
 
 ## Where we are
 
 A real, responsive, **no-fake-data** full-stack app (Vite + React 19 web, Hono
-API), TDD-gated (API/web ≥ 80% coverage), CI-green. The API runs on **SQLite or
-Postgres**, chosen at boot — the code is deploy-ready but not yet deployed.
+API), TDD-gated (API/web ≥ 80% coverage), CI-green. The API runs on **Postgres**
+(the only store) — the code is deploy-ready but not yet deployed.
 
 - **Auth** is real: `POST /auth/login {username,password}` → JWT whose `sub` is
   the resident's id. **Only the `admin` login is seeded** (`admin` /
@@ -19,32 +19,32 @@ Postgres**, chosen at boot — the code is deploy-ready but not yet deployed.
 - **Turnover** works: `POST /api/residents/:id/deactivate` frees the apartment;
   the next resident reuses the same apartment id → continuous history.
 - Dashboard is computed live from the ledger. Session persists across reloads.
-- **Postgres adapter is done** (the repository-pattern payoff): every repository
-  has a SQLite _and_ a Postgres implementation, selected by `DB_DRIVER`
-  (auto-`postgres` when `DATABASE_URL` is set). A shared `*-repository.contract.ts`
-  runs against **both** stores so they stay in lockstep. Schema lives in inlined
-  migrations (`apps/api/src/platform/postgres/migrations.ts`), applied at boot.
-  The demo admin seed is gated off in production unless `SEED_DEMO_DATA=1`.
+- **Postgres is the only store.** Each repository has a single `Postgres*Repository`
+  (`apps/api/src/*/adapters/postgres/`); `createRepositories` needs `DATABASE_URL`
+  and the API refuses to boot without it. Schema is in inlined migrations
+  (`apps/api/src/platform/postgres/migrations.ts`), applied at boot. The demo admin
+  seed is gated off in production unless `SEED_DEMO_DATA=1`. A shared
+  `*-repository.contract.ts` per feature is the adapter test.
 
-Run it: `make start` (API :8787 + web :5173, SQLite). `make reset-db` wipes the local DB.
-Gates: `make check` (web), `make api-check` (api SQLite). **Postgres:** `make db-up`
-(dedicated pg on :5433) then `make api-test-pg` runs the pg contract; CI runs it too
-against a service container. Log in as `admin` / `morada-admin`.
+Run it: `make db-up` (local Postgres on :5433, a `db-up` prereq of `start`/`api-test`)
+then `make start` (API :8787 + web :5173). `make reset-db` wipes the local Postgres.
+Gates: `make check` (web), `make api-check` (api, against local Postgres); the whole api
+suite runs serially against a live pg — CI uses a Postgres service. `DATABASE_URL` is
+exported by the Makefile (defaults to the local pg). Log in as `admin` / `morada-admin`.
 
 ## Architecture
 
 Feature-first clean architecture, lint-enforced boundaries — see
 [ARCHITECTURE.md](ARCHITECTURE.md). API mirrors it (domain / app / adapters /
 platform). Repository pattern everywhere: the domain declares interfaces; adapters
-implement them (SQLite _and_ Postgres, driver-selected — domain/UI don't change).
-Composition is in `apps/api/src/platform/repositories.ts` (`createRepositories`).
+implement them with Postgres — domain/UI don't change. Composition is in
+`apps/api/src/platform/repositories.ts` (`createRepositories` → pool + migrate).
 Workflow & testing conventions in [WORKFLOW.md](WORKFLOW.md) / [TESTING.md](TESTING.md).
 
-> **Jest gotcha:** the SQLite adapter suite hit a native better-sqlite3 GC flake
-> under coverage on low-core runners. It is fixed (the user adapter no longer
-> relies on the DB index throwing — it checks explicitly, like residents). Don't
-> reintroduce constraint-throw-dependent SQLite tests. Validate any test-infra
-> change with `jest --coverage --maxWorkers=1` (the CI worst case), not `jest` alone.
+> **API tests need Postgres.** The suite (adapter contracts + `compose.test`) runs
+> against a live database, serially (`maxWorkers: 1`), resetting between tests.
+> `make api-test` / `make api-check` bring the local pg up and set `DATABASE_URL`.
+> (Removing better-sqlite3 also retired an old native GC test flake for good.)
 
 ## Next: Part 2 — Deploy (the code is ready; this ships it)
 
