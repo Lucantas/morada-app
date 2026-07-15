@@ -72,6 +72,25 @@ export function runReceiptRepositoryContract(
       expect(await repo.getById('nope')).toBeNull();
     });
 
+    test('round-trips an em_analise receipt with proof and submittedAt', async () => {
+      const repo = await makeRepo();
+      const receipt = {
+        id: 'rc-analise',
+        ref: '07/2026',
+        title: 'Taxa condominial',
+        dueDate: '2026-07-15',
+        valueCents: 15000,
+        status: 'em_analise' as const,
+        method: 'pix' as const,
+        submittedAt: '2026-07-14',
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+        residentId: 'r-1',
+        apartmentId: 'apt-1',
+      };
+      await repo.save(receipt);
+      expect(await repo.getById('rc-analise')).toEqual(receipt);
+    });
+
     test('listByResident returns only that resident receipts and round-trips residentId', async () => {
       const repo = await makeRepo();
       const base = { ref: '2024-01', title: 'Taxa', dueDate: '2026-05-10', valueCents: 1000 };

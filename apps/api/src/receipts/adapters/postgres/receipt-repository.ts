@@ -4,10 +4,10 @@ import { receiptSchema, type Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
 const INSERT_COLUMNS =
-  'id, ref, title, due_date, paid_at, value_cents, status, method, resident_id, apartment_id';
+  'id, ref, title, due_date, paid_at, value_cents, status, method, resident_id, apartment_id, submitted_at, proof_data_url';
 // DATE columns come back as YYYY-MM-DD strings (::text) rather than JS Date objects.
 const SELECT_COLUMNS =
-  'id, ref, title, due_date::text AS due_date, paid_at::text AS paid_at, value_cents, status, method, resident_id, apartment_id';
+  'id, ref, title, due_date::text AS due_date, paid_at::text AS paid_at, value_cents, status, method, resident_id, apartment_id, submitted_at::text AS submitted_at, proof_data_url';
 
 interface ReceiptRow {
   id: string;
@@ -20,6 +20,8 @@ interface ReceiptRow {
   method: string | null;
   resident_id: string | null;
   apartment_id: string | null;
+  submitted_at: string | null;
+  proof_data_url: string | null;
 }
 
 function toReceipt(row: ReceiptRow): Receipt {
@@ -34,6 +36,8 @@ function toReceipt(row: ReceiptRow): Receipt {
     method: row.method ?? undefined,
     residentId: row.resident_id ?? undefined,
     apartmentId: row.apartment_id ?? undefined,
+    ...(row.submitted_at ? { submittedAt: row.submitted_at } : {}),
+    ...(row.proof_data_url ? { proofDataUrl: row.proof_data_url } : {}),
   });
 }
 
@@ -72,12 +76,13 @@ export class PostgresReceiptRepository implements ReceiptRepository {
   async save(receipt: Receipt): Promise<Receipt> {
     await this.pool.query(
       `INSERT INTO receipts (${INSERT_COLUMNS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (id) DO UPDATE SET
          ref = EXCLUDED.ref, title = EXCLUDED.title, due_date = EXCLUDED.due_date,
          paid_at = EXCLUDED.paid_at, value_cents = EXCLUDED.value_cents, status = EXCLUDED.status,
          method = EXCLUDED.method, resident_id = EXCLUDED.resident_id,
-         apartment_id = EXCLUDED.apartment_id`,
+         apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at,
+         proof_data_url = EXCLUDED.proof_data_url`,
       [
         receipt.id,
         receipt.ref,
@@ -89,6 +94,8 @@ export class PostgresReceiptRepository implements ReceiptRepository {
         receipt.method ?? null,
         receipt.residentId ?? null,
         receipt.apartmentId ?? null,
+        receipt.submittedAt ?? null,
+        receipt.proofDataUrl ?? null,
       ],
     );
     return receipt;

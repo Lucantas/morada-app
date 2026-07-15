@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const receiptStatusSchema = z.enum(['pago', 'pendente']);
+export const receiptStatusSchema = z.enum(['pendente', 'em_analise', 'pago']);
 export type ReceiptStatus = z.infer<typeof receiptStatusSchema>;
 
 export const receiptMethodSchema = z.enum(['dinheiro', 'pix']);
@@ -20,6 +20,8 @@ export const receiptSchema = z.object({
   dueDate: isoDateSchema.nullable(),
   // When the charge was actually paid; absent while pending. Set on payment.
   paidAt: isoDateSchema.optional(),
+  submittedAt: isoDateSchema.optional(),
+  proofDataUrl: z.string().max(7_000_000).optional(),
   valueCents: z.number().int(),
   status: receiptStatusSchema,
   method: receiptMethodSchema.optional(),

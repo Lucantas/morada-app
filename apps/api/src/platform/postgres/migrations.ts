@@ -117,4 +117,11 @@ CREATE TABLE condo_settings (
 INSERT INTO condo_settings (id, monthly_fee_cents, due_day) VALUES ('default', 15000, 15);
 `,
   },
+  {
+    id: '005_receipt_review',
+    sql: `
+ALTER TABLE receipts ADD COLUMN submitted_at DATE;
+ALTER TABLE receipts ADD COLUMN proof_data_url TEXT;
+`,
+  },
 ];
