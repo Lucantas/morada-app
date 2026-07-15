@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ApiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/api-client';
 
-import { receiptSchema, type Receipt } from '../domain/receipt';
+import { receiptSchema, type Receipt, type ReceiptMethod } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
 const receiptListSchema = z.array(receiptSchema);
@@ -33,6 +33,17 @@ export class HttpReceiptRepository implements ReceiptRepository {
     // the server derives the paid status and returns the updated receipt.
     const response = await this.api.post(`/api/receipts/${receipt.id}/pay`, {
       method: receipt.method,
+    });
+    return receiptSchema.parse(response);
+  }
+
+  async submitPayment(
+    id: string,
+    input: { method: ReceiptMethod; proofDataUrl: string },
+  ): Promise<Receipt> {
+    const response = await this.api.post(`/api/receipts/${id}/submit-payment`, {
+      method: input.method,
+      proofDataUrl: input.proofDataUrl,
     });
     return receiptSchema.parse(response);
   }

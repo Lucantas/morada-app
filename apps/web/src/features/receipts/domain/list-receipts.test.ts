@@ -10,6 +10,11 @@ function fakeRepo(receipts: Receipt[]): ReceiptRepository {
     listByApartment: async (aid) => receipts.filter((r) => r.apartmentId === aid),
     getById: async (id) => receipts.find((r) => r.id === id) ?? null,
     save: async (r) => r,
+    submitPayment: async (id, input) => {
+      const receipt = receipts.find((r) => r.id === id);
+      if (!receipt) throw new Error(`Receipt ${id} not found`);
+      return { ...receipt, status: 'em_analise', ...input };
+    },
   };
 }
 

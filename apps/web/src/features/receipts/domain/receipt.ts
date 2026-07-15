@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const receiptStatusSchema = z.enum(['pago', 'pendente']);
+export const receiptStatusSchema = z.enum(['pendente', 'em_analise', 'pago']);
 export type ReceiptStatus = z.infer<typeof receiptStatusSchema>;
 
 export const receiptMethodSchema = z.enum(['dinheiro', 'pix']);
@@ -19,5 +19,7 @@ export const receiptSchema = z.object({
   method: receiptMethodSchema.optional(),
   residentId: z.string().min(1).optional(),
   apartmentId: z.string().min(1).optional(),
+  submittedAt: z.string().optional(),
+  proofDataUrl: z.string().optional(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;

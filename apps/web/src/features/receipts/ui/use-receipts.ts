@@ -19,3 +19,19 @@ export function usePayReceipt(repository: ReceiptRepository) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: receiptsQueryKey }),
   });
 }
+
+export function useSubmitPayment(repository: ReceiptRepository) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      method,
+      proofDataUrl,
+    }: {
+      id: string;
+      method: ReceiptMethod;
+      proofDataUrl: string;
+    }) => repository.submitPayment(id, { method, proofDataUrl }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: receiptsQueryKey }),
+  });
+}

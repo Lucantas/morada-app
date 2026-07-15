@@ -91,23 +91,26 @@ export function PrimaryButton({
   icon,
   onClick,
   type = 'button',
+  disabled = false,
 }: {
   children: ReactNode;
   icon?: IconName;
   onClick?: () => void;
   type?: 'button' | 'submit';
+  disabled?: boolean;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       style={{
         width: '100%',
         minHeight: 52,
         border: 'none',
         borderRadius: 'var(--r-md)',
-        background: 'var(--brass-500)',
-        color: 'var(--petrol-900)',
+        background: disabled ? 'var(--line)' : 'var(--brass-500)',
+        color: disabled ? 'var(--ink-500)' : 'var(--petrol-900)',
         fontFamily: "'Inter', sans-serif",
         fontWeight: 600,
         fontSize: '1rem',
@@ -115,8 +118,8 @@ export function PrimaryButton({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 9,
-        cursor: 'pointer',
-        boxShadow: 'var(--sh-1)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: disabled ? 'none' : 'var(--sh-1)',
       }}
     >
       {icon && <Icon name={icon} size={19} strokeWidth={2.2} />}

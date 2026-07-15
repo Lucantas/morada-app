@@ -5,6 +5,7 @@ import type { ReceiptMethod, ReceiptStatus } from '../domain/receipt';
 const VIEW: Record<ReceiptStatus, { tone: PillTone; label: string }> = {
   pago: { tone: 'pago', label: 'Pago' },
   pendente: { tone: 'pendente', label: 'Pendente' },
+  em_analise: { tone: 'pendente', label: 'Em análise' },
 };
 
 const METHOD_LABELS: Record<ReceiptMethod, string> = {

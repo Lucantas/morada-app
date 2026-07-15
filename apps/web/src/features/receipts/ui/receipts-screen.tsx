@@ -221,6 +221,22 @@ function ReceiptTicket({
             </PrimaryButton>
           </div>
         )}
+        {receipt.status === 'em_analise' && (
+          <div style={{ marginTop: 12 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: '.86rem',
+                color: 'var(--ink-500)',
+              }}
+            >
+              <Icon name="clock" size={17} color="var(--ink-500)" strokeWidth={2.4} />
+              Aguardando confirmação
+            </span>
+          </div>
+        )}
       </div>
     </SurfaceCard>
   );

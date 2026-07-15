@@ -1,4 +1,4 @@
-import type { Receipt } from './receipt';
+import type { Receipt, ReceiptMethod } from './receipt';
 
 export interface ReceiptRepository {
   list(): Promise<Receipt[]>;
@@ -6,4 +6,8 @@ export interface ReceiptRepository {
   listByApartment(apartmentId: string): Promise<Receipt[]>;
   getById(id: string): Promise<Receipt | null>;
   save(receipt: Receipt): Promise<Receipt>;
+  submitPayment(
+    id: string,
+    input: { method: ReceiptMethod; proofDataUrl: string },
+  ): Promise<Receipt>;
 }

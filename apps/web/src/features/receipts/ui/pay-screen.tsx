@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -9,11 +10,12 @@ import { PrimaryButton } from '@/shared/ui/primitives';
 
 import { getReceipt } from '../domain/get-receipt';
 import { pixCopyPaste } from '../domain/pix-code';
+import { fileToDataUrl, isAllowedProof } from '../domain/proof';
 import type { ReceiptMethod } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
 import { methodLabel } from './receipt-status-view';
-import { receiptsQueryKey, usePayReceipt } from './use-receipts';
+import { receiptsQueryKey, useSubmitPayment } from './use-receipts';
 
 const METHODS: ReceiptMethod[] = ['dinheiro', 'pix'];
 
@@ -28,18 +30,38 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
     queryKey: [...receiptsQueryKey, receiptId],
     queryFn: () => getReceipt(repository, receiptId),
   });
-  const pay = usePayReceipt(repository);
+  const submitPayment = useSubmitPayment(repository);
   const [method, setMethod] = useState<ReceiptMethod>('pix');
   const [pixCopied, setPixCopied] = useState(false);
+  const [proofDataUrl, setProofDataUrl] = useState<string | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
 
   const confirm = () => {
-    pay.mutate({ id: receiptId, method }, { onSuccess: onDone });
+    if (!proofDataUrl) return;
+    submitPayment.mutate({ id: receiptId, method, proofDataUrl }, { onSuccess: onDone });
   };
 
   const copyPix = async () => {
     if (!receipt.data) return;
     await navigator.clipboard.writeText(pixCopyPaste(receipt.data));
     setPixCopied(true);
+  };
+
+  const handleProofChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setProofDataUrl(null);
+      setProofError(null);
+      return;
+    }
+    const dataUrl = await fileToDataUrl(file);
+    if (!isAllowedProof(dataUrl)) {
+      setProofDataUrl(null);
+      setProofError('Envie uma imagem ou PDF do comprovante.');
+      return;
+    }
+    setProofDataUrl(dataUrl);
+    setProofError(null);
   };
 
   return (
@@ -199,14 +221,46 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
               </div>
             )}
 
-            {pay.isError && (
+            <label
+              htmlFor="payment-proof"
+              style={{
+                display: 'block',
+                fontWeight: 600,
+                fontSize: '.9rem',
+                marginBottom: 9,
+                color: 'var(--ink-900)',
+              }}
+            >
+              Comprovante de pagamento
+            </label>
+            <input
+              id="payment-proof"
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(event) => void handleProofChange(event)}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginBottom: 8,
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '.86rem',
+              }}
+            />
+
+            {proofError && (
               <p style={{ color: 'var(--atraso-700)', marginBottom: 12, fontSize: '.88rem' }}>
-                Não foi possível confirmar o pagamento. Tente novamente.
+                {proofError}
               </p>
             )}
 
-            <PrimaryButton icon="check" onClick={confirm}>
-              Confirmar pagamento
+            {submitPayment.isError && (
+              <p style={{ color: 'var(--atraso-700)', marginBottom: 12, fontSize: '.88rem' }}>
+                Não foi possível enviar o comprovante. Tente novamente.
+              </p>
+            )}
+
+            <PrimaryButton icon="check" onClick={confirm} disabled={!proofDataUrl}>
+              Enviar comprovante
             </PrimaryButton>
           </div>
         )}
