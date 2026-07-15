@@ -22,7 +22,7 @@ export DATABASE_URL
 # `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
 TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
 
-.PHONY: help install start start-lan start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
+.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,15 @@ start-lan: db-up ## Start API+web bound to the LAN so a phone on the same Wi-Fi 
 		API_PID=$$!; \
 		trap 'pkill -P $$API_PID 2>/dev/null; kill $$API_PID 2>/dev/null' INT TERM EXIT; \
 		VITE_API_URL=http://$(LAN_IP):$(API_PORT) $(WEB) dev --host --port $(WEB_PORT) --strictPort
+
+start-tunnel: db-up ## Expose the stack over a public HTTPS cloudflared tunnel (phone on ANY network); prints the URL
+	@command -v cloudflared >/dev/null 2>&1 || { echo "cloudflared not found. Install: curl -fL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.local/bin/cloudflared && chmod +x ~/.local/bin/cloudflared"; exit 1; }
+	@echo "==> Tunnel mode — open the https://<...>.trycloudflare.com URL printed below on your phone. Ctrl-C stops everything."
+	@PORT=$(API_PORT) $(API) dev & API_PID=$$!; \
+		VITE_API_URL= API_PROXY_TARGET=http://localhost:$(API_PORT) $(WEB) dev --port $(WEB_PORT) --strictPort & WEB_PID=$$!; \
+		trap 'pkill -P $$API_PID 2>/dev/null; pkill -P $$WEB_PID 2>/dev/null; kill $$API_PID $$WEB_PID 2>/dev/null' INT TERM EXIT; \
+		sleep 4; \
+		cloudflared tunnel --url http://localhost:$(WEB_PORT)
 
 start-backend: db-up ## Start only the API (Postgres) on :$(API_PORT)
 	PORT=$(API_PORT) $(API) dev
