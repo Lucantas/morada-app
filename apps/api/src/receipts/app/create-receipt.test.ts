@@ -82,4 +82,15 @@ describe('createReceipt', () => {
     expect(receipt.paidAt).toBeUndefined();
     expect(receipt.method).toBeUndefined();
   });
+
+  test('stays pending when paidAt is given but method is omitted', async () => {
+    const repo = fakeRepo();
+    const receipt = await createReceipt(repo, async () => ({ apartmentId: 'ap-1' }), {
+      ...validInput,
+      paidAt: '2026-05-09',
+    });
+    expect(receipt.status).toBe('pendente');
+    expect(receipt.paidAt).toBeUndefined();
+    expect(receipt.method).toBeUndefined();
+  });
 });

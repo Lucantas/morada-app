@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import { DashboardScreen } from './dashboard-screen';
 
@@ -38,7 +38,17 @@ function renderScreen() {
 describe('DashboardScreen monthly ensure', () => {
   it('calls ensure-month once on mount', async () => {
     ensureMock.mockClear();
+    ensureMock.mockResolvedValueOnce(undefined);
     renderScreen();
     await waitFor(() => expect(ensureMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows a non-blocking notice when ensure-month fails', async () => {
+    ensureMock.mockClear();
+    ensureMock.mockRejectedValueOnce(new Error('network error'));
+    renderScreen();
+    expect(
+      await screen.findByText(/Não foi possível gerar as cobranças do mês/),
+    ).toBeInTheDocument();
   });
 });

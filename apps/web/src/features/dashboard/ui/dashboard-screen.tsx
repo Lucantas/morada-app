@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -34,13 +34,18 @@ export function DashboardScreen({
   bottomNav,
 }: Props) {
   const dashboard = useDashboard(repository);
+  const [ensureError, setEnsureError] = useState(false);
 
   const queryClient = useQueryClient();
   useEffect(() => {
     let cancelled = false;
-    void ensureMonthlyReceipts().then(() => {
-      if (!cancelled) void queryClient.invalidateQueries({ queryKey: residentsQueryKey });
-    });
+    void ensureMonthlyReceipts()
+      .then(() => {
+        if (!cancelled) void queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+      })
+      .catch(() => {
+        if (!cancelled) setEnsureError(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -67,6 +72,11 @@ export function DashboardScreen({
         }
       />
       <ScreenBody>
+        {ensureError && (
+          <p role="status" style={{ color: 'var(--atraso-700)', fontSize: '.82rem' }}>
+            Não foi possível gerar as cobranças do mês. Tente recarregar.
+          </p>
+        )}
         {dashboard.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando painel…</p>}
         {dashboard.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar o painel.</p>
