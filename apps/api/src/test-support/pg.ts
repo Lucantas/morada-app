@@ -9,6 +9,7 @@ const DATA_TABLES = [
   'notices',
   'threads',
   'users',
+  'condo_settings',
 ];
 
 // Empties every data table (keeping the applied-migrations ledger) so each

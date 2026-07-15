@@ -12,6 +12,8 @@ import { PostgresReceiptRepository } from '../receipts/adapters/postgres/receipt
 import type { ReceiptRepository } from '../receipts/domain/receipt-repository';
 import { PostgresResidentRepository } from '../residents/adapters/postgres/resident-repository';
 import type { ResidentRepository } from '../residents/domain/resident-repository';
+import { PostgresSettingsRepository } from '../settings/adapters/postgres/settings-repository';
+import type { SettingsRepository } from '../settings/domain/settings-repository';
 import { PostgresUserRepository } from '../users/adapters/postgres/user-repository';
 import type { UserRepository } from '../users/domain/user-repository';
 
@@ -28,6 +30,7 @@ export interface Repositories {
   threads: ThreadRepository;
   dashboard: DashboardRepository;
   users: UserRepository;
+  settings: SettingsRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -39,6 +42,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     threads: new PostgresThreadRepository(pool),
     dashboard: new PostgresDashboardRepository(pool),
     users: new PostgresUserRepository(pool),
+    settings: new PostgresSettingsRepository(pool),
   };
 }
 

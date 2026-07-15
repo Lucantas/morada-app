@@ -105,4 +105,16 @@ ALTER TABLE accounts ADD COLUMN date DATE;
 UPDATE receipts SET method = 'dinheiro' WHERE method IN ('boleto', 'cartao');
 `,
   },
+  {
+    id: '004_condo_settings',
+    sql: `
+CREATE TABLE condo_settings (
+  id TEXT PRIMARY KEY,
+  monthly_fee_cents INTEGER NOT NULL,
+  due_day INTEGER NOT NULL DEFAULT 15
+);
+
+INSERT INTO condo_settings (id, monthly_fee_cents, due_day) VALUES ('default', 15000, 15);
+`,
+  },
 ];
