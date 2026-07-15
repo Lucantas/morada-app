@@ -15,6 +15,7 @@ import { createReceipt } from './receipts/app/create-receipt';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
+import { settingsRoutes } from './settings/adapters/http/routes';
 import { generateTempPassword } from './platform/temp-password';
 import { createResidentLogin } from './users/app/create-resident-login';
 import { verifyCredentials } from './users/app/verify-credentials';
@@ -39,7 +40,7 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 }
 
 export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
-  const { residents, accounts, receipts, notices, threads, dashboard, users } = repos;
+  const { residents, accounts, receipts, notices, threads, dashboard, users, settings } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
@@ -102,6 +103,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
+  api.route('/settings', guarded('admin', settingsRoutes(settings)));
 
   // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
   api.post('/receipts', requireRole('admin'), async (c) =>
