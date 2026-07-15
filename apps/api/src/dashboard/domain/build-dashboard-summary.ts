@@ -18,6 +18,7 @@ function formatBrDate(date: string): string {
 export interface LedgerReceipt {
   valueCents: number;
   status: string;
+  paidAt: string | null;
 }
 
 const PAID = 'pago';
@@ -42,13 +43,22 @@ function sum(values: { valueCents: number }[]): number {
   return values.reduce((total, v) => total + v.valueCents, 0);
 }
 
+function sameMonth(iso: string | null, today: string): boolean {
+  return iso !== null && iso.slice(0, 7) === today.slice(0, 7);
+}
+
 export function buildDashboardSummary(
   accounts: LedgerAccount[],
   receipts: LedgerReceipt[],
+  today: string,
 ): DashboardSummary {
   const paidAccounts = accounts.filter((a) => a.status === PAID);
-  const incomeCents = sum(receipts.filter((r) => r.status === PAID));
-  const paidCents = sum(paidAccounts);
+  const paidReceipts = receipts.filter((r) => r.status === PAID);
+
+  const allTimeIncome = sum(paidReceipts);
+  const allTimePaid = sum(paidAccounts);
+  const monthIncome = sum(paidReceipts.filter((r) => sameMonth(r.paidAt, today)));
+  const monthPaid = sum(paidAccounts.filter((a) => sameMonth(a.date, today)));
 
   const recentPaid = [...paidAccounts]
     .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
@@ -71,7 +81,11 @@ export function buildDashboardSummary(
     }));
 
   return dashboardSummarySchema.parse({
-    balance: { balanceCents: incomeCents - paidCents, incomeCents, paidCents },
+    balance: {
+      balanceCents: allTimeIncome - allTimePaid,
+      incomeCents: monthIncome,
+      paidCents: monthPaid,
+    },
     recentPaid,
     maintenances,
   });

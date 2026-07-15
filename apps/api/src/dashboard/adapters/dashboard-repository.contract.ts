@@ -17,11 +17,13 @@ export function runDashboardRepositoryContract(
   describe(label, () => {
     test('derives the balance live from paid accounts and paid receipts', async () => {
       const { dashboard, accounts, receipts } = await setup();
+      const today = new Date().toISOString().slice(0, 10);
+      const thisMonth = today.slice(0, 7);
       await accounts.save({
         id: 'a-1',
         description: 'Água',
         category: 'Utilidades',
-        date: '2026-04-05',
+        date: `${thisMonth}-05`,
         valueCents: 100000,
         status: 'pago',
       });
@@ -29,7 +31,7 @@ export function runDashboardRepositoryContract(
         id: 'a-2',
         description: 'Jardinagem',
         category: 'Serviços',
-        date: '2026-04-12',
+        date: `${thisMonth}-12`,
         valueCents: 50000,
         status: 'pendente',
       });
@@ -37,7 +39,8 @@ export function runDashboardRepositoryContract(
         id: 'rc-1',
         ref: '04/2026',
         title: 'Taxa',
-        dueDate: '2026-04-10',
+        dueDate: `${thisMonth}-10`,
+        paidAt: `${thisMonth}-10`,
         valueCents: 45000,
         status: 'pago',
         residentId: 'r-1',
@@ -46,7 +49,8 @@ export function runDashboardRepositoryContract(
         id: 'rc-2',
         ref: '04/2026',
         title: 'Taxa',
-        dueDate: '2026-04-10',
+        dueDate: `${thisMonth}-10`,
+        paidAt: `${thisMonth}-11`,
         valueCents: 45000,
         status: 'pago',
         residentId: 'r-1',
@@ -55,7 +59,7 @@ export function runDashboardRepositoryContract(
         id: 'rc-3',
         ref: '04/2026',
         title: 'Taxa',
-        dueDate: '2026-04-10',
+        dueDate: `${thisMonth}-10`,
         valueCents: 45000,
         status: 'pendente',
         residentId: 'r-1',

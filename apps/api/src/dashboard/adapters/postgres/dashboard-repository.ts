@@ -20,6 +20,7 @@ interface AccountRow {
 interface ReceiptRow {
   value_cents: number;
   status: string;
+  paid_at: string | null;
 }
 
 // The summary is derived live from the ledger (accounts = expenses,
@@ -41,13 +42,15 @@ export class PostgresDashboardRepository implements DashboardRepository {
     }));
 
     const receiptsResult = await this.pool.query<ReceiptRow>(
-      'SELECT value_cents, status FROM receipts',
+      'SELECT value_cents, status, paid_at::text AS paid_at FROM receipts',
     );
     const receipts: LedgerReceipt[] = receiptsResult.rows.map((row) => ({
       valueCents: row.value_cents,
       status: row.status,
+      paidAt: row.paid_at,
     }));
 
-    return buildDashboardSummary(accounts, receipts);
+    const today = new Date().toISOString().slice(0, 10);
+    return buildDashboardSummary(accounts, receipts, today);
   }
 }
