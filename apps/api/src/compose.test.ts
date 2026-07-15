@@ -372,15 +372,30 @@ describe('Morada API — authorization wiring', () => {
     expect(pay.status).toBe(403);
   });
 
-  test('a resident can pay their own receipt', async () => {
+  test('a resident cannot pay their own receipt directly (admin-only)', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1
     const pay = await auth('/api/receipts/rc-1/pay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ method: 'pix' }),
     });
-    expect(pay.status).toBe(200);
-    expect(((await pay.json()) as { status: string }).status).toBe('pago');
+    expect(pay.status).toBe(403);
+  });
+
+  test('a resident submits a payment with proof for their own receipt, moving it to em_analise', async () => {
+    const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1
+    const submit = await auth('/api/receipts/rc-1/submit-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        method: 'pix',
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+    });
+    expect(submit.status).toBe(200);
+    const body = (await submit.json()) as { status: string; submittedAt?: string };
+    expect(body.status).toBe('em_analise');
+    expect(body.submittedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   test('an admin issues a charge and the resident then sees it (pending)', async () => {
