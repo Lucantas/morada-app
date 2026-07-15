@@ -8,6 +8,7 @@ export type View =
   | 'a-resident-charge'
   | 'a-accounts'
   | 'a-account-edit'
+  | 'a-settings'
   | 'a-notice'
   | 'a-messages'
   | 'r-home'

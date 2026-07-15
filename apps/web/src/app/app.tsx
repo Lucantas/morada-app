@@ -23,6 +23,7 @@ import { IssueChargeScreen } from '@/features/residents/ui/issue-charge-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
+import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 
@@ -36,6 +37,7 @@ import {
   receiptRepository,
   registerPayment,
   residentRepository,
+  settingsRepository,
   threadRepository,
 } from './container';
 import { useNavStore, type View } from './nav-store';
@@ -50,6 +52,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-resident-edit': 'residents',
   'a-accounts': 'accounts',
   'a-account-edit': 'accounts',
+  'a-settings': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -191,6 +194,8 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onBack={() => go('a-accounts')}
         />
       );
+    case 'a-settings':
+      return <SettingsScreen repository={settingsRepository} onBack={() => go('a-home')} />;
     case 'a-notice':
       return (
         <SendNoticeScreen
@@ -327,6 +332,13 @@ function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavIt
       icon: 'receipt',
       active: active === 'accounts',
       onClick: () => go('a-accounts'),
+    },
+    {
+      key: 'settings',
+      label: 'Config.',
+      icon: 'wrench',
+      active: active === 'settings',
+      onClick: () => go('a-settings'),
     },
     { key: 'logout', label: 'Sair', icon: 'logout', onClick: signOut },
   ];

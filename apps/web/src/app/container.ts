@@ -4,6 +4,7 @@ import { HttpThreadRepository } from '@/features/messages/data/http-thread-repos
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
+import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
 import type { Role } from '@/features/session/domain/session';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
@@ -25,6 +26,7 @@ export const receiptRepository = new HttpReceiptRepository(apiClient);
 export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
+export const settingsRepository = new HttpSettingsRepository(apiClient);
 
 /** Authenticate with a username and password against the API, storing the JWT
  *  (with the real subject decoded from it) and returning the resolved role. */
