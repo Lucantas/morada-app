@@ -14,6 +14,10 @@ DB_URL ?= postgres://morada:morada@localhost:5433/morada
 DATABASE_URL ?= $(DB_URL)
 export DATABASE_URL
 
+# Tests TRUNCATE + reseed their database, so they run against an ISOLATED
+# `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
+TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
+
 .PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
 
 help: ## List targets
@@ -70,8 +74,10 @@ clean: ## Remove caches and coverage output
 api-dev: db-up ## Start only the API (alias of start-backend)
 	PORT=$(API_PORT) $(API) dev
 
-api-test: db-up ## Run API tests with coverage (gate = 80%) against local Postgres
-	$(API) test:coverage
+api-test: db-up ## Run API tests with coverage (gate = 80%) against an ISOLATED test DB (never the app data)
+	@docker exec morada-postgres psql -U morada -d morada -tAc "SELECT 1 FROM pg_database WHERE datname='morada_test'" | grep -q 1 \
+		|| docker exec morada-postgres psql -U morada -d morada -c "CREATE DATABASE morada_test"
+	DATABASE_URL=$(TEST_DB_URL) $(API) test:coverage
 
 api-typecheck: ## Type-check the API with tsc
 	$(API) typecheck
