@@ -12,6 +12,7 @@ import { createRepositories, type Repositories } from './platform/repositories';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { createReceipt } from './receipts/app/create-receipt';
+import { generateMonthlyReceipts } from './receipts/app/generate-monthly-receipts';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
@@ -109,6 +110,20 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.post('/receipts', requireRole('admin'), async (c) =>
     c.json(
       await createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
+      201,
+    ),
+  );
+
+  // Admin-only: create the missing monthly condo-fee receipts, idempotently
+  // (one 'pendente' charge per active resident for the current ref/month).
+  api.post('/receipts/ensure-month', requireRole('admin'), async (c) =>
+    c.json(
+      await generateMonthlyReceipts(
+        receipts,
+        residents,
+        settings,
+        new Date().toISOString().slice(0, 10),
+      ),
       201,
     ),
   );
