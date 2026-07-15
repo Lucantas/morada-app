@@ -12,6 +12,7 @@ import { createRepositories, type Repositories } from './platform/repositories';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { createReceipt } from './receipts/app/create-receipt';
+import { editReceipt } from './receipts/app/edit-receipt';
 import { generateMonthlyReceipts } from './receipts/app/generate-monthly-receipts';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
@@ -112,6 +113,12 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
       await createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
       201,
     ),
+  );
+
+  // Editing a receipt (ref/title/valueCents/dueDate) is admin-only; must be
+  // registered before the '/receipts' mount below or it would be shadowed.
+  api.put('/receipts/:id', requireRole('admin'), async (c) =>
+    c.json(await editReceipt(receipts, c.req.param('id'), await c.req.json())),
   );
 
   // Admin-only: create the missing monthly condo-fee receipts, idempotently

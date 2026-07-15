@@ -60,4 +60,26 @@ describe('createReceipt', () => {
       }),
     ).rejects.toThrow(ReceiptValidationError);
   });
+
+  test('registers a receipt already paid when paidAt and method are given', async () => {
+    const repo = fakeRepo();
+    const receipt = await createReceipt(repo, async () => ({ apartmentId: 'ap-1' }), {
+      residentId: 'r-1',
+      ref: '06/2026',
+      title: 'Taxa condominial',
+      valueCents: 15000,
+      dueDate: '2026-06-15',
+      paidAt: '2026-06-14',
+      method: 'dinheiro',
+    });
+    expect(receipt).toMatchObject({ status: 'pago', paidAt: '2026-06-14', method: 'dinheiro' });
+  });
+
+  test('creates a pending receipt when paidAt/method are omitted', async () => {
+    const repo = fakeRepo();
+    const receipt = await createReceipt(repo, async () => ({ apartmentId: 'ap-1' }), validInput);
+    expect(receipt.status).toBe('pendente');
+    expect(receipt.paidAt).toBeUndefined();
+    expect(receipt.method).toBeUndefined();
+  });
 });
