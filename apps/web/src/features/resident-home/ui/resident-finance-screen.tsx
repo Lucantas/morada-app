@@ -80,13 +80,13 @@ function BalanceHero({ balance }: { balance: CondoBalance }) {
       </div>
       <div style={{ display: 'flex', gap: 20, marginTop: 16 }}>
         <div>
-          <div style={{ fontSize: '.72rem', color: '#A9C6C9' }}>Entradas</div>
+          <div style={{ fontSize: '.72rem', color: '#A9C6C9' }}>Entradas do mês</div>
           <div style={{ fontWeight: 600, fontSize: '.95rem', marginTop: 2 }}>
             {formatBRL(balance.incomeCents)}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: '.72rem', color: '#A9C6C9' }}>Contas pagas</div>
+          <div style={{ fontSize: '.72rem', color: '#A9C6C9' }}>Contas pagas do mês</div>
           <div style={{ fontWeight: 600, fontSize: '.95rem', marginTop: 2 }}>
             {formatBRL(balance.paidCents)}
           </div>
