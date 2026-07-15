@@ -66,6 +66,10 @@ Monorepo (pnpm workspaces): `apps/web` is the app. Run commands as
 7. **Errors are explicit.** Wrap infra errors in domain errors; render explicit
    error states; nothing silently swallowed.
 8. **Conventional commits**, small and atomic. Never `--no-verify`.
+9. **Subagent-driven execution.** Implement plans one task at a time via a fresh
+   subagent per task (superpowers:subagent-driven-development), reviewing between
+   tasks. This is the default for any multi-task work here — never batch tasks
+   inline unless explicitly told to.
 
 ## Commands
 
