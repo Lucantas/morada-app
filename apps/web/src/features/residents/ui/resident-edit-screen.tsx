@@ -42,6 +42,9 @@ type EditReceipt = (input: {
   dueDate: string;
 }) => Promise<void>;
 
+type ConfirmPayment = (receiptId: string) => Promise<void>;
+type RejectPayment = (receiptId: string) => Promise<void>;
+
 type Props = {
   repository: ResidentRepository;
   receiptRepository: ReceiptRepository;
@@ -51,6 +54,8 @@ type Props = {
   onIssueCharge?: () => void;
   registerPayment?: RegisterPayment;
   onEditReceipt?: EditReceipt;
+  onConfirmPayment?: ConfirmPayment;
+  onRejectPayment?: RejectPayment;
 };
 
 export function ResidentEditScreen({
@@ -62,6 +67,8 @@ export function ResidentEditScreen({
   onIssueCharge,
   registerPayment,
   onEditReceipt,
+  onConfirmPayment,
+  onRejectPayment,
 }: Props) {
   const queryClient = useQueryClient();
   const registration = useMutation({
@@ -80,6 +87,20 @@ export function ResidentEditScreen({
       valueCents: number;
       dueDate: string;
     }) => (onEditReceipt ?? (async () => {}))(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    },
+  });
+  const confirming = useMutation({
+    mutationFn: (receiptId: string) => (onConfirmPayment ?? (async () => {}))(receiptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    },
+  });
+  const rejecting = useMutation({
+    mutationFn: (receiptId: string) => (onRejectPayment ?? (async () => {}))(receiptId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       queryClient.invalidateQueries({ queryKey: residentsQueryKey });
@@ -312,6 +333,14 @@ export function ResidentEditScreen({
               isRegistering={registration.isPending}
               onEditReceipt={onEditReceipt ? (input) => editing.mutate(input) : undefined}
               isEditing={editing.isPending}
+              onConfirmPayment={
+                onConfirmPayment ? (receiptId) => confirming.mutate(receiptId) : undefined
+              }
+              isConfirming={confirming.isPending}
+              onRejectPayment={
+                onRejectPayment ? (receiptId) => rejecting.mutate(receiptId) : undefined
+              }
+              isRejecting={rejecting.isPending}
             />
           </>
         )}
@@ -364,6 +393,9 @@ type EditReceiptHandler = (input: {
   dueDate: string;
 }) => void;
 
+type ConfirmPaymentHandler = (receiptId: string) => void;
+type RejectPaymentHandler = (receiptId: string) => void;
+
 function ReceiptsSection({
   receipts,
   onIssueCharge,
@@ -371,6 +403,10 @@ function ReceiptsSection({
   isRegistering,
   onEditReceipt,
   isEditing,
+  onConfirmPayment,
+  isConfirming,
+  onRejectPayment,
+  isRejecting,
 }: {
   receipts: Receipt[];
   onIssueCharge?: () => void;
@@ -378,6 +414,10 @@ function ReceiptsSection({
   isRegistering?: boolean;
   onEditReceipt?: EditReceiptHandler;
   isEditing?: boolean;
+  onConfirmPayment?: ConfirmPaymentHandler;
+  isConfirming?: boolean;
+  onRejectPayment?: RejectPaymentHandler;
+  isRejecting?: boolean;
 }) {
   return (
     <>
@@ -407,6 +447,10 @@ function ReceiptsSection({
               isRegistering={isRegistering}
               onEditReceipt={onEditReceipt}
               isEditing={isEditing}
+              onConfirmPayment={onConfirmPayment}
+              isConfirming={isConfirming}
+              onRejectPayment={onRejectPayment}
+              isRejecting={isRejecting}
             />
           ))}
         </div>
@@ -421,12 +465,20 @@ function ReceiptLedgerRow({
   isRegistering,
   onEditReceipt,
   isEditing,
+  onConfirmPayment,
+  isConfirming,
+  onRejectPayment,
+  isRejecting,
 }: {
   receipt: Receipt;
   onRegisterPayment?: RegisterPaymentHandler;
   isRegistering?: boolean;
   onEditReceipt?: EditReceiptHandler;
   isEditing?: boolean;
+  onConfirmPayment?: ConfirmPaymentHandler;
+  isConfirming?: boolean;
+  onRejectPayment?: RejectPaymentHandler;
+  isRejecting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -437,6 +489,9 @@ function ReceiptLedgerRow({
   const [editDueDate, setEditDueDate] = useState(receipt.dueDate ?? '');
   const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
   const canEdit = onEditReceipt !== undefined;
+  const isUnderReview = receipt.status === 'em_analise';
+  const canReview =
+    isUnderReview && onConfirmPayment !== undefined && onRejectPayment !== undefined;
 
   const openEdit = () => {
     setEditRef(receipt.ref);
@@ -462,8 +517,8 @@ function ReceiptLedgerRow({
           R$ {formatBRL(receipt.valueCents)}
         </span>
         <StatusPill
-          tone={receipt.status === 'pago' ? 'pago' : 'pendente'}
-          label={receipt.status === 'pago' ? 'Pago' : 'Pendente'}
+          tone={receipt.status === 'pago' ? 'pago' : isUnderReview ? 'info' : 'pendente'}
+          label={receipt.status === 'pago' ? 'Pago' : isUnderReview ? 'Em análise' : 'Pendente'}
         />
       </div>
 
@@ -480,6 +535,48 @@ function ReceiptLedgerRow({
               <Icon name="edit" size={15} />
               Editar
             </button>
+          )}
+        </div>
+      )}
+
+      {isUnderReview && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+          {receipt.proofDataUrl && (
+            <a
+              href={receipt.proofDataUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{ ...archiveButtonStyle, textDecoration: 'none' }}
+            >
+              <Icon name="receipt" size={15} />
+              Ver comprovante
+            </a>
+          )}
+          {canReview && (
+            <>
+              <button
+                type="button"
+                disabled={isConfirming || isRejecting}
+                onClick={() => onConfirmPayment?.(receipt.id)}
+                style={{
+                  ...archiveButtonStyle,
+                  border: 'none',
+                  background: 'var(--brass-500)',
+                  color: 'var(--petrol-900)',
+                }}
+              >
+                <Icon name="check" size={15} />
+                {isConfirming ? 'Confirmando…' : 'Confirmar'}
+              </button>
+              <button
+                type="button"
+                disabled={isConfirming || isRejecting}
+                onClick={() => onRejectPayment?.(receipt.id)}
+                style={archiveButtonStyle}
+              >
+                Rejeitar
+              </button>
+            </>
           )}
         </div>
       )}

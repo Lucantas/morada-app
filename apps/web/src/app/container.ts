@@ -81,6 +81,19 @@ export async function registerPayment(input: {
   });
 }
 
+/** Admin-only: confirm a resident-submitted payment, marking the receipt paid. */
+export async function confirmPayment(input: { receiptId: string; paidAt?: string }): Promise<void> {
+  await apiClient.post(
+    `/api/receipts/${input.receiptId}/confirm`,
+    input.paidAt ? { paidAt: input.paidAt } : {},
+  );
+}
+
+/** Admin-only: reject a resident-submitted payment, returning the receipt to pendente. */
+export async function rejectPayment(receiptId: string): Promise<void> {
+  await apiClient.post(`/api/receipts/${receiptId}/reject`, {});
+}
+
 /** Admin-only: ensure every active resident has the current month's condo-fee
  *  charge. Idempotent; safe to call on each admin load. */
 export async function ensureMonthlyReceipts(): Promise<void> {

@@ -199,4 +199,44 @@ describe('ResidentEditScreen', () => {
       }),
     );
   });
+
+  test('lets the admin confirm or reject a payment submitted for review', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        status: 'em_analise',
+        proofDataUrl: 'data:image/png;base64,abc123',
+      }),
+    ]);
+    const onConfirmPayment = jest.fn().mockResolvedValue(undefined);
+    const onRejectPayment = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onConfirmPayment={onConfirmPayment}
+        onRejectPayment={onRejectPayment}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+
+    expect(screen.queryByRole('button', { name: /dar baixa/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
+      'href',
+      'data:image/png;base64,abc123',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /confirmar/i }));
+
+    await waitFor(() => expect(onConfirmPayment).toHaveBeenCalledWith('rc-1'));
+    expect(onRejectPayment).not.toHaveBeenCalled();
+  });
 });

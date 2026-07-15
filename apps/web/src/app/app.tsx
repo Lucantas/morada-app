@@ -29,6 +29,7 @@ import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 
 import {
   accountRepository,
+  confirmPayment,
   dashboardRepository,
   editReceipt,
   issueCharge,
@@ -37,6 +38,7 @@ import {
   provisionResidentLogin,
   receiptRepository,
   registerPayment,
+  rejectPayment,
   residentRepository,
   settingsRepository,
   threadRepository,
@@ -150,6 +152,8 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onIssueCharge={residentId ? () => go('a-resident-charge', { residentId }) : undefined}
           registerPayment={registerPayment}
           onEditReceipt={editReceipt}
+          onConfirmPayment={(receiptId) => confirmPayment({ receiptId })}
+          onRejectPayment={rejectPayment}
         />
       );
     case 'a-resident-login':
