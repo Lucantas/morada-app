@@ -21,6 +21,9 @@ export async function listResidents(
     byResident.set(r.residentId, list);
   }
   return residents
-    .map((r) => ({ ...r, status: deriveResidentStatus(byResident.get(r.id) ?? [], now) }))
+    .map((r) => ({
+      ...r,
+      status: r.statusOverride ?? deriveResidentStatus(byResident.get(r.id) ?? [], now),
+    }))
     .sort((a, b) => a.apt.localeCompare(b.apt, 'pt-BR', { numeric: true }));
 }

@@ -37,6 +37,10 @@ function fakeRepo(): ResidentRepository {
       const r = map.get(id);
       if (r) map.set(id, { ...r, active: false });
     },
+    setStatusOverride: async (id, status) => {
+      const r = map.get(id);
+      if (r) map.set(id, { ...r, statusOverride: status });
+    },
   };
 }
 

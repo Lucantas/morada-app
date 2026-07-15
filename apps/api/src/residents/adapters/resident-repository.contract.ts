@@ -95,5 +95,16 @@ export function runResidentRepositoryContract(
       const repo = await makeRepo();
       expect(await repo.getById('nope')).toBeNull();
     });
+
+    test('setStatusOverride round-trips and clears', async () => {
+      const repo = await makeRepo();
+      await repo.save(maria);
+
+      await repo.setStatusOverride('r-1', 'atrasado');
+      expect((await repo.getById('r-1'))?.statusOverride).toBe('atrasado');
+
+      await repo.setStatusOverride('r-1', null);
+      expect((await repo.getById('r-1'))?.statusOverride).toBeNull();
+    });
   });
 }

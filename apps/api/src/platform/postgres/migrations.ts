@@ -124,4 +124,10 @@ ALTER TABLE receipts ADD COLUMN submitted_at DATE;
 ALTER TABLE receipts ADD COLUMN proof_data_url TEXT;
 `,
   },
+  {
+    id: '006_resident_status_override',
+    sql: `
+ALTER TABLE residents ADD COLUMN status_override TEXT;
+`,
+  },
 ];

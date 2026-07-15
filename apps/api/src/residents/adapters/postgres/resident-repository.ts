@@ -12,13 +12,14 @@ interface ResidentRow {
   phone: string;
   email: string;
   status: string;
+  status_override: string | null;
   apartment_id: string;
   apt: string;
   active: boolean;
 }
 
 const SELECT = `
-  SELECT r.id, r.name, r.phone, r.email, r.status,
+  SELECT r.id, r.name, r.phone, r.email, r.status, r.status_override,
          ar.apartment_id AS apartment_id, a.label AS apt, ar.active AS active
   FROM residents r
   JOIN apartment_residents ar ON ar.resident_id = r.id
@@ -34,6 +35,7 @@ function toResident(row: ResidentRow): Resident {
     email: row.email,
     status: row.status,
     active: row.active,
+    statusOverride: row.status_override ?? null,
   });
 }
 
@@ -118,6 +120,10 @@ export class PostgresResidentRepository implements ResidentRepository {
     await this.pool.query('UPDATE apartment_residents SET active = FALSE WHERE resident_id = $1', [
       id,
     ]);
+  }
+
+  async setStatusOverride(id: string, status: Resident['status'] | null): Promise<void> {
+    await this.pool.query('UPDATE residents SET status_override = $2 WHERE id = $1', [id, status]);
   }
 
   private async apartmentIdForLabel(client: PoolClient, label: string): Promise<string> {

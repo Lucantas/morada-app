@@ -24,10 +24,16 @@ function fakeRepo(list: Resident[]): ResidentRepository {
       const r = map.get(id);
       if (r) map.set(id, { ...r, active: false });
     },
+    setStatusOverride: async (id, status) => {
+      const r = map.get(id);
+      if (r) map.set(id, { ...r, statusOverride: status });
+    },
   };
 }
 
-function fakeReceipts(rows: Pick<Receipt, 'residentId' | 'status'>[]): ReceiptRepository {
+function fakeReceipts(
+  rows: (Pick<Receipt, 'residentId' | 'status'> & Partial<Pick<Receipt, 'dueDate'>>)[],
+): ReceiptRepository {
   const all = rows as Receipt[];
   return {
     list: async () => all,
@@ -70,5 +76,19 @@ describe('listResidents', () => {
     const byId = new Map((await listResidents(repo, receipts)).map((r) => [r.id, r.status]));
     expect(byId.get('a')).toBe('pendente');
     expect(byId.get('b')).toBe('em_dia');
+  });
+
+  test('an admin status override wins over the derived status', async () => {
+    const repo = fakeRepo([build({ id: 'a', name: 'Ana', statusOverride: 'em_dia' })]);
+    const receipts = fakeReceipts([{ residentId: 'a', status: 'pendente', dueDate: '2000-01-01' }]);
+    const byId = new Map((await listResidents(repo, receipts)).map((r) => [r.id, r.status]));
+    expect(byId.get('a')).toBe('em_dia');
+  });
+
+  test('a null override falls back to the derived status', async () => {
+    const repo = fakeRepo([build({ id: 'a', name: 'Ana', statusOverride: null })]);
+    const receipts = fakeReceipts([{ residentId: 'a', status: 'pendente', dueDate: '2000-01-01' }]);
+    const byId = new Map((await listResidents(repo, receipts)).map((r) => [r.id, r.status]));
+    expect(byId.get('a')).toBe('atrasado');
   });
 });

@@ -16,9 +16,11 @@ export async function getResident(
   const resident = await repo.getById(id);
   if (!resident) throw new ResidentNotFoundError(id);
   const mine = await receipts.listByResident(id);
-  const status = deriveResidentStatus(
-    mine.map((r) => ({ status: r.status, dueDate: r.dueDate })),
-    today(),
-  );
+  const status =
+    resident.statusOverride ??
+    deriveResidentStatus(
+      mine.map((r) => ({ status: r.status, dueDate: r.dueDate })),
+      today(),
+    );
   return { ...resident, status };
 }
