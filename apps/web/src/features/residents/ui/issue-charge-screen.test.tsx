@@ -35,4 +35,18 @@ describe('IssueChargeScreen', () => {
     expect(issue).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Preencha referência, valor e vencimento.');
   });
+
+  it('shows an error when adding fails', async () => {
+    const issue = jest.fn().mockRejectedValue(new Error('Falhou'));
+    render(<IssueChargeScreen residentId="r-1" issue={issue} onBack={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Referência'), { target: { value: '05/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '45000' } });
+    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '2026-05-15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+    await waitFor(() => expect(issue).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Falhou')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Falhou');
+  });
 });

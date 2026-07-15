@@ -19,6 +19,12 @@ function previousMonthDate(today: string): string {
   return `${previousYear}-${String(previousMonth).padStart(2, '0')}-15`;
 }
 
+function monthYearRef(isoDate: string): string {
+  const year = isoDate.slice(0, 4);
+  const month = isoDate.slice(5, 7);
+  return `${month}/${year}`;
+}
+
 export function runDashboardRepositoryContract(
   label: string,
   setup: () => Promise<DashboardHarness>,
@@ -84,7 +90,7 @@ export function runDashboardRepositoryContract(
       });
       await receipts.save({
         id: 'rc-4',
-        ref: '03/2026',
+        ref: monthYearRef(previousMonth),
         title: 'Taxa',
         dueDate: previousMonth,
         paidAt: previousMonth,
