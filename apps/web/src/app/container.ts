@@ -43,15 +43,30 @@ export async function login(username: string, password: string): Promise<Role> {
   return data.role;
 }
 
-/** Admin-only: issue a pending charge (receipt) to a resident. */
+/** Admin-only: issue a pending charge (receipt) to a resident. Optionally
+ *  mark it already paid by providing both `paidAt` and `method`. */
 export async function issueCharge(input: {
   residentId: string;
   ref: string;
   title: string;
   valueCents: number;
   dueDate: string;
+  paidAt?: string;
+  method?: 'dinheiro' | 'pix';
 }): Promise<void> {
   await apiClient.post('/api/receipts', input);
+}
+
+/** Admin-only: edit an existing receipt's ref/title/value/due date. */
+export async function editReceipt(input: {
+  receiptId: string;
+  ref: string;
+  title: string;
+  valueCents: number;
+  dueDate: string;
+}): Promise<void> {
+  const { receiptId, ...patch } = input;
+  await apiClient.put(`/api/receipts/${receiptId}`, patch);
 }
 
 /** Admin-only: register a payment against a receipt, informing when it was paid. */

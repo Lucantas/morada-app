@@ -10,6 +10,7 @@ import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
+import { MoneyInput } from '@/shared/ui/money-input';
 
 import { apartmentLabel, apartmentNumber } from '../domain/apartment';
 import { getResident } from '../domain/get-resident';
@@ -33,6 +34,14 @@ type RegisterPayment = (input: {
   paidAt: string;
 }) => Promise<void>;
 
+type EditReceipt = (input: {
+  receiptId: string;
+  ref: string;
+  title: string;
+  valueCents: number;
+  dueDate: string;
+}) => Promise<void>;
+
 type Props = {
   repository: ResidentRepository;
   receiptRepository: ReceiptRepository;
@@ -41,6 +50,7 @@ type Props = {
   onCreateLogin?: () => void;
   onIssueCharge?: () => void;
   registerPayment?: RegisterPayment;
+  onEditReceipt?: EditReceipt;
 };
 
 export function ResidentEditScreen({
@@ -51,11 +61,25 @@ export function ResidentEditScreen({
   onCreateLogin,
   onIssueCharge,
   registerPayment,
+  onEditReceipt,
 }: Props) {
   const queryClient = useQueryClient();
   const registration = useMutation({
     mutationFn: (input: { receiptId: string; method: ReceiptMethod; paidAt: string }) =>
       (registerPayment ?? (async () => {}))(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    },
+  });
+  const editing = useMutation({
+    mutationFn: (input: {
+      receiptId: string;
+      ref: string;
+      title: string;
+      valueCents: number;
+      dueDate: string;
+    }) => (onEditReceipt ?? (async () => {}))(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       queryClient.invalidateQueries({ queryKey: residentsQueryKey });
@@ -286,6 +310,8 @@ export function ResidentEditScreen({
                 registerPayment ? (input) => registration.mutate(input) : undefined
               }
               isRegistering={registration.isPending}
+              onEditReceipt={onEditReceipt ? (input) => editing.mutate(input) : undefined}
+              isEditing={editing.isPending}
             />
           </>
         )}
@@ -330,16 +356,28 @@ type RegisterPaymentHandler = (input: {
   paidAt: string;
 }) => void;
 
+type EditReceiptHandler = (input: {
+  receiptId: string;
+  ref: string;
+  title: string;
+  valueCents: number;
+  dueDate: string;
+}) => void;
+
 function ReceiptsSection({
   receipts,
   onIssueCharge,
   onRegisterPayment,
   isRegistering,
+  onEditReceipt,
+  isEditing,
 }: {
   receipts: Receipt[];
   onIssueCharge?: () => void;
   onRegisterPayment?: RegisterPaymentHandler;
   isRegistering?: boolean;
+  onEditReceipt?: EditReceiptHandler;
+  isEditing?: boolean;
 }) {
   return (
     <>
@@ -367,6 +405,8 @@ function ReceiptsSection({
               receipt={r}
               onRegisterPayment={onRegisterPayment}
               isRegistering={isRegistering}
+              onEditReceipt={onEditReceipt}
+              isEditing={isEditing}
             />
           ))}
         </div>
@@ -379,15 +419,31 @@ function ReceiptLedgerRow({
   receipt,
   onRegisterPayment,
   isRegistering,
+  onEditReceipt,
+  isEditing,
 }: {
   receipt: Receipt;
   onRegisterPayment?: RegisterPaymentHandler;
   isRegistering?: boolean;
+  onEditReceipt?: EditReceiptHandler;
+  isEditing?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [method, setMethod] = useState<ReceiptMethod>('dinheiro');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRef, setEditRef] = useState(receipt.ref);
+  const [editValueCents, setEditValueCents] = useState(receipt.valueCents);
+  const [editDueDate, setEditDueDate] = useState(receipt.dueDate ?? '');
   const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
+  const canEdit = onEditReceipt !== undefined;
+
+  const openEdit = () => {
+    setEditRef(receipt.ref);
+    setEditValueCents(receipt.valueCents);
+    setEditDueDate(receipt.dueDate ?? '');
+    setEditOpen(true);
+  };
 
   return (
     <SurfaceCard style={{ padding: '12px 14px' }}>
@@ -411,15 +467,65 @@ function ReceiptLedgerRow({
         />
       </div>
 
-      {canRegister && !open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          style={{ ...archiveButtonStyle, marginTop: 10 }}
-        >
-          <Icon name="check" size={15} />
-          Dar baixa
-        </button>
+      {(canRegister || canEdit) && !open && !editOpen && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          {canRegister && (
+            <button type="button" onClick={() => setOpen(true)} style={archiveButtonStyle}>
+              <Icon name="check" size={15} />
+              Dar baixa
+            </button>
+          )}
+          {canEdit && (
+            <button type="button" onClick={openEdit} style={archiveButtonStyle}>
+              <Icon name="edit" size={15} />
+              Editar
+            </button>
+          )}
+        </div>
+      )}
+
+      {canEdit && editOpen && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Field label="Referência" value={editRef} onChange={setEditRef} />
+          <MoneyInput label="Valor" value={editValueCents} onChange={setEditValueCents} />
+          <Field label="Vencimento" value={editDueDate} onChange={setEditDueDate} type="date" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              disabled={isEditing || !editRef.trim() || !editDueDate || editValueCents <= 0}
+              onClick={() =>
+                onEditReceipt?.({
+                  receiptId: receipt.id,
+                  ref: editRef.trim(),
+                  title: receipt.title,
+                  valueCents: editValueCents,
+                  dueDate: editDueDate,
+                })
+              }
+              style={{
+                flex: 1,
+                minHeight: 44,
+                border: 'none',
+                borderRadius: 'var(--r-sm)',
+                background: 'var(--brass-500)',
+                color: 'var(--petrol-900)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '.9rem',
+                cursor: 'pointer',
+              }}
+            >
+              {isEditing ? 'Salvando…' : 'Salvar edição'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditOpen(false)}
+              style={{ ...archiveButtonStyle, minHeight: 44 }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
 
       {canRegister && open && (

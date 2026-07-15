@@ -49,4 +49,24 @@ describe('IssueChargeScreen', () => {
     expect(await screen.findByText('Falhou')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Falhou');
   });
+
+  it('sends paidAt and method when marked as already paid', async () => {
+    const issue = jest.fn().mockResolvedValue(undefined);
+    render(<IssueChargeScreen residentId="r-1" issue={issue} onBack={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Referência'), { target: { value: '06/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '15000' } });
+    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '2026-06-15' } });
+    fireEvent.click(screen.getByLabelText('Já foi pago'));
+    fireEvent.change(screen.getByLabelText('Data do pagamento'), {
+      target: { value: '2026-06-14' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+    await waitFor(() =>
+      expect(issue).toHaveBeenCalledWith(
+        expect.objectContaining({ paidAt: '2026-06-14', method: 'dinheiro' }),
+      ),
+    );
+  });
 });

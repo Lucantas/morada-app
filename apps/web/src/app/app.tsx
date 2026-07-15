@@ -30,6 +30,7 @@ import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import {
   accountRepository,
   dashboardRepository,
+  editReceipt,
   issueCharge,
   login,
   noticeRepository,
@@ -148,6 +149,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           onIssueCharge={residentId ? () => go('a-resident-charge', { residentId }) : undefined}
           registerPayment={registerPayment}
+          onEditReceipt={editReceipt}
         />
       );
     case 'a-resident-login':

@@ -5,12 +5,16 @@ import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
 import { MoneyInput } from '@/shared/ui/money-input';
 
+type ChargeMethod = 'dinheiro' | 'pix';
+
 type ChargeInput = {
   residentId: string;
   ref: string;
   title: string;
   valueCents: number;
   dueDate: string;
+  paidAt?: string;
+  method?: ChargeMethod;
 };
 
 type Props = {
@@ -22,10 +26,18 @@ type Props = {
 
 const TITLE = 'Taxa condominial';
 
+const METHODS: { value: ChargeMethod; label: string }[] = [
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'pix', label: 'Pix' },
+];
+
 export function IssueChargeScreen({ residentId, residentName, issue, onBack }: Props) {
   const [ref, setRef] = useState('');
   const [valueCents, setValueCents] = useState(0);
   const [dueDate, setDueDate] = useState('');
+  const [paid, setPaid] = useState(false);
+  const [paidAt, setPaidAt] = useState('');
+  const [method, setMethod] = useState<ChargeMethod>('dinheiro');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -39,7 +51,14 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
     setPending(true);
     setError(null);
     try {
-      await issue({ residentId, ref: ref.trim(), title: TITLE, valueCents, dueDate });
+      await issue({
+        residentId,
+        ref: ref.trim(),
+        title: TITLE,
+        valueCents,
+        dueDate,
+        ...(paid && paidAt ? { paidAt, method } : {}),
+      });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível adicionar o recibo.');
@@ -99,6 +118,54 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
             <Field label="Referência" value={ref} onChange={setRef} placeholder="Ex.: 05/2026" />
             <MoneyInput label="Valor" value={valueCents} onChange={setValueCents} />
             <Field label="Vencimento" value={dueDate} onChange={setDueDate} type="date" />
+
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 16,
+                fontWeight: 600,
+                fontSize: '.9rem',
+                color: 'var(--ink-900)',
+              }}
+            >
+              <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
+              Já foi pago
+            </label>
+
+            {paid && (
+              <>
+                <Field label="Data do pagamento" value={paidAt} onChange={setPaidAt} type="date" />
+                <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                  {METHODS.map((m) => {
+                    const active = method === m.value;
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setMethod(m.value)}
+                        style={{
+                          flex: 1,
+                          minHeight: 40,
+                          borderRadius: 'var(--r-sm)',
+                          border: `1.5px solid ${active ? 'var(--petrol-600)' : 'var(--line)'}`,
+                          background: active ? 'var(--petrol-50)' : 'var(--surface)',
+                          color: active ? 'var(--petrol-800)' : 'var(--ink-500)',
+                          fontFamily: "'Inter', sans-serif",
+                          fontWeight: 600,
+                          fontSize: '.82rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             {error && (
               <p role="alert" style={{ color: 'var(--atraso-700)', marginBottom: 14 }}>
                 {error}
