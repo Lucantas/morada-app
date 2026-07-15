@@ -158,8 +158,7 @@ export function ResidentEditScreen({
     : null;
   const isActive = existing.data?.active !== false;
   const statusView = existing.data ? residentStatusView(existing.data.status) : null;
-  const hasStatusOverride =
-    existing.data?.statusOverride !== undefined && existing.data.statusOverride !== null;
+  const hasStatusOverride = Boolean(existing.data?.statusOverride);
   const title = residentId ? (existing.data?.apt ?? 'Apartamento') : 'Novo apartamento';
   const moradorSubtitle = residentId && isActive ? 'Morador atual' : 'Morador';
 
@@ -298,7 +297,6 @@ export function ResidentEditScreen({
 
         {residentId && onOverrideStatus && (
           <StatusOverrideControl
-            residentId={residentId}
             currentOverride={existing.data?.statusOverride ?? null}
             onOverride={(status) => overridingStatus.mutate({ residentId, status })}
             isPending={overridingStatus.isPending}
@@ -411,7 +409,6 @@ function StatusOverrideControl({
   onOverride,
   isPending,
 }: {
-  residentId: string;
   currentOverride: ResidentStatus | null;
   onOverride: (status: ResidentStatus | null) => void;
   isPending: boolean;
@@ -437,6 +434,7 @@ function StatusOverrideControl({
               key={option.label}
               type="button"
               disabled={isPending}
+              aria-pressed={active}
               onClick={() => onOverride(option.value)}
               style={{
                 minHeight: 38,
