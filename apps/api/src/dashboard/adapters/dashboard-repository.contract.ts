@@ -10,6 +10,15 @@ export interface DashboardHarness {
   receipts: ReceiptRepository;
 }
 
+function previousMonthDate(today: string): string {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const isJanuary = month === 1;
+  const previousYear = isJanuary ? year - 1 : year;
+  const previousMonth = isJanuary ? 12 : month - 1;
+  return `${previousYear}-${String(previousMonth).padStart(2, '0')}-15`;
+}
+
 export function runDashboardRepositoryContract(
   label: string,
   setup: () => Promise<DashboardHarness>,
@@ -19,6 +28,7 @@ export function runDashboardRepositoryContract(
       const { dashboard, accounts, receipts } = await setup();
       const today = new Date().toISOString().slice(0, 10);
       const thisMonth = today.slice(0, 7);
+      const previousMonth = previousMonthDate(today);
       await accounts.save({
         id: 'a-1',
         description: 'Água',
@@ -64,13 +74,31 @@ export function runDashboardRepositoryContract(
         status: 'pendente',
         residentId: 'r-1',
       });
+      await accounts.save({
+        id: 'a-3',
+        description: 'Energia',
+        category: 'Utilidades',
+        date: previousMonth,
+        valueCents: 30000,
+        status: 'pago',
+      });
+      await receipts.save({
+        id: 'rc-4',
+        ref: '03/2026',
+        title: 'Taxa',
+        dueDate: previousMonth,
+        paidAt: previousMonth,
+        valueCents: 20000,
+        status: 'pago',
+        residentId: 'r-1',
+      });
 
       const summary = await dashboard.getSummary();
 
       expect(summary.balance.incomeCents).toBe(90000);
       expect(summary.balance.paidCents).toBe(100000);
-      expect(summary.balance.balanceCents).toBe(-10000);
-      expect(summary.recentPaid.map((p) => p.id)).toEqual(['a-1']);
+      expect(summary.balance.balanceCents).toBe(-20000);
+      expect(summary.recentPaid.map((p) => p.id)).toEqual(['a-1', 'a-3']);
     });
 
     test('returns a zeroed summary for an empty ledger', async () => {
