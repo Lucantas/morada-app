@@ -337,6 +337,15 @@ describe('Morada API — authorization wiring', () => {
     expect((await admin.auth('/api/accounts')).status).toBe(200);
   });
 
+  test('settings are admin-only', async () => {
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth('/api/settings')).status).toBe(403);
+    const admin = await withCreds(adminCredentials);
+    const res = await admin.auth('/api/settings');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+  });
+
   test('receipts and dashboard are open to any authenticated user', async () => {
     const { auth } = await withCreds(residentCredentials);
     expect((await auth('/api/receipts')).status).toBe(200);
