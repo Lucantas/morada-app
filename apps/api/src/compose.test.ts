@@ -98,6 +98,37 @@ describe('Morada API', () => {
     expect(read.status).toBe(200);
   });
 
+  test('an admin overrides and then clears a resident status', async () => {
+    const app = await makeApp();
+    const token = await tokenFor(app, adminCredentials);
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+    const override = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: 'atrasado' }),
+    });
+    expect(override.status).toBe(200);
+
+    const clear = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status: null }),
+    });
+    expect(clear.status).toBe(200);
+  });
+
+  test('overriding a resident status is admin-only', async () => {
+    const app = await makeApp();
+    const token = await tokenFor(app, residentCredentials);
+    const res = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'atrasado' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   test('rejects a login missing the password with 400', async () => {
     const res = await (
       await makeApp()

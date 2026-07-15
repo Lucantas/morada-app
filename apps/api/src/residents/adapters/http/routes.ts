@@ -5,6 +5,7 @@ import type { ReceiptRepository } from '../../../receipts/domain/receipt-reposit
 import { deactivateResident } from '../../app/deactivate-resident';
 import { getResident } from '../../app/get-resident';
 import { listResidents } from '../../app/list-residents';
+import { overrideStatus } from '../../app/override-status';
 import { saveResident } from '../../app/save-resident';
 import { residentDraftSchema } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
@@ -31,6 +32,11 @@ export function residentRoutes(repo: ResidentRepository, receipts: ReceiptReposi
   app.post('/:id/deactivate', async (c) => {
     await deactivateResident(repo, c.req.param('id'));
     return c.body(null, 204);
+  });
+
+  app.put('/:id/status', async (c) => {
+    await overrideStatus(repo, c.req.param('id'), await c.req.json());
+    return c.json({ ok: true });
   });
 
   return app;
