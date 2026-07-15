@@ -1,3 +1,4 @@
+import { ReceiptNotFoundError } from '../domain/errors';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 import { confirmPayment } from './confirm-payment';
@@ -46,5 +47,17 @@ describe('confirm/reject payment', () => {
     expect(r.submittedAt).toBeUndefined();
     expect(r.method).toBeUndefined();
     expect(r.paidAt).toBeUndefined();
+  });
+
+  it('confirm rejects with ReceiptNotFoundError when the receipt does not exist', async () => {
+    const repo = fakeRepo([]);
+    await expect(confirmPayment(repo, 'nope', '2026-07-16')).rejects.toBeInstanceOf(
+      ReceiptNotFoundError,
+    );
+  });
+
+  it('reject rejects with ReceiptNotFoundError when the receipt does not exist', async () => {
+    const repo = fakeRepo([]);
+    await expect(rejectPayment(repo, 'nope')).rejects.toBeInstanceOf(ReceiptNotFoundError);
   });
 });

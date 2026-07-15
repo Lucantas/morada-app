@@ -38,7 +38,7 @@ export class InMemoryReceiptRepository implements ReceiptRepository {
       status: 'em_analise',
       method: input.method,
       proofDataUrl: input.proofDataUrl,
-      submittedAt: new Date().toISOString(),
+      submittedAt: new Date().toISOString().slice(0, 10),
     };
     this.receipts = new Map(this.receipts).set(id, updated);
     return updated;

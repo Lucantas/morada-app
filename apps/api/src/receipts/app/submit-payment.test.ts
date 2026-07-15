@@ -1,3 +1,4 @@
+import { ReceiptNotFoundError } from '../domain/errors';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 import { submitPayment } from './submit-payment';
@@ -53,5 +54,16 @@ describe('submitPayment', () => {
         today: '2026-07-14',
       }),
     ).rejects.toBeTruthy();
+  });
+
+  it('rejects with ReceiptNotFoundError when the receipt does not exist', async () => {
+    const repo = fakeRepo([]);
+    await expect(
+      submitPayment(repo, 'nope', {
+        method: 'pix',
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+        today: '2026-07-14',
+      }),
+    ).rejects.toBeInstanceOf(ReceiptNotFoundError);
   });
 });

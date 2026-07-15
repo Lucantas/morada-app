@@ -29,8 +29,8 @@ export class HttpReceiptRepository implements ReceiptRepository {
   }
 
   async save(receipt: Receipt): Promise<Receipt> {
-    // save is only ever invoked by payReceipt, so it maps to the pay action;
-    // the server derives the paid status and returns the updated receipt.
+    // save maps to the admin pay endpoint; the server derives the paid
+    // status and returns the updated receipt.
     const response = await this.api.post(`/api/receipts/${receipt.id}/pay`, {
       method: receipt.method,
     });
