@@ -11,9 +11,11 @@ import { config } from './platform/config';
 import { createRepositories, type Repositories } from './platform/repositories';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
+import { confirmPayment } from './receipts/app/confirm-payment';
 import { createReceipt } from './receipts/app/create-receipt';
 import { editReceipt } from './receipts/app/edit-receipt';
 import { generateMonthlyReceipts } from './receipts/app/generate-monthly-receipts';
+import { rejectPayment } from './receipts/app/reject-payment';
 import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
@@ -119,6 +121,18 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // registered before the '/receipts' mount below or it would be shadowed.
   api.put('/receipts/:id', requireRole('admin'), async (c) =>
     c.json(await editReceipt(receipts, c.req.param('id'), await c.req.json())),
+  );
+
+  // Admin: confirm or reject a resident's submitted payment (status
+  // 'em_analise'); both must be registered before the '/receipts' mount
+  // below or they would be shadowed.
+  api.post('/receipts/:id/confirm', requireRole('admin'), async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { paidAt?: string };
+    const paidAt = body.paidAt ?? new Date().toISOString().slice(0, 10);
+    return c.json(await confirmPayment(receipts, c.req.param('id'), paidAt));
+  });
+  api.post('/receipts/:id/reject', requireRole('admin'), async (c) =>
+    c.json(await rejectPayment(receipts, c.req.param('id'))),
   );
 
   // Admin-only: create the missing monthly condo-fee receipts, idempotently
