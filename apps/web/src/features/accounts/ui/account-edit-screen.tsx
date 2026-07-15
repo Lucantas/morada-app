@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
+import { MoneyInput } from '@/shared/ui/money-input';
 
 import type { AccountStatus } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
 import { getAccount } from '../domain/get-account';
-import { parseReaisToCents } from '../domain/parse-reais-to-cents';
 
 import { accountStatusView } from './account-status-view';
 import { accountsQueryKey, useSaveAccount } from './use-accounts';
@@ -19,7 +18,7 @@ const EMPTY = {
   description: '',
   category: '',
   date: '',
-  value: '',
+  valueCents: 0,
   status: 'pendente' as AccountStatus,
 };
 
@@ -41,7 +40,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
   useEffect(() => {
     if (existing.data) {
       const { description, category, date, valueCents, status } = existing.data;
-      setForm({ description, category, date: date ?? '', value: formatBRL(valueCents), status });
+      setForm({ description, category, date: date ?? '', valueCents, status });
     }
   }, [existing.data]);
 
@@ -49,14 +48,9 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = () => {
-    const { value, date, ...rest } = form;
+    const { valueCents, date, ...rest } = form;
     save.mutate(
-      {
-        ...rest,
-        date: date === '' ? null : date,
-        valueCents: parseReaisToCents(value),
-        id: accountId,
-      },
+      { ...rest, date: date === '' ? null : date, valueCents, id: accountId },
       { onSuccess: onBack },
     );
   };
@@ -117,11 +111,10 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
             placeholder="Ex.: Utilidades"
           />
           <Field label="Data" value={form.date} onChange={set('date')} type="date" />
-          <Field
-            label="Valor (R$)"
-            value={form.value}
-            onChange={set('value')}
-            placeholder="Ex.: 1.240,00"
+          <MoneyInput
+            label="Valor"
+            value={form.valueCents}
+            onChange={(cents) => setForm((prev) => ({ ...prev, valueCents: cents }))}
           />
 
           <label
