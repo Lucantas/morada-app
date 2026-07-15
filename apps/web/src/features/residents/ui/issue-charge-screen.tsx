@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
+import { MoneyInput } from '@/shared/ui/money-input';
 
 type ChargeInput = {
   residentId: string;
@@ -21,22 +22,16 @@ type Props = {
 
 const TITLE = 'Taxa condominial';
 
-function parseReaisToCents(input: string): number {
-  const normalized = input.replace(/\./g, '').replace(',', '.').trim();
-  return Math.round(Number(normalized) * 100);
-}
-
 export function IssueChargeScreen({ residentId, residentName, issue, onBack }: Props) {
   const [ref, setRef] = useState('');
-  const [valor, setValor] = useState('');
+  const [valueCents, setValueCents] = useState(0);
   const [dueDate, setDueDate] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const submit = async () => {
-    const valueCents = parseReaisToCents(valor);
-    if (!ref.trim() || !dueDate || !Number.isFinite(valueCents) || valueCents <= 0) {
+    if (!ref.trim() || !dueDate || valueCents <= 0) {
       setError('Preencha referência, valor e vencimento.');
       return;
     }
@@ -44,13 +39,7 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
     setPending(true);
     setError(null);
     try {
-      await issue({
-        residentId,
-        ref: ref.trim(),
-        title: TITLE,
-        valueCents,
-        dueDate,
-      });
+      await issue({ residentId, ref: ref.trim(), title: TITLE, valueCents, dueDate });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível adicionar o recibo.');
@@ -108,7 +97,7 @@ export function IssueChargeScreen({ residentId, residentName, issue, onBack }: P
         ) : (
           <div style={{ paddingTop: 2 }}>
             <Field label="Referência" value={ref} onChange={setRef} placeholder="Ex.: 05/2026" />
-            <Field label="Valor (R$)" value={valor} onChange={setValor} placeholder="Ex.: 450,00" />
+            <MoneyInput label="Valor" value={valueCents} onChange={setValueCents} />
             <Field label="Vencimento" value={dueDate} onChange={setDueDate} type="date" />
             {error && (
               <p role="alert" style={{ color: 'var(--atraso-700)', marginBottom: 14 }}>
