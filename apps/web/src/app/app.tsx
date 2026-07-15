@@ -35,6 +35,7 @@ import {
   issueCharge,
   login,
   noticeRepository,
+  overrideResidentStatus,
   provisionResidentLogin,
   receiptRepository,
   registerPayment,
@@ -154,6 +155,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onEditReceipt={editReceipt}
           onConfirmPayment={(receiptId) => confirmPayment({ receiptId })}
           onRejectPayment={rejectPayment}
+          onOverrideStatus={overrideResidentStatus}
         />
       );
     case 'a-resident-login':

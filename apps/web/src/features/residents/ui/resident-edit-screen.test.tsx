@@ -239,4 +239,62 @@ describe('ResidentEditScreen', () => {
     await waitFor(() => expect(onConfirmPayment).toHaveBeenCalledWith('rc-1'));
     expect(onRejectPayment).not.toHaveBeenCalled();
   });
+
+  test('lets the admin override or clear the resident status', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const onOverrideStatus = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onOverrideStatus={onOverrideStatus}
+      />,
+    );
+
+    await screen.findByDisplayValue('Diego Reis');
+
+    expect(screen.getByRole('button', { name: 'Automático' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Em dia' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pendente' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Atrasado' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Atrasado' }));
+    await waitFor(() =>
+      expect(onOverrideStatus).toHaveBeenCalledWith({ residentId: 'r-7', status: 'atrasado' }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Automático' }));
+    await waitFor(() =>
+      expect(onOverrideStatus).toHaveBeenCalledWith({ residentId: 'r-7', status: null }),
+    );
+  });
+
+  test('shows a manual hint next to the status pill when the status is overridden', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({
+        id: 'r-7',
+        name: 'Diego Reis',
+        apartmentId: 'apt-1',
+        active: true,
+        status: 'atrasado',
+        statusOverride: 'atrasado',
+      }),
+    ]);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onOverrideStatus={jest.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('Diego Reis');
+    expect(screen.getByText(/manual/i)).toBeInTheDocument();
+  });
 });

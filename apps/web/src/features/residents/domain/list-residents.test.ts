@@ -12,6 +12,7 @@ function fakeRepo(residents: Resident[]): ResidentRepository {
     listByApartment: async (aid) => residents.filter((r) => r.apartmentId === aid),
     save: async (r) => r,
     deactivate: async () => {},
+    setStatusOverride: async () => {},
   };
 }
 

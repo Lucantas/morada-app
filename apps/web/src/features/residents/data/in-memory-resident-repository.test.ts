@@ -43,4 +43,22 @@ describe('InMemoryResidentRepository', () => {
   test('rejects malformed seed data at the boundary', () => {
     expect(() => new InMemoryResidentRepository([{ id: 'a', name: 'X' }])).toThrow();
   });
+
+  test('setStatusOverride sets the override and getById reflects it', async () => {
+    const repo = new InMemoryResidentRepository([buildResident({ id: 'a' })]);
+
+    await repo.setStatusOverride('a', 'atrasado');
+
+    expect((await repo.getById('a'))?.statusOverride).toBe('atrasado');
+  });
+
+  test('setStatusOverride with null clears the override', async () => {
+    const repo = new InMemoryResidentRepository([
+      buildResident({ id: 'a', statusOverride: 'atrasado' }),
+    ]);
+
+    await repo.setStatusOverride('a', null);
+
+    expect((await repo.getById('a'))?.statusOverride).toBeNull();
+  });
 });

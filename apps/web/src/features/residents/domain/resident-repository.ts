@@ -1,4 +1,4 @@
-import type { Resident } from './resident';
+import type { Resident, ResidentStatus } from './resident';
 
 export interface ResidentRepository {
   list(): Promise<Resident[]>;
@@ -9,4 +9,6 @@ export interface ResidentRepository {
   save(resident: Resident): Promise<Resident>;
   /** Mark a resident as moved out, freeing their apartment. */
   deactivate(id: string): Promise<void>;
+  /** Admin-only: override a resident's payment status, or clear it (null → derived). */
+  setStatusOverride(id: string, status: ResidentStatus | null): Promise<void>;
 }

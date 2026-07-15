@@ -45,6 +45,11 @@ type EditReceipt = (input: {
 type ConfirmPayment = (receiptId: string) => Promise<void>;
 type RejectPayment = (receiptId: string) => Promise<void>;
 
+type OverrideStatus = (input: {
+  residentId: string;
+  status: ResidentStatus | null;
+}) => Promise<void>;
+
 type Props = {
   repository: ResidentRepository;
   receiptRepository: ReceiptRepository;
@@ -56,6 +61,7 @@ type Props = {
   onEditReceipt?: EditReceipt;
   onConfirmPayment?: ConfirmPayment;
   onRejectPayment?: RejectPayment;
+  onOverrideStatus?: OverrideStatus;
 };
 
 export function ResidentEditScreen({
@@ -69,6 +75,7 @@ export function ResidentEditScreen({
   onEditReceipt,
   onConfirmPayment,
   onRejectPayment,
+  onOverrideStatus,
 }: Props) {
   const queryClient = useQueryClient();
   const registration = useMutation({
@@ -103,6 +110,13 @@ export function ResidentEditScreen({
     mutationFn: (receiptId: string) => (onRejectPayment ?? (async () => {}))(receiptId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    },
+  });
+  const overridingStatus = useMutation({
+    mutationFn: (input: { residentId: string; status: ResidentStatus | null }) =>
+      (onOverrideStatus ?? (async () => {}))(input),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: residentsQueryKey });
     },
   });
@@ -144,6 +158,8 @@ export function ResidentEditScreen({
     : null;
   const isActive = existing.data?.active !== false;
   const statusView = existing.data ? residentStatusView(existing.data.status) : null;
+  const hasStatusOverride =
+    existing.data?.statusOverride !== undefined && existing.data.statusOverride !== null;
   const title = residentId ? (existing.data?.apt ?? 'Apartamento') : 'Novo apartamento';
   const moradorSubtitle = residentId && isActive ? 'Morador atual' : 'Morador';
 
@@ -185,7 +201,14 @@ export function ResidentEditScreen({
             {title}
           </div>
         </div>
-        {residentId && statusView && <StatusPill tone={statusView.tone} label={statusView.label} />}
+        {residentId && statusView && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <StatusPill tone={statusView.tone} label={statusView.label} />
+            {hasStatusOverride && (
+              <span style={{ fontSize: '.7rem', color: '#A9C6C9' }}>manual</span>
+            )}
+          </div>
+        )}
       </div>
       <ScreenBody>
         <label style={{ display: 'block', marginBottom: 18 }}>
@@ -272,6 +295,15 @@ export function ResidentEditScreen({
           placeholder="morador@email.com"
           type="email"
         />
+
+        {residentId && onOverrideStatus && (
+          <StatusOverrideControl
+            residentId={residentId}
+            currentOverride={existing.data?.statusOverride ?? null}
+            onOverride={(status) => overridingStatus.mutate({ residentId, status })}
+            isPending={overridingStatus.isPending}
+          />
+        )}
 
         {apartmentId && (
           <>
@@ -364,6 +396,67 @@ export function ResidentEditScreen({
         )}
       </ScreenBody>
     </Screen>
+  );
+}
+
+const STATUS_OPTIONS: { value: ResidentStatus | null; label: string }[] = [
+  { value: null, label: 'Automático' },
+  { value: 'em_dia', label: 'Em dia' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'atrasado', label: 'Atrasado' },
+];
+
+function StatusOverrideControl({
+  currentOverride,
+  onOverride,
+  isPending,
+}: {
+  residentId: string;
+  currentOverride: ResidentStatus | null;
+  onOverride: (status: ResidentStatus | null) => void;
+  isPending: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <span
+        style={{
+          display: 'block',
+          fontWeight: 600,
+          fontSize: '.9rem',
+          marginBottom: 7,
+          color: 'var(--ink-900)',
+        }}
+      >
+        Status de pagamento
+      </span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {STATUS_OPTIONS.map((option) => {
+          const active = currentOverride === option.value;
+          return (
+            <button
+              key={option.label}
+              type="button"
+              disabled={isPending}
+              onClick={() => onOverride(option.value)}
+              style={{
+                minHeight: 38,
+                padding: '0 14px',
+                borderRadius: 999,
+                border: `1.5px solid ${active ? 'var(--petrol-600)' : 'var(--line)'}`,
+                background: active ? 'var(--petrol-50)' : 'var(--surface)',
+                color: active ? 'var(--petrol-800)' : 'var(--ink-500)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '.82rem',
+                cursor: 'pointer',
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

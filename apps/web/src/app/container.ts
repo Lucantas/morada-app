@@ -100,6 +100,14 @@ export async function ensureMonthlyReceipts(): Promise<void> {
   await apiClient.post('/api/receipts/ensure-month', {});
 }
 
+/** Admin-only: override a resident's payment status, or clear it (null → derived). */
+export async function overrideResidentStatus(input: {
+  residentId: string;
+  status: 'em_dia' | 'pendente' | 'atrasado' | null;
+}): Promise<void> {
+  await residentRepository.setStatusOverride(input.residentId, input.status);
+}
+
 /** Admin-only: provision a resident login. The API generates and returns the
  *  one-time temp password. */
 export async function provisionResidentLogin(input: {

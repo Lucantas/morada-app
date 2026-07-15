@@ -12,6 +12,7 @@ export const residentSchema = z.object({
   email: z.string(),
   status: residentStatusSchema,
   active: z.boolean().optional(),
+  statusOverride: residentStatusSchema.nullable().optional(),
 });
 export type Resident = z.infer<typeof residentSchema>;
 

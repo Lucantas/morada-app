@@ -56,4 +56,20 @@ describe('HttpResidentRepository', () => {
     expect(api.put).toHaveBeenCalledWith('/api/residents/r-9', resident);
     expect(result).toEqual(resident);
   });
+
+  test('setStatusOverride PUTs the status to the status-scoped path', async () => {
+    const api = fakeApi({ put: jest.fn().mockResolvedValue(undefined) });
+
+    await new HttpResidentRepository(api).setStatusOverride('r-9', 'atrasado');
+
+    expect(api.put).toHaveBeenCalledWith('/api/residents/r-9/status', { status: 'atrasado' });
+  });
+
+  test('setStatusOverride PUTs a null status to clear the override', async () => {
+    const api = fakeApi({ put: jest.fn().mockResolvedValue(undefined) });
+
+    await new HttpResidentRepository(api).setStatusOverride('r-9', null);
+
+    expect(api.put).toHaveBeenCalledWith('/api/residents/r-9/status', { status: null });
+  });
 });

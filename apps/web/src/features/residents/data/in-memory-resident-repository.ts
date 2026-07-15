@@ -1,4 +1,4 @@
-import type { Resident } from '../domain/resident';
+import type { Resident, ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
 import { toResident } from './resident-row';
@@ -35,6 +35,13 @@ export class InMemoryResidentRepository implements ResidentRepository {
     const resident = this.residents.get(id);
     if (resident) {
       this.residents = new Map(this.residents).set(id, { ...resident, active: false });
+    }
+  }
+
+  async setStatusOverride(id: string, status: ResidentStatus | null): Promise<void> {
+    const resident = this.residents.get(id);
+    if (resident) {
+      this.residents = new Map(this.residents).set(id, { ...resident, statusOverride: status });
     }
   }
 }

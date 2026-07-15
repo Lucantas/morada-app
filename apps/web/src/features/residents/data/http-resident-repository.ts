@@ -47,4 +47,8 @@ export class HttpResidentRepository implements ResidentRepository {
   async deactivate(id: string): Promise<void> {
     await this.api.post(`/api/residents/${id}/deactivate`);
   }
+
+  async setStatusOverride(id: string, status: Resident['status'] | null): Promise<void> {
+    await this.api.put(`/api/residents/${id}/status`, { status });
+  }
 }
