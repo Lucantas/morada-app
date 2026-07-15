@@ -8,6 +8,10 @@ API_URL = http://localhost:$(API_PORT)
 WEB = pnpm --filter @morada/web
 API = pnpm --filter @morada/api
 
+# LAN mode (test on a phone on the same Wi-Fi). Best-effort auto-detect of the
+# machine's LAN IPv4, skipping docker bridges (172.16-31.x). Override: make start-lan LAN_IP=192.168.0.155
+LAN_IP ?= $(shell ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[\d.]+' | grep -vE '^172\.(1[6-9]|2[0-9]|3[0-1])\.' | head -1)
+
 # The API runs on Postgres. Point DATABASE_URL elsewhere to use another database;
 # it defaults to the local docker Postgres from `make db-up`.
 DB_URL ?= postgres://morada:morada@localhost:5433/morada
@@ -18,7 +22,7 @@ export DATABASE_URL
 # `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
 TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
 
-.PHONY: help install start start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
+.PHONY: help install start start-lan start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +36,14 @@ start: db-up ## Start the API (Postgres) + web together; Ctrl-C stops both
 		API_PID=$$!; \
 		trap 'pkill -P $$API_PID 2>/dev/null; kill $$API_PID 2>/dev/null' INT TERM EXIT; \
 		VITE_API_URL=$(API_URL) $(WEB) dev --port $(WEB_PORT) --strictPort
+
+start-lan: db-up ## Start API+web bound to the LAN so a phone on the same Wi-Fi can reach them (override LAN_IP=...)
+	@test -n "$(LAN_IP)" || { echo "Could not detect LAN_IP — run: make start-lan LAN_IP=192.168.x.x"; exit 1; }
+	@echo "==> LAN mode — open http://$(LAN_IP):$(WEB_PORT) on your phone (same Wi-Fi). Ctrl-C stops both."
+	@PORT=$(API_PORT) WEB_ORIGIN=http://$(LAN_IP):$(WEB_PORT) $(API) dev & \
+		API_PID=$$!; \
+		trap 'pkill -P $$API_PID 2>/dev/null; kill $$API_PID 2>/dev/null' INT TERM EXIT; \
+		VITE_API_URL=http://$(LAN_IP):$(API_PORT) $(WEB) dev --host --port $(WEB_PORT) --strictPort
 
 start-backend: db-up ## Start only the API (Postgres) on :$(API_PORT)
 	PORT=$(API_PORT) $(API) dev
