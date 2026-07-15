@@ -66,6 +66,12 @@ export async function registerPayment(input: {
   });
 }
 
+/** Admin-only: ensure every active resident has the current month's condo-fee
+ *  charge. Idempotent; safe to call on each admin load. */
+export async function ensureMonthlyReceipts(): Promise<void> {
+  await apiClient.post('/api/receipts/ensure-month', {});
+}
+
 /** Admin-only: provision a resident login. The API generates and returns the
  *  one-time temp password. */
 export async function provisionResidentLogin(input: {

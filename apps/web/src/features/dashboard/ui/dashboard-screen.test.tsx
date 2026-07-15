@@ -8,6 +8,8 @@ import { InMemoryDashboardRepository } from '../data/in-memory-dashboard-reposit
 
 import { DashboardScreen } from './dashboard-screen';
 
+jest.mock('@/app/container', () => ({ ensureMonthlyReceipts: () => Promise.resolve() }));
+
 function setup(unreadCount = 3) {
   const repository = new InMemoryDashboardRepository(buildDashboardSummary());
   const onSendNotice = jest.fn();

@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
+
+import { ensureMonthlyReceipts } from '@/app/container';
+import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -29,6 +34,17 @@ export function DashboardScreen({
   bottomNav,
 }: Props) {
   const dashboard = useDashboard(repository);
+
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let cancelled = false;
+    void ensureMonthlyReceipts().then(() => {
+      if (!cancelled) void queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [queryClient]);
 
   return (
     <Screen>
