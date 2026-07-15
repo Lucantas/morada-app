@@ -17,7 +17,7 @@ describe('pendingReceipt', () => {
   test('returns null when there is no pending receipt', async () => {
     const result = pendingReceipt([
       buildReceipt({ id: 'rc-1', status: 'pago', method: 'pix' }),
-      buildReceipt({ id: 'rc-2', status: 'pago', method: 'boleto' }),
+      buildReceipt({ id: 'rc-2', status: 'pago', method: 'dinheiro' }),
     ]);
 
     expect(result).toBeNull();

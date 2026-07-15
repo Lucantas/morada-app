@@ -59,12 +59,12 @@ export function runReceiptRepositoryContract(
         dueDate: '2026-05-10',
         valueCents: 1000,
         status: 'pago',
-        method: 'cartao',
+        method: 'dinheiro',
       });
 
       expect(await repo.list()).toHaveLength(1);
       expect((await repo.getById('r-1'))?.status).toBe('pago');
-      expect((await repo.getById('r-1'))?.method).toBe('cartao');
+      expect((await repo.getById('r-1'))?.method).toBe('dinheiro');
     });
 
     test('getById returns null when missing', async () => {

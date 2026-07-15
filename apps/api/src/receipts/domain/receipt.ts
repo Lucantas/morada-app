@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const receiptStatusSchema = z.enum(['pago', 'pendente']);
 export type ReceiptStatus = z.infer<typeof receiptStatusSchema>;
 
-export const receiptMethodSchema = z.enum(['pix', 'boleto', 'cartao']);
+export const receiptMethodSchema = z.enum(['dinheiro', 'pix']);
 export type ReceiptMethod = z.infer<typeof receiptMethodSchema>;
 
 // ISO calendar date (YYYY-MM-DD), stored in a DATE column and sortable/reportable.

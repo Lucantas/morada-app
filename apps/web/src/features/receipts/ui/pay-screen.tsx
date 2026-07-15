@@ -15,7 +15,7 @@ import type { ReceiptRepository } from '../domain/receipt-repository';
 import { methodLabel } from './receipt-status-view';
 import { receiptsQueryKey, usePayReceipt } from './use-receipts';
 
-const METHODS: ReceiptMethod[] = ['pix', 'boleto', 'cartao'];
+const METHODS: ReceiptMethod[] = ['dinheiro', 'pix'];
 
 type Props = {
   repository: ReceiptRepository;

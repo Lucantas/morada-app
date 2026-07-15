@@ -11,7 +11,7 @@ import type { Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
 const paySchema = z.object({
-  method: z.enum(['pix', 'boleto', 'cartao']),
+  method: z.enum(['dinheiro', 'pix']),
   paidAt: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

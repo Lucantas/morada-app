@@ -105,7 +105,7 @@ const receipts = [
     due_date: '2026-02-10',
     value_cents: 45000,
     status: 'pago',
-    method: 'boleto',
+    method: 'dinheiro',
     resident_id: 'r-1',
   },
   {
@@ -131,7 +131,7 @@ const receipts = [
   ...['r-2', 'r-4', 'r-6', 'r-7'].flatMap((residentId) =>
     [
       { ref: '03/2026', due_date: '2026-03-10', method: 'pix' },
-      { ref: '02/2026', due_date: '2026-02-10', method: 'boleto' },
+      { ref: '02/2026', due_date: '2026-02-10', method: 'dinheiro' },
       { ref: '01/2026', due_date: '2026-01-10', method: 'pix' },
     ].map((m) => ({
       id: `rc-${residentId}-${m.ref.slice(0, 2)}`,

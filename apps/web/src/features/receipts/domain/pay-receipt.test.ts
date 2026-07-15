@@ -20,7 +20,7 @@ describe('payReceipt', () => {
     const original = buildReceipt({ id: 'rc-2', status: 'pendente' });
     const repo = new InMemoryReceiptRepository([original]);
 
-    await payReceipt(repo, 'rc-2', 'boleto');
+    await payReceipt(repo, 'rc-2', 'dinheiro');
 
     expect(original.status).toBe('pendente');
     expect(original.method).toBeUndefined();
@@ -29,6 +29,6 @@ describe('payReceipt', () => {
   test('throws when the receipt is missing', async () => {
     const repo = new InMemoryReceiptRepository([]);
 
-    await expect(payReceipt(repo, 'nope', 'cartao')).rejects.toBeInstanceOf(ReceiptNotFoundError);
+    await expect(payReceipt(repo, 'nope', 'pix')).rejects.toBeInstanceOf(ReceiptNotFoundError);
   });
 });

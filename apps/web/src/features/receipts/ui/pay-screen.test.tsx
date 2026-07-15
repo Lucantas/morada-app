@@ -27,13 +27,13 @@ describe('PayScreen', () => {
     renderWithClient(<PayScreen repository={repository} receiptId="rc-1" onDone={onDone} />);
 
     await screen.findByText('Taxa condominial');
-    await userEvent.click(screen.getByRole('button', { name: 'Boleto' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Dinheiro' }));
     await userEvent.click(screen.getByRole('button', { name: /confirmar pagamento/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     const saved = await repository.getById('rc-1');
     expect(saved?.status).toBe('pago');
-    expect(saved?.method).toBe('boleto');
+    expect(saved?.method).toBe('dinheiro');
   });
 
   test('copying the Pix code writes the payload to the clipboard', async () => {

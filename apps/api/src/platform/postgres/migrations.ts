@@ -99,4 +99,10 @@ ALTER TABLE accounts DROP COLUMN date_label;
 ALTER TABLE accounts ADD COLUMN date DATE;
 `,
   },
+  {
+    id: '003_payment_methods',
+    sql: `
+UPDATE receipts SET method = 'dinheiro' WHERE method IN ('boleto', 'cartao');
+`,
+  },
 ];

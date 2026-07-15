@@ -12,8 +12,7 @@ describe('receiptStatusView', () => {
 
 describe('methodLabel', () => {
   test('maps each method to its label', () => {
+    expect(methodLabel('dinheiro')).toBe('Dinheiro');
     expect(methodLabel('pix')).toBe('Pix');
-    expect(methodLabel('boleto')).toBe('Boleto');
-    expect(methodLabel('cartao')).toBe('Cartão');
   });
 });

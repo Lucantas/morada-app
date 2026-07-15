@@ -8,9 +8,8 @@ const VIEW: Record<ReceiptStatus, { tone: PillTone; label: string }> = {
 };
 
 const METHOD_LABELS: Record<ReceiptMethod, string> = {
+  dinheiro: 'Dinheiro',
   pix: 'Pix',
-  boleto: 'Boleto',
-  cartao: 'Cartão',
 };
 
 export function receiptStatusView(status: ReceiptStatus): { tone: PillTone; label: string } {

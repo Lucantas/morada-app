@@ -55,7 +55,7 @@ export async function issueCharge(input: {
 /** Admin-only: register a payment against a receipt, informing when it was paid. */
 export async function registerPayment(input: {
   receiptId: string;
-  method: 'pix' | 'boleto' | 'cartao';
+  method: 'dinheiro' | 'pix';
   paidAt: string;
 }): Promise<void> {
   await apiClient.post(`/api/receipts/${input.receiptId}/pay`, {

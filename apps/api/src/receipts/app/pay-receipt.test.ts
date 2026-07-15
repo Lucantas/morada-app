@@ -38,7 +38,7 @@ describe('payReceipt', () => {
 
   test('does not mutate the original receipt', async () => {
     const repo = fakeRepo([pending]);
-    await payReceipt(repo, 'r-1', 'boleto');
+    await payReceipt(repo, 'r-1', 'dinheiro');
     expect(pending.status).toBe('pendente');
     expect(pending.method).toBeUndefined();
   });
@@ -48,7 +48,7 @@ describe('payReceipt', () => {
   });
 
   test('rejects an invalid method', async () => {
-    await expect(payReceipt(fakeRepo([pending]), 'r-1', 'dinheiro')).rejects.toThrow(PaymentError);
+    await expect(payReceipt(fakeRepo([pending]), 'r-1', 'boleto')).rejects.toThrow(PaymentError);
   });
 
   test('records the given payment date (admin registering a past payment)', async () => {

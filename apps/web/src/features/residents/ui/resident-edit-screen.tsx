@@ -313,9 +313,8 @@ export function ResidentEditScreen({
 }
 
 const METHODS: { value: ReceiptMethod; label: string }[] = [
+  { value: 'dinheiro', label: 'Dinheiro' },
   { value: 'pix', label: 'Pix' },
-  { value: 'boleto', label: 'Boleto' },
-  { value: 'cartao', label: 'Cartão' },
 ];
 
 function receiptDateInfo(receipt: Receipt): string {
@@ -387,7 +386,7 @@ function ReceiptLedgerRow({
 }) {
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
-  const [method, setMethod] = useState<ReceiptMethod>('boleto');
+  const [method, setMethod] = useState<ReceiptMethod>('dinheiro');
   const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
 
   return (
