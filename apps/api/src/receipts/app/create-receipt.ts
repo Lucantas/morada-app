@@ -20,6 +20,7 @@ const inputSchema = z.object({
   dueDate: isoDateSchema,
   paidAt: isoDateSchema.optional(),
   method: receiptMethodSchema.optional(),
+  proofDataUrl: z.string().optional(),
 });
 
 export async function createReceipt(
@@ -32,13 +33,13 @@ export async function createReceipt(
   const apartment = await residentApartment(parsed.data.residentId);
   if (!apartment) throw new ChargeResidentNotFoundError(parsed.data.residentId);
   const paid = parsed.data.paidAt !== undefined && parsed.data.method !== undefined;
-  const { paidAt, method, ...base } = parsed.data;
+  const { paidAt, method, proofDataUrl, ...base } = parsed.data;
   const receipt = receiptSchema.parse({
     ...base,
     id: randomUUID(),
     apartmentId: apartment.apartmentId,
     status: paid ? 'pago' : 'pendente',
-    ...(paid ? { paidAt, method } : {}),
+    ...(paid ? { paidAt, method, ...(proofDataUrl ? { proofDataUrl } : {}) } : {}),
   });
   return repo.save(receipt);
 }

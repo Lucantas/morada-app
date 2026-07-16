@@ -93,4 +93,33 @@ describe('createReceipt', () => {
     expect(receipt.paidAt).toBeUndefined();
     expect(receipt.method).toBeUndefined();
   });
+
+  test('persists the proof when creating an already-paid receipt with a proofDataUrl', async () => {
+    const repo = fakeRepo();
+    const receipt = await createReceipt(repo, async () => ({ apartmentId: 'ap-1' }), {
+      residentId: 'r-1',
+      ref: '06/2026',
+      title: 'Taxa condominial',
+      valueCents: 15000,
+      dueDate: '2026-06-15',
+      paidAt: '2026-06-14',
+      method: 'dinheiro',
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+    expect(receipt).toMatchObject({
+      status: 'pago',
+      method: 'dinheiro',
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+  });
+
+  test('ignores proofDataUrl when the receipt is created pending', async () => {
+    const repo = fakeRepo();
+    const receipt = await createReceipt(repo, async () => ({ apartmentId: 'ap-1' }), {
+      ...validInput,
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+    expect(receipt.status).toBe('pendente');
+    expect(receipt.proofDataUrl).toBeUndefined();
+  });
 });
