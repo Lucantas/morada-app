@@ -156,7 +156,7 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
                   height: 38,
                   marginBottom: 16,
                   borderRadius: 10,
-                  background: 'var(--atraso-50, #fbe9e7)',
+                  background: 'var(--atraso-bg)',
                   border: 'none',
                   display: 'grid',
                   placeItems: 'center',
@@ -197,8 +197,9 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
           <div
             role="status"
             style={{
-              background: 'var(--petrol-50)',
-              color: 'var(--petrol-800)',
+              background: 'var(--pago-bg)',
+              border: '1px solid var(--pago-line)',
+              color: 'var(--pago-700)',
               borderRadius: 'var(--r-md)',
               padding: '12px 14px',
               marginBottom: 16,
@@ -210,7 +211,16 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
           </div>
         )}
 
-        <PrimaryButton icon="check" onClick={() => void submit()}>
+        <PrimaryButton
+          icon="check"
+          onClick={() => void submit()}
+          disabled={
+            !settings.isSuccess ||
+            !categories.isSuccess ||
+            saveSettings.isPending ||
+            saveCategories.isPending
+          }
+        >
           Salvar e reclassificar contas
         </PrimaryButton>
       </ScreenBody>

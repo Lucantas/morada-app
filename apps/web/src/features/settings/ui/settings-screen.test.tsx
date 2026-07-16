@@ -56,4 +56,21 @@ describe('SettingsScreen', () => {
 
     expect(await screen.findByText(/2 contas foram reclassificadas/i)).toBeInTheDocument();
   });
+
+  test('disables save until settings and categories both finish loading, and seeds loaded categories', async () => {
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const categories = new InMemoryCategoryRepository([
+      { id: 'c1', name: 'Água', keywords: 'agua, saneamento', position: 0 },
+    ]);
+    renderWithClient(
+      <SettingsScreen repository={settings} categoryRepository={categories} onBack={jest.fn()} />,
+    );
+
+    expect(screen.getByRole('button', { name: /salvar e reclassificar/i })).toBeDisabled();
+
+    expect(await screen.findByDisplayValue('Água')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /salvar e reclassificar/i })).toBeEnabled(),
+    );
+  });
 });
