@@ -130,4 +130,21 @@ ALTER TABLE receipts ADD COLUMN proof_data_url TEXT;
 ALTER TABLE residents ADD COLUMN status_override TEXT;
 `,
   },
+  {
+    id: '007_categories',
+    sql: `
+CREATE TABLE categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  keywords TEXT NOT NULL,
+  position INTEGER NOT NULL
+);
+
+INSERT INTO categories (id, name, keywords, position) VALUES
+  ('cat-agua', 'Água', 'água, agua, saneamento, esgoto', 0),
+  ('cat-energia', 'Energia', 'energia, luz, elétr, eletr', 1),
+  ('cat-servicos', 'Serviços', 'limpeza, internet, portaria, serviço, servico, segurança', 2),
+  ('cat-manutencao', 'Manutenção', 'manutenção, manutencao, reparo, elevador, conserto, bomba', 3);
+`,
+  },
 ];
