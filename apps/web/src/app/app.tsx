@@ -194,6 +194,8 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
         <AccountsScreen
           repository={accountRepository}
           onOpenAccount={(id) => go('a-account-edit', { residentId: id })}
+          incomeRepository={incomeRepository}
+          onOpenIncome={(id) => go('a-income-edit', id ? { incomeId: id } : undefined)}
           bottomNav={nav}
         />
       );
