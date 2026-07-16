@@ -147,4 +147,17 @@ INSERT INTO categories (id, name, keywords, position) VALUES
   ('cat-manutencao', 'Manutenção', 'manutenção, manutencao, reparo, elevador, conserto, bomba', 3);
 `,
   },
+  {
+    id: '008_incomes',
+    sql: `
+CREATE TABLE incomes (
+  id TEXT PRIMARY KEY,
+  description TEXT NOT NULL,
+  source TEXT NOT NULL,
+  value_cents INTEGER NOT NULL,
+  date DATE,
+  proof_data_url TEXT
+);
+`,
+  },
 ];
