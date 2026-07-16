@@ -34,6 +34,7 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
   const [localCategories, setLocalCategories] = useState<CategoryDraft[]>([]);
   const [newCat, setNewCat] = useState<CategoryDraft>({ name: '', keywords: '' });
   const [reclassifiedMsg, setReclassifiedMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings.data) {
@@ -71,13 +72,19 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
   };
 
   const submit = async () => {
-    const day = Number.parseInt(dueDay, 10);
-    await saveSettings.mutateAsync({
-      monthlyFeeCents: feeCents,
-      dueDay: Number.isFinite(day) ? day : 15,
-    });
-    const result = await saveCategories.mutateAsync(localCategories);
-    setReclassifiedMsg(reclassifiedMessage(result.reclassified));
+    try {
+      const day = Number.parseInt(dueDay, 10);
+      await saveSettings.mutateAsync({
+        monthlyFeeCents: feeCents,
+        dueDay: Number.isFinite(day) ? day : 15,
+      });
+      const result = await saveCategories.mutateAsync(localCategories);
+      setSaveError(null);
+      setReclassifiedMsg(reclassifiedMessage(result.reclassified));
+    } catch (error) {
+      setReclassifiedMsg(null);
+      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar.');
+    }
   };
 
   return (
@@ -208,6 +215,24 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
             }}
           >
             {reclassifiedMsg}
+          </div>
+        )}
+
+        {saveError && (
+          <div
+            role="alert"
+            style={{
+              background: 'var(--atraso-bg)',
+              border: '1px solid var(--atraso-line)',
+              color: 'var(--atraso-700)',
+              borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+              marginBottom: 16,
+              fontWeight: 600,
+              fontSize: '.9rem',
+            }}
+          >
+            {saveError}
           </div>
         )}
 

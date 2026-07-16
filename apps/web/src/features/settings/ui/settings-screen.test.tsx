@@ -57,6 +57,22 @@ describe('SettingsScreen', () => {
     expect(await screen.findByText(/2 contas foram reclassificadas/i)).toBeInTheDocument();
   });
 
+  test('shows a save error and no success message when saving categories rejects', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const categories = new InMemoryCategoryRepository([]);
+    jest.spyOn(categories, 'save').mockRejectedValue(new Error('Falha ao salvar categorias'));
+    renderWithClient(
+      <SettingsScreen repository={settings} categoryRepository={categories} onBack={jest.fn()} />,
+    );
+
+    await screen.findByText('Ajustes');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao salvar categorias');
+    expect(screen.queryByText(/reclassificada/i)).not.toBeInTheDocument();
+  });
+
   test('disables save until settings and categories both finish loading, and seeds loaded categories', async () => {
     const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
     const categories = new InMemoryCategoryRepository([
