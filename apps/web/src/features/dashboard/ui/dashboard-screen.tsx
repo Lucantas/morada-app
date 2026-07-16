@@ -21,6 +21,7 @@ type Props = {
   onSendNotice: () => void;
   onOpenMessages: () => void;
   onSeeAccounts: () => void;
+  onOpenSettings?: () => void;
   unreadCount: number;
   bottomNav: ReactNode;
 };
@@ -30,6 +31,7 @@ export function DashboardScreen({
   onSendNotice,
   onOpenMessages,
   onSeeAccounts,
+  onOpenSettings,
   unreadCount,
   bottomNav,
 }: Props) {
@@ -57,17 +59,36 @@ export function DashboardScreen({
         eyebrow="Condomínio Morada · Bloco 2"
         title="Painel do administrador"
         right={
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: 'rgba(255,255,255,.12)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
-            <Icon name="bell" size={19} color="#fff" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: 'rgba(255,255,255,.12)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <Icon name="bell" size={19} color="#fff" />
+            </div>
+            <button
+              type="button"
+              aria-label="Ajustes"
+              onClick={onOpenSettings}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: 'rgba(255,255,255,.12)',
+                display: 'grid',
+                placeItems: 'center',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="wrench" size={19} color="#fff" />
+            </button>
           </div>
         }
       />

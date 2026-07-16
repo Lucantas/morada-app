@@ -232,6 +232,7 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           onSendNotice={() => go('a-notice')}
           onOpenMessages={() => go('a-messages')}
           onSeeAccounts={() => go('a-accounts')}
+          onOpenSettings={() => go('a-settings')}
           unreadCount={unread}
           bottomNav={nav}
         />
@@ -349,13 +350,6 @@ function adminNav(view: View, go: (v: View) => void, signOut: () => void): NavIt
       icon: 'receipt',
       active: active === 'accounts',
       onClick: () => go('a-accounts'),
-    },
-    {
-      key: 'settings',
-      label: 'Config.',
-      icon: 'wrench',
-      active: active === 'settings',
-      onClick: () => go('a-settings'),
     },
     { key: 'logout', label: 'Sair', icon: 'logout', onClick: signOut },
   ];

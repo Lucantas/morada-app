@@ -15,17 +15,19 @@ function setup(unreadCount = 3) {
   const onSendNotice = jest.fn();
   const onOpenMessages = jest.fn();
   const onSeeAccounts = jest.fn();
+  const onOpenSettings = jest.fn();
   renderWithClient(
     <DashboardScreen
       repository={repository}
       onSendNotice={onSendNotice}
       onOpenMessages={onOpenMessages}
       onSeeAccounts={onSeeAccounts}
+      onOpenSettings={onOpenSettings}
       unreadCount={unreadCount}
       bottomNav={null}
     />,
   );
-  return { onSendNotice, onOpenMessages, onSeeAccounts };
+  return { onSendNotice, onOpenMessages, onSeeAccounts, onOpenSettings };
 }
 
 describe('DashboardScreen', () => {
@@ -70,5 +72,14 @@ describe('DashboardScreen', () => {
 
     expect(await screen.findByText('Conta de água — abril')).toBeInTheDocument();
     expect(screen.getByText("Bomba d'água")).toBeInTheDocument();
+  });
+
+  test('the header gear navigates to settings', async () => {
+    const user = userEvent.setup();
+    const { onOpenSettings } = setup();
+
+    await user.click(await screen.findByRole('button', { name: /ajustes/i }));
+
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });
