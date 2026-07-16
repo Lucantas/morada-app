@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
+import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import { activeNotices } from '../domain/active-notices';
@@ -26,9 +28,13 @@ export function NoticesScreen({ repository, bottomNav }: Props) {
     <Screen>
       <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Avisos" />
       <ScreenBody>
-        {notices.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando avisos…</p>}
+        {notices.isLoading && <StatusView variant="loading" message="Carregando avisos…" />}
         {notices.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os avisos.</p>
+          <StatusView
+            variant="error"
+            message="Não foi possível carregar os avisos."
+            onRetry={() => void notices.refetch()}
+          />
         )}
         {notices.isSuccess && (
           <NoticesContent
@@ -56,17 +62,11 @@ function NoticesContent({
 
   if (active.length === 0) {
     return (
-      <div
-        style={{
-          display: 'grid',
-          placeItems: 'center',
-          minHeight: 240,
-          color: 'var(--ink-500)',
-          fontSize: '.95rem',
-        }}
-      >
-        Nenhum aviso no momento.
-      </div>
+      <EmptyState
+        icon="bell"
+        title="Nenhum aviso no momento"
+        description="Os comunicados do síndico aparecem aqui."
+      />
     );
   }
 

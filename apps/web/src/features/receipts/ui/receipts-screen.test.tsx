@@ -63,4 +63,17 @@ describe('ReceiptsScreen', () => {
     expect(screen.getByText('Pix')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /baixar comprovante/i })).toBeInTheDocument();
   });
+
+  test('shows an empty state when the resident has no receipts', async () => {
+    const repository = new InMemoryReceiptRepository([]);
+    renderWithClient(
+      <ReceiptsScreen
+        repository={repository}
+        resident={{ name: 'Maria', apt: 'Apto 302' }}
+        onPay={jest.fn()}
+        bottomNav={null}
+      />,
+    );
+    expect(await screen.findByText('Nenhum recibo ainda')).toBeInTheDocument();
+  });
 });

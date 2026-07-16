@@ -2,10 +2,12 @@ import type { ReactNode } from 'react';
 
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
+import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import { pendingReceipt } from '../domain/pending-receipt';
@@ -57,9 +59,13 @@ export function ReceiptsScreen({ repository, resident, onPay, bottomNav }: Props
         }
       />
       <ScreenBody>
-        {receipts.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando recibos…</p>}
+        {receipts.isLoading && <StatusView variant="loading" message="Carregando recibos…" />}
         {receipts.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os recibos.</p>
+          <StatusView
+            variant="error"
+            message="Não foi possível carregar os recibos."
+            onRetry={() => void receipts.refetch()}
+          />
         )}
         {receipts.isSuccess && (
           <ReceiptsContent receipts={receipts.data} resident={resident} onPay={onPay} />
@@ -79,6 +85,16 @@ function ReceiptsContent({
   resident: { name: string; apt: string };
   onPay: (id: string) => void;
 }) {
+  if (receipts.length === 0) {
+    return (
+      <EmptyState
+        icon="receipt"
+        title="Nenhum recibo ainda"
+        description="Seus recibos de pagamento aparecem aqui."
+      />
+    );
+  }
+
   const pending = pendingReceipt(receipts);
   return (
     <>

@@ -26,7 +26,7 @@ describe('NoticesScreen', () => {
     const repository = new InMemoryNoticeRepository([buildNotice({ id: 'n-1', dismissed: true })]);
     renderWithClient(<NoticesScreen repository={repository} bottomNav={null} />);
 
-    expect(await screen.findByText('Nenhum aviso no momento.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum aviso no momento')).toBeInTheDocument();
   });
 
   test('dismissing a notice removes it from the active list', async () => {
@@ -54,6 +54,12 @@ describe('NoticesScreen', () => {
     await screen.findByText('Portão da garagem');
     await userEvent.click(screen.getByRole('button', { name: /limpar todos/i }));
 
-    expect(await screen.findByText('Nenhum aviso no momento.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum aviso no momento')).toBeInTheDocument();
+  });
+
+  test('shows an empty state when there are no notices', async () => {
+    const repository = new InMemoryNoticeRepository([]);
+    renderWithClient(<NoticesScreen repository={repository} bottomNav={null} />);
+    expect(await screen.findByText('Nenhum aviso no momento')).toBeInTheDocument();
   });
 });
