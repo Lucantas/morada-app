@@ -8,6 +8,7 @@ import { formatBRL } from '@/shared/lib/money';
 import type { IconName } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
+import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import { firstName } from './current-resident';
@@ -36,9 +37,13 @@ export function ResidentHomeScreen({
     <Screen>
       <TopBar eyebrow={`${resident.apt} · Bloco 2`} title={`Olá, ${firstName(resident.name)}`} />
       <ScreenBody>
-        {home.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
+        {home.isLoading && <StatusView variant="loading" message="Carregando…" />}
         {home.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar sua taxa.</p>
+          <StatusView
+            variant="error"
+            message="Não foi possível carregar sua taxa."
+            onRetry={() => void home.refetch()}
+          />
         )}
         {home.isSuccess && (
           <HomeContent

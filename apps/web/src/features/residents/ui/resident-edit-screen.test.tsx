@@ -324,6 +324,30 @@ describe('ResidentEditScreen', () => {
     await waitFor(() => expect(deactivateSpy).toHaveBeenCalledWith('r-1'));
   });
 
+  test('shows an empty state under moradores antigos when there is no history', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({
+        id: 'r-1',
+        name: 'Maria Ribeiro',
+        apt: 'Apto 302',
+        apartmentId: 'apt-1',
+        active: true,
+      }),
+    ]);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={new InMemoryReceiptRepository([])}
+        residentId="r-1"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /ver moradores antigos/i }));
+    expect(await screen.findByText('Nenhum morador antigo registrado')).toBeInTheDocument();
+  });
+
   test('cancelling the archive confirmation does not deactivate', async () => {
     const user = userEvent.setup();
     const repository = new InMemoryResidentRepository([

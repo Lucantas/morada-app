@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { SurfaceCard } from '@/shared/ui/primitives';
+import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import type { Message, Thread } from '../domain/message';
@@ -23,12 +25,20 @@ export function AdminMessagesScreen({ repository, onOpenThread, bottomNav }: Pro
     <Screen>
       <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Mensagens" />
       <ScreenBody>
-        {threads.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando conversas…</p>}
+        {threads.isLoading && <StatusView variant="loading" message="Carregando conversas…" />}
         {threads.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as conversas.</p>
+          <StatusView
+            variant="error"
+            message="Não foi possível carregar as conversas."
+            onRetry={() => void threads.refetch()}
+          />
         )}
         {threads.isSuccess && threads.data.length === 0 && (
-          <p style={{ color: 'var(--ink-500)' }}>Nenhuma conversa por aqui ainda.</p>
+          <EmptyState
+            icon="message"
+            title="Nenhuma conversa ainda"
+            description="As mensagens dos moradores aparecem aqui."
+          />
         )}
         {threads.isSuccess && threads.data.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

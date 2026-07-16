@@ -7,6 +7,7 @@ import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -322,19 +323,7 @@ export function ResidentEditScreen({
             {showArchived && (
               <div style={{ marginTop: 12 }}>
                 {archived.length === 0 ? (
-                  <div
-                    style={{
-                      padding: 16,
-                      textAlign: 'center',
-                      fontSize: '.86rem',
-                      color: 'var(--ink-500)',
-                      background: 'var(--surface-2)',
-                      border: '1px dashed var(--line)',
-                      borderRadius: 'var(--r-md)',
-                    }}
-                  >
-                    Nenhum morador antigo registrado.
-                  </div>
+                  <EmptyState title="Nenhum morador antigo registrado" />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {archived.map((r) => (

@@ -47,4 +47,12 @@ describe('AdminMessagesScreen', () => {
 
     await waitFor(() => expect(onOpenThread).toHaveBeenCalledWith('t-2'));
   });
+
+  test('shows an empty state when there are no conversations', async () => {
+    const repository = new InMemoryThreadRepository([]);
+    renderWithClient(
+      <AdminMessagesScreen repository={repository} onOpenThread={jest.fn()} bottomNav={null} />,
+    );
+    expect(await screen.findByText('Nenhuma conversa ainda')).toBeInTheDocument();
+  });
 });
