@@ -179,7 +179,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           issueCharge={issueCharge}
           registerPayment={registerPayment}
           onEditReceipt={editReceipt}
-          onConfirmPayment={(receiptId) => confirmPayment({ receiptId })}
+          onConfirmPayment={(receiptId, paidAt) => confirmPayment({ receiptId, paidAt })}
           onRejectPayment={rejectPayment}
           onOverrideStatus={overrideResidentStatus}
         />

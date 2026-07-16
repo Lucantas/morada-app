@@ -45,7 +45,7 @@ type EditReceipt = (input: {
   dueDate: string;
 }) => Promise<void>;
 
-type ConfirmPayment = (receiptId: string) => Promise<void>;
+type ConfirmPayment = (receiptId: string, paidAt: string) => Promise<void>;
 type RejectPayment = (receiptId: string) => Promise<void>;
 
 type OverrideStatus = (input: {
@@ -114,7 +114,8 @@ export function ResidentEditScreen({
     },
   });
   const confirming = useMutation({
-    mutationFn: (receiptId: string) => (onConfirmPayment ?? (async () => {}))(receiptId),
+    mutationFn: (input: { receiptId: string; paidAt: string }) =>
+      (onConfirmPayment ?? (async () => {}))(input.receiptId, input.paidAt),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
       queryClient.invalidateQueries({ queryKey: residentsQueryKey });
@@ -392,7 +393,9 @@ export function ResidentEditScreen({
               onEditReceipt={onEditReceipt ? (input) => editing.mutate(input) : undefined}
               isEditing={editing.isPending}
               onConfirmPayment={
-                onConfirmPayment ? (receiptId) => confirming.mutate(receiptId) : undefined
+                onConfirmPayment
+                  ? (receiptId, paidAt) => confirming.mutate({ receiptId, paidAt })
+                  : undefined
               }
               isConfirming={confirming.isPending}
               onRejectPayment={
@@ -525,7 +528,7 @@ type EditReceiptHandler = (input: {
   dueDate: string;
 }) => void;
 
-type ConfirmPaymentHandler = (receiptId: string) => void;
+type ConfirmPaymentHandler = (receiptId: string, paidAt: string) => void;
 type RejectPaymentHandler = (receiptId: string) => void;
 
 function ReceiptsSection({
@@ -630,7 +633,8 @@ function ReceiptLedgerRow({
   isRejecting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidAt, setPaidAt] = useState('');
+  const [confirmPaidAt, setConfirmPaidAt] = useState('');
   const [method, setMethod] = useState<ReceiptMethod>('dinheiro');
   const [editOpen, setEditOpen] = useState(false);
   const [editRef, setEditRef] = useState(receipt.ref);
@@ -703,10 +707,39 @@ function ReceiptLedgerRow({
           )}
           {canReview && (
             <>
+              <label
+                style={{
+                  flexBasis: '100%',
+                  fontSize: '.82rem',
+                  fontWeight: 600,
+                  color: 'var(--ink-900)',
+                }}
+              >
+                Data do pagamento
+                <input
+                  type="date"
+                  value={confirmPaidAt}
+                  onChange={(e) => setConfirmPaidAt(e.target.value)}
+                  aria-label="Data do pagamento"
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    minHeight: 44,
+                    marginTop: 6,
+                    border: '1.5px solid var(--line)',
+                    borderRadius: 'var(--r-sm)',
+                    padding: '0 12px',
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '.95rem',
+                    color: 'var(--ink-900)',
+                    background: 'var(--surface)',
+                  }}
+                />
+              </label>
               <button
                 type="button"
-                disabled={isConfirming || isRejecting}
-                onClick={() => onConfirmPayment?.(receipt.id)}
+                disabled={isConfirming || isRejecting || !confirmPaidAt}
+                onClick={() => onConfirmPayment?.(receipt.id, confirmPaidAt)}
                 style={{
                   ...archiveButtonStyle,
                   border: 'none',

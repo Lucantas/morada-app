@@ -141,6 +141,10 @@ describe('ResidentEditScreen', () => {
     await screen.findByText('Taxa condominial');
     await userEvent.click(screen.getByRole('button', { name: /dar baixa/i }));
     await userEvent.click(screen.getByRole('button', { name: 'Pix' }));
+
+    expect(screen.getByLabelText('Data do pagamento')).toHaveValue('');
+    expect(screen.getByRole('button', { name: /confirmar baixa/i })).toBeDisabled();
+
     fireEvent.change(screen.getByLabelText('Data do pagamento'), {
       target: { value: '2026-05-08' },
     });
@@ -235,9 +239,15 @@ describe('ResidentEditScreen', () => {
       'data:image/png;base64,abc123',
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /confirmar/i }));
+    const confirmButton = screen.getByRole('button', { name: /^confirmar$/i });
+    expect(confirmButton).toBeDisabled();
 
-    await waitFor(() => expect(onConfirmPayment).toHaveBeenCalledWith('rc-1'));
+    fireEvent.change(screen.getByLabelText('Data do pagamento'), {
+      target: { value: '2026-06-20' },
+    });
+    await userEvent.click(confirmButton);
+
+    await waitFor(() => expect(onConfirmPayment).toHaveBeenCalledWith('rc-1', '2026-06-20'));
     expect(onRejectPayment).not.toHaveBeenCalled();
   });
 
