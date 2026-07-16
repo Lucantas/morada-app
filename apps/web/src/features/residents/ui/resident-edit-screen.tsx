@@ -160,24 +160,25 @@ export function ResidentEditScreen({
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const submitNewReceipt = issueCharge
-    ? async (input: {
-        ref: string;
-        valueCents: number;
-        dueDate: string;
-        paidAt?: string;
-        method?: ReceiptMethod;
-        proofDataUrl?: string;
-      }) => {
-        await issueCharge({
-          residentId: residentId as string,
-          title: 'Taxa condominial',
-          ...input,
-        });
-        queryClient.invalidateQueries({ queryKey: ['receipts'] });
-        queryClient.invalidateQueries({ queryKey: residentsQueryKey });
-      }
-    : undefined;
+  const submitNewReceipt =
+    issueCharge && residentId
+      ? async (input: {
+          ref: string;
+          valueCents: number;
+          dueDate: string;
+          paidAt?: string;
+          method?: ReceiptMethod;
+          proofDataUrl?: string;
+        }) => {
+          await issueCharge({
+            residentId,
+            title: 'Taxa condominial',
+            ...input,
+          });
+          queryClient.invalidateQueries({ queryKey: ['receipts'] });
+          queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+        }
+      : undefined;
 
   const submit = () =>
     save.mutate({ ...form, apt: apartmentLabel(form.apt), id: residentId }, { onSuccess: onBack });

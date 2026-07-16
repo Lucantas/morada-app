@@ -1,13 +1,9 @@
 import { z } from 'zod';
 
 import { ReceiptNotFoundError, ReceiptValidationError } from '../domain/errors';
+import { proofSchema } from '../domain/proof';
 import { receiptMethodSchema, receiptSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
-
-const proofSchema = z
-  .string()
-  .regex(/^data:(image\/[a-z0-9.+-]+|application\/pdf);base64,/i, 'Comprovante inválido')
-  .max(7_000_000);
 
 const inputSchema = z.object({
   method: receiptMethodSchema,

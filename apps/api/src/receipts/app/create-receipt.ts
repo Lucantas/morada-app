@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { ChargeResidentNotFoundError, ReceiptValidationError } from '../domain/errors';
+import { proofSchema } from '../domain/proof';
 import { isoDateSchema, receiptMethodSchema, receiptSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
@@ -20,7 +21,7 @@ const inputSchema = z.object({
   dueDate: isoDateSchema,
   paidAt: isoDateSchema.optional(),
   method: receiptMethodSchema.optional(),
-  proofDataUrl: z.string().optional(),
+  proofDataUrl: proofSchema.optional(),
 });
 
 export async function createReceipt(

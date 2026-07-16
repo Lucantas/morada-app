@@ -70,7 +70,8 @@ export function NewReceiptCard({ dueDay, issue, onClose }: Props) {
       setError('Competência inválida. Use MM/AAAA.');
       return;
     }
-    if (valueCents <= 0 || pending) {
+    if (pending) return;
+    if (valueCents <= 0) {
       setError('Informe um valor maior que zero.');
       return;
     }

@@ -122,4 +122,19 @@ describe('createReceipt', () => {
     expect(receipt.status).toBe('pendente');
     expect(receipt.proofDataUrl).toBeUndefined();
   });
+
+  test('rejects a malformed proofDataUrl when creating an already-paid receipt', async () => {
+    await expect(
+      createReceipt(fakeRepo(), async () => ({ apartmentId: 'ap-1' }), {
+        residentId: 'r-1',
+        ref: '06/2026',
+        title: 'Taxa condominial',
+        valueCents: 15000,
+        dueDate: '2026-06-15',
+        paidAt: '2026-06-14',
+        method: 'dinheiro',
+        proofDataUrl: 'not-a-proof',
+      }),
+    ).rejects.toThrow(ReceiptValidationError);
+  });
 });
