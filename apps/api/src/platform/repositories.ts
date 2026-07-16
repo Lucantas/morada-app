@@ -6,6 +6,8 @@ import { PostgresCategoryRepository } from '../categories/adapters/postgres/cate
 import type { CategoryRepository } from '../categories/domain/category-repository';
 import { PostgresDashboardRepository } from '../dashboard/adapters/postgres/dashboard-repository';
 import type { DashboardRepository } from '../dashboard/domain/dashboard-repository';
+import { PostgresIncomeRepository } from '../income/adapters/postgres/income-repository';
+import type { IncomeRepository } from '../income/domain/income-repository';
 import { PostgresThreadRepository } from '../messages/adapters/postgres/thread-repository';
 import type { ThreadRepository } from '../messages/domain/thread-repository';
 import { PostgresNoticeRepository } from '../notices/adapters/postgres/notice-repository';
@@ -34,6 +36,7 @@ export interface Repositories {
   users: UserRepository;
   settings: SettingsRepository;
   categories: CategoryRepository;
+  incomes: IncomeRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -47,6 +50,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     users: new PostgresUserRepository(pool),
     settings: new PostgresSettingsRepository(pool),
     categories: new PostgresCategoryRepository(pool),
+    incomes: new PostgresIncomeRepository(pool),
   };
 }
 

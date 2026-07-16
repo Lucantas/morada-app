@@ -1,13 +1,16 @@
 import type { AccountRepository } from '../../accounts/domain/account-repository';
+import type { IncomeRepository } from '../../income/domain/income-repository';
 import type { ReceiptRepository } from '../../receipts/domain/receipt-repository';
 import type { DashboardRepository } from '../domain/dashboard-repository';
 
-// The dashboard reads the ledger, so the harness also exposes the account and
-// receipt repositories (driver-matched) to seed it through the real adapters.
+// The dashboard reads the ledger, so the harness also exposes the account,
+// receipt, and income repositories (driver-matched) to seed it through the
+// real adapters.
 export interface DashboardHarness {
   dashboard: DashboardRepository;
   accounts: AccountRepository;
   receipts: ReceiptRepository;
+  incomes: IncomeRepository;
 }
 
 function previousMonthDate(today: string): string {
@@ -30,8 +33,8 @@ export function runDashboardRepositoryContract(
   setup: () => Promise<DashboardHarness>,
 ): void {
   describe(label, () => {
-    test('derives the balance live from paid accounts and paid receipts', async () => {
-      const { dashboard, accounts, receipts } = await setup();
+    test('derives the balance live from paid accounts, paid receipts, and incomes', async () => {
+      const { dashboard, accounts, receipts, incomes } = await setup();
       const today = new Date().toISOString().slice(0, 10);
       const thisMonth = today.slice(0, 7);
       const previousMonth = previousMonthDate(today);
@@ -98,12 +101,19 @@ export function runDashboardRepositoryContract(
         status: 'pago',
         residentId: 'r-1',
       });
+      await incomes.save({
+        id: 'i-1',
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: `${thisMonth}-08`,
+        valueCents: 10000,
+      });
 
       const summary = await dashboard.getSummary();
 
-      expect(summary.balance.incomeCents).toBe(90000);
+      expect(summary.balance.incomeCents).toBe(100000);
       expect(summary.balance.paidCents).toBe(100000);
-      expect(summary.balance.balanceCents).toBe(-20000);
+      expect(summary.balance.balanceCents).toBe(-10000);
       expect(summary.recentPaid.map((p) => p.id)).toEqual(['a-1', 'a-3']);
     });
 

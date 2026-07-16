@@ -368,6 +368,26 @@ describe('Morada API — authorization wiring', () => {
     expect((await admin.auth('/api/accounts')).status).toBe(200);
   });
 
+  test('incomes are admin-only; an admin can create one', async () => {
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth('/api/incomes')).status).toBe(403);
+
+    const admin = await withCreds(adminCredentials);
+    const res = await admin.auth('/api/incomes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: '2026-05-10',
+        valueCents: 20000,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string; description: string };
+    expect(created.description).toBe('Aluguel salão de festas');
+  });
+
   test('settings are admin-only', async () => {
     const resident = await withCreds(residentCredentials);
     expect((await resident.auth('/api/settings')).status).toBe(403);

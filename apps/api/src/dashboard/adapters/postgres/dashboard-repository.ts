@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import {
   buildDashboardSummary,
   type LedgerAccount,
+  type LedgerIncome,
   type LedgerReceipt,
 } from '../../domain/build-dashboard-summary';
 import type { DashboardSummary } from '../../domain/dashboard';
@@ -21,6 +22,11 @@ interface ReceiptRow {
   value_cents: number;
   status: string;
   paid_at: string | null;
+}
+
+interface IncomeRow {
+  value_cents: number;
+  date: string | null;
 }
 
 // The summary is derived live from the ledger (accounts = expenses,
@@ -50,7 +56,15 @@ export class PostgresDashboardRepository implements DashboardRepository {
       paidAt: row.paid_at,
     }));
 
+    const incomesResult = await this.pool.query<IncomeRow>(
+      'SELECT value_cents, date::text AS date FROM incomes',
+    );
+    const incomes: LedgerIncome[] = incomesResult.rows.map((row) => ({
+      valueCents: row.value_cents,
+      date: row.date,
+    }));
+
     const today = new Date().toISOString().slice(0, 10);
-    return buildDashboardSummary(accounts, receipts, [], today);
+    return buildDashboardSummary(accounts, receipts, incomes, today);
   }
 }

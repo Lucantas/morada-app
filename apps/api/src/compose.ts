@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
+import { incomeRoutes } from './income/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, signSession, type ApiEnv, type Role } from './platform/auth';
@@ -55,6 +56,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     users,
     settings,
     categories,
+    incomes,
   } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
   // The seeded admin uses a weak, public password — never auto-seed it into a
@@ -118,6 +120,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
+  api.route('/incomes', guarded('admin', incomeRoutes(incomes)));
   api.route(
     '/categories',
     guarded(

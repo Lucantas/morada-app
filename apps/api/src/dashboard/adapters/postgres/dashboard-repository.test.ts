@@ -1,4 +1,5 @@
 import { PostgresAccountRepository } from '../../../accounts/adapters/postgres/account-repository';
+import { PostgresIncomeRepository } from '../../../income/adapters/postgres/income-repository';
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import { PostgresReceiptRepository } from '../../../receipts/adapters/postgres/receipt-repository';
@@ -23,5 +24,6 @@ runDashboardRepositoryContract('PostgresDashboardRepository', async () => {
     dashboard: new PostgresDashboardRepository(pool),
     accounts: new PostgresAccountRepository(pool),
     receipts: new PostgresReceiptRepository(pool),
+    incomes: new PostgresIncomeRepository(pool),
   };
 });
