@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { accountRoutes } from './accounts/adapters/http/routes';
+import { categoryRoutes } from './categories/adapters/http/routes';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
@@ -44,7 +45,17 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 }
 
 export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
-  const { residents, accounts, receipts, notices, threads, dashboard, users, settings } = repos;
+  const {
+    residents,
+    accounts,
+    receipts,
+    notices,
+    threads,
+    dashboard,
+    users,
+    settings,
+    categories,
+  } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
@@ -107,6 +118,19 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
+  api.route(
+    '/categories',
+    guarded(
+      'admin',
+      categoryRoutes(categories, {
+        list: () => accounts.list(),
+        save: async (account) => {
+          const existing = await accounts.getById(account.id);
+          if (existing) await accounts.save({ ...existing, category: account.category });
+        },
+      }),
+    ),
+  );
   api.route('/settings', guarded('admin', settingsRoutes(settings)));
 
   // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.

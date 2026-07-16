@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 
 import { PostgresAccountRepository } from '../accounts/adapters/postgres/account-repository';
 import type { AccountRepository } from '../accounts/domain/account-repository';
+import { PostgresCategoryRepository } from '../categories/adapters/postgres/category-repository';
+import type { CategoryRepository } from '../categories/domain/category-repository';
 import { PostgresDashboardRepository } from '../dashboard/adapters/postgres/dashboard-repository';
 import type { DashboardRepository } from '../dashboard/domain/dashboard-repository';
 import { PostgresThreadRepository } from '../messages/adapters/postgres/thread-repository';
@@ -31,6 +33,7 @@ export interface Repositories {
   dashboard: DashboardRepository;
   users: UserRepository;
   settings: SettingsRepository;
+  categories: CategoryRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -43,6 +46,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     dashboard: new PostgresDashboardRepository(pool),
     users: new PostgresUserRepository(pool),
     settings: new PostgresSettingsRepository(pool),
+    categories: new PostgresCategoryRepository(pool),
   };
 }
 

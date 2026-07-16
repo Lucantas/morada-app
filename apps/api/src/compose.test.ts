@@ -377,6 +377,36 @@ describe('Morada API — authorization wiring', () => {
     expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
   });
 
+  test('categories are admin-only; saving reclassifies matching accounts', async () => {
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth('/api/categories')).status).toBe(403);
+
+    const admin = await withCreds(adminCredentials);
+    const list = await admin.auth('/api/categories');
+    expect(list.status).toBe(200);
+    expect(await list.json()).toEqual([]);
+
+    // fixtures seed account a-1 with description "Água — abril" — matched by keyword "água"
+    const put = await admin.auth('/api/categories', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([{ name: 'Água', keywords: 'água' }]),
+    });
+    expect(put.status).toBe(200);
+    const body = (await put.json()) as {
+      categories: { name: string; keywords: string }[];
+      reclassified: number;
+    };
+    expect(body.categories).toEqual([
+      { id: expect.any(String), name: 'Água', keywords: 'água', position: 0 },
+    ]);
+    expect(body.reclassified).toBe(1);
+
+    const accounts = await admin.auth('/api/accounts');
+    const list2 = (await accounts.json()) as { id: string; category: string }[];
+    expect(list2.find((a) => a.id === 'a-1')?.category).toBe('Água');
+  });
+
   test('receipts and dashboard are open to any authenticated user', async () => {
     const { auth } = await withCreds(residentCredentials);
     expect((await auth('/api/receipts')).status).toBe(200);
