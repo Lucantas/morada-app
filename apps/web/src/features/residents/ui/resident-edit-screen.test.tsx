@@ -69,6 +69,7 @@ describe('ResidentEditScreen', () => {
 
     await screen.findByDisplayValue('Diego Reis');
     await userEvent.click(screen.getByRole('button', { name: /arquivar morador/i }));
+    await userEvent.click(screen.getByRole('button', { name: /confirmar saída/i }));
 
     await waitFor(() => expect(onBack).toHaveBeenCalled());
     expect((await repository.getById('r-7'))?.active).toBe(false);
@@ -296,5 +297,52 @@ describe('ResidentEditScreen', () => {
 
     await screen.findByDisplayValue('Diego Reis');
     expect(screen.getByText(/manual/i)).toBeInTheDocument();
+  });
+
+  test('archiving a resident asks for confirmation before deactivating', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-1', name: 'Maria Ribeiro', apt: 'Apto 302', active: true }),
+    ]);
+    const deactivateSpy = jest.spyOn(repository, 'deactivate');
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-1"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /arquivar morador/i }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(deactivateSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /confirmar saída/i }));
+
+    await waitFor(() => expect(deactivateSpy).toHaveBeenCalledWith('r-1'));
+  });
+
+  test('cancelling the archive confirmation does not deactivate', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-1', name: 'Maria Ribeiro', apt: 'Apto 302', active: true }),
+    ]);
+    const deactivateSpy = jest.spyOn(repository, 'deactivate');
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-1"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /arquivar morador/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deactivateSpy).not.toHaveBeenCalled();
   });
 });

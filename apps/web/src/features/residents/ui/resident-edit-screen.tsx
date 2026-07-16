@@ -6,6 +6,7 @@ import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repos
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -129,6 +130,7 @@ export function ResidentEditScreen({
   const deactivate = useDeactivateResident(repository);
   const [form, setForm] = useState(EMPTY);
   const [showArchived, setShowArchived] = useState(false);
+  const [confirmingMoveOut, setConfirmingMoveOut] = useState(false);
 
   const apartmentId = existing.data?.apartmentId;
   const history = useApartmentResidents(repository, apartmentId);
@@ -265,7 +267,11 @@ export function ResidentEditScreen({
         <SectionLabel
           right={
             residentId && isActive ? (
-              <button type="button" onClick={moveOut} style={archiveButtonStyle}>
+              <button
+                type="button"
+                onClick={() => setConfirmingMoveOut(true)}
+                style={archiveButtonStyle}
+              >
                 <Icon name="logout" size={15} />
                 {deactivate.isPending ? 'Arquivando…' : 'Arquivar morador'}
               </button>
@@ -393,6 +399,19 @@ export function ResidentEditScreen({
           </button>
         )}
       </ScreenBody>
+      <ConfirmDialog
+        open={confirmingMoveOut}
+        title={`Registrar saída de ${existing.data?.name || 'deste morador'}?`}
+        message={`${existing.data?.name || 'O morador'} deixa de ser o morador ativo do ${existing.data?.apt ?? 'apartamento'}. O histórico do apartamento é preservado.`}
+        confirmLabel="Confirmar saída"
+        tone="danger"
+        isPending={deactivate.isPending}
+        onConfirm={() => {
+          setConfirmingMoveOut(false);
+          moveOut();
+        }}
+        onCancel={() => setConfirmingMoveOut(false)}
+      />
     </Screen>
   );
 }
