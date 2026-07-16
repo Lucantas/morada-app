@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
+import { IncomeEditScreen } from '@/features/accounts/ui/income-edit-screen';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
 import { unreadCount } from '@/features/messages/domain/unread-count';
 import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
@@ -34,6 +35,7 @@ import {
   confirmPayment,
   dashboardRepository,
   editReceipt,
+  incomeRepository,
   issueCharge,
   login,
   noticeRepository,
@@ -86,6 +88,7 @@ function Router() {
   const signOut = useSessionStore((s) => s.signOut);
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
+  const incomeId = useNavStore((s) => s.incomeId);
   const go = useNavStore((s) => s.go);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -110,7 +113,15 @@ function Router() {
   }
 
   if (role === 'admin') {
-    return <AdminRouter view={view} residentId={residentId} go={go} signOut={signOut} />;
+    return (
+      <AdminRouter
+        view={view}
+        residentId={residentId}
+        incomeId={incomeId}
+        go={go}
+        signOut={signOut}
+      />
+    );
   }
   return (
     <ResidentRouter
@@ -126,12 +137,13 @@ function Router() {
 type RouteProps = {
   view: View;
   residentId?: string;
+  incomeId?: string;
   subject?: string | null;
-  go: (view: View, opts?: { residentId?: string }) => void;
+  go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
   signOut: () => void;
 };
 
-function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
+function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
   const threads = useThreads(threadRepository);
   const unread = unreadCount(threads.data ?? []);
   const settings = useSettings(settingsRepository);
@@ -190,6 +202,14 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
         <AccountEditScreen
           repository={accountRepository}
           accountId={residentId}
+          onBack={() => go('a-accounts')}
+        />
+      );
+    case 'a-income-edit':
+      return (
+        <IncomeEditScreen
+          repository={incomeRepository}
+          incomeId={incomeId}
           onBack={() => go('a-accounts')}
         />
       );

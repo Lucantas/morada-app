@@ -7,6 +7,7 @@ export type View =
   | 'a-resident-login'
   | 'a-accounts'
   | 'a-account-edit'
+  | 'a-income-edit'
   | 'a-settings'
   | 'a-notice'
   | 'a-messages'
@@ -21,11 +22,13 @@ export type View =
 type NavState = {
   view: View;
   residentId?: string;
-  go: (view: View, opts?: { residentId?: string }) => void;
+  incomeId?: string;
+  go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
 };
 
 export const useNavStore = create<NavState>((set) => ({
   view: 'a-home',
   residentId: undefined,
-  go: (view, opts) => set({ view, residentId: opts?.residentId }),
+  incomeId: undefined,
+  go: (view, opts) => set({ view, residentId: opts?.residentId, incomeId: opts?.incomeId }),
 }));
