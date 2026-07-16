@@ -26,7 +26,7 @@ estrutura domain/app/adapters/postgres/contract).
 
 `reclassifyAccounts(categories, accounts)` — função **pura**:
 
-- Normaliza com `norm(s) = s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')`
+- Normaliza com `norm(s) = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')`
   (minúsculas + remove acentos).
 - Para cada conta: `hay = norm(description + ' ' + category)`.
 - Acha a **primeira** categoria (ordem da lista) cuja **alguma** palavra-chave
