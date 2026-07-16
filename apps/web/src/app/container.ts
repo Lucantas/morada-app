@@ -1,4 +1,5 @@
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
+import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
 import { HttpDashboardRepository } from '@/features/dashboard/data/http-dashboard-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
@@ -27,6 +28,7 @@ export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
 export const settingsRepository = new HttpSettingsRepository(apiClient);
+export const categoryRepository = new HttpCategoryRepository(apiClient);
 
 /** Authenticate with a username and password against the API, storing the JWT
  *  (with the real subject decoded from it) and returning the resolved role. */

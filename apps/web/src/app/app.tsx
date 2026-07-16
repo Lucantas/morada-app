@@ -30,6 +30,7 @@ import { StatusView } from '@/shared/ui/status-view';
 
 import {
   accountRepository,
+  categoryRepository,
   confirmPayment,
   dashboardRepository,
   editReceipt,
@@ -193,7 +194,13 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
         />
       );
     case 'a-settings':
-      return <SettingsScreen repository={settingsRepository} onBack={() => go('a-home')} />;
+      return (
+        <SettingsScreen
+          repository={settingsRepository}
+          categoryRepository={categoryRepository}
+          onBack={() => go('a-home')}
+        />
+      );
     case 'a-notice':
       return (
         <SendNoticeScreen

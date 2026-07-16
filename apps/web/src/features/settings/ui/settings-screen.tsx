@@ -1,20 +1,39 @@
 import { useEffect, useState } from 'react';
 
+import type { CategoryDraft } from '@/features/categories/domain/category';
+import type { CategoryRepository } from '@/features/categories/domain/category-repository';
+import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
-import { Field, PrimaryButton } from '@/shared/ui/primitives';
+import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 
 import type { SettingsRepository } from '../domain/settings-repository';
 import { useSettings, useSaveSettings } from './use-settings';
 
-type Props = { repository: SettingsRepository; onBack: () => void };
+type Props = {
+  repository: SettingsRepository;
+  categoryRepository: CategoryRepository;
+  onBack: () => void;
+};
 
-export function SettingsScreen({ repository, onBack }: Props) {
+function reclassifiedMessage(count: number): string {
+  if (count === 0) return 'Configurações salvas. Nenhuma conta precisou ser reclassificada.';
+  if (count === 1) return 'Pronto — 1 conta foi reclassificada.';
+  return `Pronto — ${count} contas foram reclassificadas.`;
+}
+
+export function SettingsScreen({ repository, categoryRepository, onBack }: Props) {
   const settings = useSettings(repository);
-  const save = useSaveSettings(repository);
+  const saveSettings = useSaveSettings(repository);
+  const categories = useCategories(categoryRepository);
+  const saveCategories = useSaveCategories(categoryRepository);
+
   const [feeCents, setFeeCents] = useState(0);
   const [dueDay, setDueDay] = useState('15');
+  const [localCategories, setLocalCategories] = useState<CategoryDraft[]>([]);
+  const [newCat, setNewCat] = useState<CategoryDraft>({ name: '', keywords: '' });
+  const [reclassifiedMsg, setReclassifiedMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings.data) {
@@ -23,12 +42,42 @@ export function SettingsScreen({ repository, onBack }: Props) {
     }
   }, [settings.data]);
 
-  const submit = () => {
-    const day = Number.parseInt(dueDay, 10);
-    save.mutate(
-      { monthlyFeeCents: feeCents, dueDay: Number.isFinite(day) ? day : 15 },
-      { onSuccess: onBack },
+  useEffect(() => {
+    if (categories.data) {
+      setLocalCategories(
+        categories.data.map((category) => ({
+          id: category.id,
+          name: category.name,
+          keywords: category.keywords,
+        })),
+      );
+    }
+  }, [categories.data]);
+
+  const updateCategory = (index: number, patch: Partial<CategoryDraft>) => {
+    setLocalCategories((current) =>
+      current.map((category, i) => (i === index ? { ...category, ...patch } : category)),
     );
+  };
+
+  const removeCategory = (index: number) => {
+    setLocalCategories((current) => current.filter((_, i) => i !== index));
+  };
+
+  const addCategory = () => {
+    if (!newCat.name.trim()) return;
+    setLocalCategories((current) => [...current, newCat]);
+    setNewCat({ name: '', keywords: '' });
+  };
+
+  const submit = async () => {
+    const day = Number.parseInt(dueDay, 10);
+    await saveSettings.mutateAsync({
+      monthlyFeeCents: feeCents,
+      dueDay: Number.isFinite(day) ? day : 15,
+    });
+    const result = await saveCategories.mutateAsync(localCategories);
+    setReclassifiedMsg(reclassifiedMessage(result.reclassified));
   };
 
   return (
@@ -62,23 +111,108 @@ export function SettingsScreen({ repository, onBack }: Props) {
           <Icon name="chevronLeft" color="#fff" />
         </button>
         <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600 }}>
-          Configurações
+          Ajustes
         </div>
       </div>
       <ScreenBody>
-        {settings.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
-        {settings.isError && (
+        {(settings.isError || categories.isError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
         )}
+        {settings.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
         {settings.isSuccess && (
           <div style={{ paddingTop: 2 }}>
             <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
             <Field label="Dia de vencimento" value={dueDay} onChange={setDueDay} type="number" />
-            <PrimaryButton icon="check" onClick={submit}>
-              Salvar
-            </PrimaryButton>
           </div>
         )}
+
+        <SectionLabel>Categorias de contas</SectionLabel>
+        {localCategories.map((category, index) => (
+          <SurfaceCard
+            key={category.id ?? `new-${index}`}
+            style={{ padding: 12, marginBottom: 10 }}
+          >
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <Field
+                  label="Nome"
+                  value={category.name}
+                  onChange={(value) => updateCategory(index, { name: value })}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Field
+                  label="Palavras-chave"
+                  value={category.keywords}
+                  onChange={(value) => updateCategory(index, { keywords: value })}
+                />
+              </div>
+              <button
+                type="button"
+                aria-label={`Remover categoria ${category.name}`}
+                onClick={() => removeCategory(index)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  marginBottom: 16,
+                  borderRadius: 10,
+                  background: 'var(--atraso-50, #fbe9e7)',
+                  border: 'none',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                  flex: 'none',
+                }}
+              >
+                <Icon name="x" size={16} color="var(--atraso-700)" />
+              </button>
+            </div>
+          </SurfaceCard>
+        ))}
+
+        <SurfaceCard style={{ padding: 12, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: '.9rem', marginBottom: 10 }}>Nova categoria</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1 }}>
+              <Field
+                label="Nome da nova categoria"
+                value={newCat.name}
+                onChange={(value) => setNewCat({ ...newCat, name: value })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Field
+                label="Palavras-chave da nova categoria"
+                value={newCat.keywords}
+                onChange={(value) => setNewCat({ ...newCat, keywords: value })}
+              />
+            </div>
+          </div>
+          <PrimaryButton icon="plus" onClick={addCategory}>
+            Adicionar categoria
+          </PrimaryButton>
+        </SurfaceCard>
+
+        {reclassifiedMsg && (
+          <div
+            role="status"
+            style={{
+              background: 'var(--petrol-50)',
+              color: 'var(--petrol-800)',
+              borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+              marginBottom: 16,
+              fontWeight: 600,
+              fontSize: '.9rem',
+            }}
+          >
+            {reclassifiedMsg}
+          </div>
+        )}
+
+        <PrimaryButton icon="check" onClick={() => void submit()}>
+          Salvar e reclassificar contas
+        </PrimaryButton>
       </ScreenBody>
     </Screen>
   );
