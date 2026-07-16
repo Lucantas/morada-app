@@ -25,6 +25,7 @@ const PATHS = {
   wrench: 'M14 7a4 4 0 01-5 5l-6 6 2 2 6-6a4 4 0 005-5l-2 2-2-2 2-2z',
   building2: 'M12 20v-6M6 20v-4M18 20v-9M4 8l8-5 8 5',
   bank: 'M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01',
+  x: 'M18 6L6 18M6 6l12 12',
 } as const;
 
 export type IconName = keyof typeof PATHS;
