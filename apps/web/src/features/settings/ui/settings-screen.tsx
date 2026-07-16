@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { CategoryDraft } from '@/features/categories/domain/category';
-import type { CategoryRepository } from '@/features/categories/domain/category-repository';
-import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
+import type { Category, CategoryDraft } from '@/features/categories/domain/category';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -13,7 +11,11 @@ import { useSettings, useSaveSettings } from './use-settings';
 
 type Props = {
   repository: SettingsRepository;
-  categoryRepository: CategoryRepository;
+  categories: readonly Category[] | undefined;
+  categoriesError: boolean;
+  categoriesReady: boolean;
+  savingCategories: boolean;
+  onSaveCategories: (drafts: CategoryDraft[]) => Promise<{ reclassified: number }>;
   onBack: () => void;
 };
 
@@ -23,11 +25,17 @@ function reclassifiedMessage(count: number): string {
   return `Pronto — ${count} contas foram reclassificadas.`;
 }
 
-export function SettingsScreen({ repository, categoryRepository, onBack }: Props) {
+export function SettingsScreen({
+  repository,
+  categories,
+  categoriesError,
+  categoriesReady,
+  savingCategories,
+  onSaveCategories,
+  onBack,
+}: Props) {
   const settings = useSettings(repository);
   const saveSettings = useSaveSettings(repository);
-  const categories = useCategories(categoryRepository);
-  const saveCategories = useSaveCategories(categoryRepository);
 
   const [feeCents, setFeeCents] = useState(0);
   const [dueDay, setDueDay] = useState('15');
@@ -44,16 +52,16 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
   }, [settings.data]);
 
   useEffect(() => {
-    if (categories.data) {
+    if (categories) {
       setLocalCategories(
-        categories.data.map((category) => ({
+        categories.map((category) => ({
           id: category.id,
           name: category.name,
           keywords: category.keywords,
         })),
       );
     }
-  }, [categories.data]);
+  }, [categories]);
 
   const updateCategory = (index: number, patch: Partial<CategoryDraft>) => {
     setLocalCategories((current) =>
@@ -78,7 +86,7 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
         monthlyFeeCents: feeCents,
         dueDay: Number.isFinite(day) ? day : 15,
       });
-      const result = await saveCategories.mutateAsync(localCategories);
+      const result = await onSaveCategories(localCategories);
       setSaveError(null);
       setReclassifiedMsg(reclassifiedMessage(result.reclassified));
     } catch (error) {
@@ -122,7 +130,7 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
         </div>
       </div>
       <ScreenBody>
-        {(settings.isError || categories.isError) && (
+        {(settings.isError || categoriesError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
         )}
         {settings.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
@@ -240,10 +248,7 @@ export function SettingsScreen({ repository, categoryRepository, onBack }: Props
           icon="check"
           onClick={() => void submit()}
           disabled={
-            !settings.isSuccess ||
-            !categories.isSuccess ||
-            saveSettings.isPending ||
-            saveCategories.isPending
+            !settings.isSuccess || !categoriesReady || saveSettings.isPending || savingCategories
           }
         >
           Salvar e reclassificar contas

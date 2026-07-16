@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useCallback, useState, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
-import { IncomeEditScreen } from '@/features/accounts/ui/income-edit-screen';
+import { IncomeEditScreen } from '@/features/income/ui/income-edit-screen';
+import { IncomeSection } from '@/features/income/ui/income-section';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
 import { unreadCount } from '@/features/messages/domain/unread-count';
 import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
@@ -22,9 +23,11 @@ import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
+import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
+import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { StatusView } from '@/shared/ui/status-view';
@@ -35,6 +38,7 @@ import {
   confirmPayment,
   dashboardRepository,
   editReceipt,
+  ensureMonthlyReceipts,
   incomeRepository,
   issueCharge,
   login,
@@ -148,6 +152,11 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
   const unread = unreadCount(threads.data ?? []);
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
+  const queryClient = useQueryClient();
+  const ensureMonthly = useCallback(async () => {
+    await ensureMonthlyReceipts();
+    await queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+  }, [queryClient]);
   const nav = <BottomNav items={adminNav(view, go, signOut)} />;
   switch (view) {
     case 'a-residents':
@@ -194,8 +203,12 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
         <AccountsScreen
           repository={accountRepository}
           onOpenAccount={(id) => go('a-account-edit', { residentId: id })}
-          incomeRepository={incomeRepository}
-          onOpenIncome={(id) => go('a-income-edit', id ? { incomeId: id } : undefined)}
+          incomeSection={
+            <IncomeSection
+              repository={incomeRepository}
+              onOpenIncome={(id) => go('a-income-edit', id ? { incomeId: id } : undefined)}
+            />
+          }
           bottomNav={nav}
         />
       );
@@ -216,13 +229,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
         />
       );
     case 'a-settings':
-      return (
-        <SettingsScreen
-          repository={settingsRepository}
-          categoryRepository={categoryRepository}
-          onBack={() => go('a-home')}
-        />
-      );
+      return <AdminSettings onBack={() => go('a-home')} />;
     case 'a-notice':
       return (
         <SendNoticeScreen
@@ -257,9 +264,26 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           onOpenSettings={() => go('a-settings')}
           unreadCount={unread}
           bottomNav={nav}
+          ensureMonthlyReceipts={ensureMonthly}
         />
       );
   }
+}
+
+function AdminSettings({ onBack }: { onBack: () => void }) {
+  const categories = useCategories(categoryRepository);
+  const saveCategories = useSaveCategories(categoryRepository);
+  return (
+    <SettingsScreen
+      repository={settingsRepository}
+      categories={categories.data}
+      categoriesError={categories.isError}
+      categoriesReady={categories.isSuccess}
+      savingCategories={saveCategories.isPending}
+      onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
+      onBack={onBack}
+    />
+  );
 }
 
 function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {

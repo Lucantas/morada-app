@@ -7,8 +7,8 @@ import { MoneyInput } from '@/shared/ui/money-input';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 
-import type { IncomeRepository } from '../../income/domain/income-repository';
-import { useDeleteIncome, useIncomes, useSaveIncome } from '../../income/ui/use-income';
+import type { IncomeRepository } from '../domain/income-repository';
+import { useDeleteIncome, useIncomes, useSaveIncome } from './use-income';
 
 const EMPTY = {
   description: '',

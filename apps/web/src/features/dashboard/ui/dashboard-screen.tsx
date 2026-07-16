@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
-import { useQueryClient } from '@tanstack/react-query';
-
-import { ensureMonthlyReceipts } from '@/app/container';
-import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -24,6 +20,7 @@ type Props = {
   onOpenSettings?: () => void;
   unreadCount: number;
   bottomNav: ReactNode;
+  ensureMonthlyReceipts?: () => Promise<void>;
 };
 
 export function DashboardScreen({
@@ -34,24 +31,21 @@ export function DashboardScreen({
   onOpenSettings,
   unreadCount,
   bottomNav,
+  ensureMonthlyReceipts,
 }: Props) {
   const dashboard = useDashboard(repository);
   const [ensureError, setEnsureError] = useState(false);
 
-  const queryClient = useQueryClient();
   useEffect(() => {
+    if (!ensureMonthlyReceipts) return;
     let cancelled = false;
-    void ensureMonthlyReceipts()
-      .then(() => {
-        if (!cancelled) void queryClient.invalidateQueries({ queryKey: residentsQueryKey });
-      })
-      .catch(() => {
-        if (!cancelled) setEnsureError(true);
-      });
+    void ensureMonthlyReceipts().catch(() => {
+      if (!cancelled) setEnsureError(true);
+    });
     return () => {
       cancelled = true;
     };
-  }, [queryClient]);
+  }, [ensureMonthlyReceipts]);
 
   return (
     <Screen>

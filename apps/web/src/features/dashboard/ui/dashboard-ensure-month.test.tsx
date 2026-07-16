@@ -17,7 +17,6 @@ jest.mock('./use-dashboard', () => ({
 }));
 
 const ensureMock = jest.fn().mockResolvedValue(undefined);
-jest.mock('@/app/container', () => ({ ensureMonthlyReceipts: () => ensureMock() }));
 
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -30,6 +29,7 @@ function renderScreen() {
         onSeeAccounts={() => {}}
         unreadCount={0}
         bottomNav={null}
+        ensureMonthlyReceipts={() => ensureMock()}
       />
     </QueryClientProvider>,
   );

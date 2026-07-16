@@ -3,8 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 
+import type { CategoryRepository } from '@/features/categories/domain/category-repository';
 import { InMemoryCategoryRepository } from '@/features/categories/data/in-memory-category-repository';
+import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
 
+import type { SettingsRepository } from '../domain/settings-repository';
 import { InMemorySettingsRepository } from '../data/in-memory-settings-repository';
 import { SettingsScreen } from './settings-screen';
 
@@ -13,14 +16,33 @@ function renderWithClient(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
-function renderScreen(repo: InMemorySettingsRepository) {
-  return renderWithClient(
+function Harness({
+  settings,
+  categoryRepo,
+}: {
+  settings: SettingsRepository;
+  categoryRepo: CategoryRepository;
+}) {
+  const categories = useCategories(categoryRepo);
+  const saveCategories = useSaveCategories(categoryRepo);
+  return (
     <SettingsScreen
-      repository={repo}
-      categoryRepository={new InMemoryCategoryRepository([])}
+      repository={settings}
+      categories={categories.data}
+      categoriesError={categories.isError}
+      categoriesReady={categories.isSuccess}
+      savingCategories={saveCategories.isPending}
+      onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
       onBack={() => {}}
-    />,
+    />
   );
+}
+
+function renderScreen(
+  repo: InMemorySettingsRepository,
+  categoryRepo: CategoryRepository = new InMemoryCategoryRepository([]),
+) {
+  return renderWithClient(<Harness settings={repo} categoryRepo={categoryRepo} />);
 }
 
 describe('SettingsScreen', () => {
@@ -44,9 +66,7 @@ describe('SettingsScreen', () => {
       categories: [{ id: 'c1', name: 'Energia', keywords: 'luz', position: 0 }],
       reclassified: 2,
     });
-    renderWithClient(
-      <SettingsScreen repository={settings} categoryRepository={categories} onBack={jest.fn()} />,
-    );
+    renderWithClient(<Harness settings={settings} categoryRepo={categories} />);
 
     await screen.findByText('Ajustes');
     await user.type(screen.getByLabelText('Nome da nova categoria'), 'Energia');
@@ -62,9 +82,7 @@ describe('SettingsScreen', () => {
     const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
     const categories = new InMemoryCategoryRepository([]);
     jest.spyOn(categories, 'save').mockRejectedValue(new Error('Falha ao salvar categorias'));
-    renderWithClient(
-      <SettingsScreen repository={settings} categoryRepository={categories} onBack={jest.fn()} />,
-    );
+    renderWithClient(<Harness settings={settings} categoryRepo={categories} />);
 
     await screen.findByText('Ajustes');
     await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
@@ -78,9 +96,7 @@ describe('SettingsScreen', () => {
     const categories = new InMemoryCategoryRepository([
       { id: 'c1', name: 'Água', keywords: 'agua, saneamento', position: 0 },
     ]);
-    renderWithClient(
-      <SettingsScreen repository={settings} categoryRepository={categories} onBack={jest.fn()} />,
-    );
+    renderWithClient(<Harness settings={settings} categoryRepo={categories} />);
 
     expect(screen.getByRole('button', { name: /salvar e reclassificar/i })).toBeDisabled();
 
