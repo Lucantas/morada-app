@@ -51,6 +51,6 @@ export class PostgresDashboardRepository implements DashboardRepository {
     }));
 
     const today = new Date().toISOString().slice(0, 10);
-    return buildDashboardSummary(accounts, receipts, today);
+    return buildDashboardSummary(accounts, receipts, [], today);
   }
 }

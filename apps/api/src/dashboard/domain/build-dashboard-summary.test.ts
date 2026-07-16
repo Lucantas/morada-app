@@ -1,6 +1,7 @@
 import {
   buildDashboardSummary,
   type LedgerAccount,
+  type LedgerIncome,
   type LedgerReceipt,
 } from './build-dashboard-summary';
 
@@ -55,23 +56,41 @@ const receipts: LedgerReceipt[] = [
   { valueCents: 45000, status: 'pendente', paidAt: null },
 ];
 
+const incomes: LedgerIncome[] = [
+  { valueCents: 10000, date: '2026-04-10' }, // this month
+  { valueCents: 5000, date: '2026-01-02' }, // earlier — all-time only
+  { valueCents: 2000, date: null }, // undated — all-time only
+];
+
 describe('buildDashboardSummary', () => {
   test('income is the sum of this month paid receipts', () => {
-    expect(buildDashboardSummary(accounts, receipts, TODAY).balance.incomeCents).toBe(90000);
+    expect(buildDashboardSummary(accounts, receipts, [], TODAY).balance.incomeCents).toBe(90000);
   });
 
   test('paid is the sum of this month paid accounts (expenses)', () => {
-    expect(buildDashboardSummary(accounts, receipts, TODAY).balance.paidCents).toBe(363000);
+    expect(buildDashboardSummary(accounts, receipts, [], TODAY).balance.paidCents).toBe(363000);
   });
 
   test('balance is all-time income minus all-time paid expenses', () => {
-    expect(buildDashboardSummary(accounts, receipts, TODAY).balance.balanceCents).toBe(
+    expect(buildDashboardSummary(accounts, receipts, [], TODAY).balance.balanceCents).toBe(
       90000 - 363000,
     );
   });
 
+  test('income of the month adds paid receipts and this-month incomes', () => {
+    expect(buildDashboardSummary(accounts, receipts, incomes, TODAY).balance.incomeCents).toBe(
+      100000,
+    );
+  });
+
+  test('balance adds all-time incomes to all-time paid receipts, minus paid expenses', () => {
+    expect(buildDashboardSummary(accounts, receipts, incomes, TODAY).balance.balanceCents).toBe(
+      90000 + 17000 - 363000,
+    );
+  });
+
   test('recentPaid lists paid accounts newest-first, capped at four', () => {
-    const { recentPaid } = buildDashboardSummary(accounts, receipts, TODAY);
+    const { recentPaid } = buildDashboardSummary(accounts, receipts, [], TODAY);
     expect(recentPaid.map((p) => p.id)).toEqual(['a-1', 'a-2', 'a-3']);
     expect(recentPaid[0]).toMatchObject({
       label: 'Água — abril',
@@ -82,7 +101,7 @@ describe('buildDashboardSummary', () => {
   });
 
   test('maintenances come from Manutenção-category accounts', () => {
-    const { maintenances } = buildDashboardSummary(accounts, receipts, TODAY);
+    const { maintenances } = buildDashboardSummary(accounts, receipts, [], TODAY);
     expect(maintenances).toHaveLength(1);
     expect(maintenances[0]).toMatchObject({
       title: 'Reparo portão',
@@ -104,6 +123,7 @@ describe('buildDashboardSummary', () => {
         },
       ],
       [],
+      [],
       TODAY,
     );
     expect(summary.recentPaid[0]?.dateLabel).toBe('Paga');
@@ -111,7 +131,7 @@ describe('buildDashboardSummary', () => {
   });
 
   test('handles an empty ledger', () => {
-    const summary = buildDashboardSummary([], [], TODAY);
+    const summary = buildDashboardSummary([], [], [], TODAY);
     expect(summary.balance).toEqual({ balanceCents: 0, incomeCents: 0, paidCents: 0 });
     expect(summary.recentPaid).toEqual([]);
     expect(summary.maintenances).toEqual([]);
@@ -152,7 +172,7 @@ describe('buildDashboardSummary — month-aware balance', () => {
       { valueCents: 15000, status: 'pendente', paidAt: null },
     ];
 
-    const summary = buildDashboardSummary(monthAccounts, monthReceipts, '2026-07-14');
+    const summary = buildDashboardSummary(monthAccounts, monthReceipts, [], '2026-07-14');
 
     expect(summary.balance.balanceCents).toBe(17000);
     expect(summary.balance.incomeCents).toBe(15000);

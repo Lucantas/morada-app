@@ -21,6 +21,11 @@ export interface LedgerReceipt {
   paidAt: string | null;
 }
 
+export interface LedgerIncome {
+  valueCents: number;
+  date: string | null;
+}
+
 const PAID = 'pago';
 const RECENT_PAID_LIMIT = 4;
 
@@ -50,14 +55,17 @@ function sameMonth(iso: string | null, today: string): boolean {
 export function buildDashboardSummary(
   accounts: LedgerAccount[],
   receipts: LedgerReceipt[],
+  incomes: LedgerIncome[],
   today: string,
 ): DashboardSummary {
   const paidAccounts = accounts.filter((a) => a.status === PAID);
   const paidReceipts = receipts.filter((r) => r.status === PAID);
 
-  const allTimeIncome = sum(paidReceipts);
+  const allTimeIncome = sum(paidReceipts) + sum(incomes);
   const allTimePaid = sum(paidAccounts);
-  const monthIncome = sum(paidReceipts.filter((r) => sameMonth(r.paidAt, today)));
+  const monthIncome =
+    sum(paidReceipts.filter((r) => sameMonth(r.paidAt, today))) +
+    sum(incomes.filter((i) => sameMonth(i.date, today)));
   const monthPaid = sum(paidAccounts.filter((a) => sameMonth(a.date, today)));
 
   const recentPaid = [...paidAccounts]
