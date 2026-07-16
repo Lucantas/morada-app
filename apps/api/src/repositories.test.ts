@@ -1,4 +1,4 @@
-import { config } from './config';
+import { config } from './platform/config';
 import { createRepositories } from './repositories';
 
 test('createRepositories connects to Postgres, migrates and closes', async () => {

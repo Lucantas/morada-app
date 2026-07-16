@@ -10,7 +10,7 @@ import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, signSession, type ApiEnv, type Role } from './platform/auth';
 import { config } from './platform/config';
-import { createRepositories, type Repositories } from './platform/repositories';
+import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { confirmPayment } from './receipts/app/confirm-payment';

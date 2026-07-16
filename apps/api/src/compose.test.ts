@@ -2,7 +2,7 @@ import { buildApp } from './compose';
 import { config } from './platform/config';
 import { migrate } from './platform/postgres/migrate';
 import { createPool } from './platform/postgres/pool';
-import { makePostgresRepositories } from './platform/repositories';
+import { makePostgresRepositories } from './repositories';
 import { adminCredentials } from './seed-data';
 import { resetPg } from './test-support/pg';
 import { residentCredentials, seedFixtures } from './test-fixtures';
@@ -386,6 +386,49 @@ describe('Morada API — authorization wiring', () => {
     expect(res.status).toBe(201);
     const created = (await res.json()) as { id: string; description: string };
     expect(created.description).toBe('Aluguel salão de festas');
+  });
+
+  test('updating and deleting an income is admin-only', async () => {
+    const resident = await withCreds(residentCredentials);
+    const put = await resident.auth('/api/incomes/whatever', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(put.status).toBe(403);
+    expect((await resident.auth('/api/incomes/whatever', { method: 'DELETE' })).status).toBe(403);
+  });
+
+  test('updating a non-existent income returns 404 instead of creating it', async () => {
+    const admin = await withCreds(adminCredentials);
+    const res = await admin.auth('/api/incomes/ghost-id', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Fantasma',
+        source: 'Nada',
+        date: '2026-05-10',
+        valueCents: 100,
+      }),
+    });
+    expect(res.status).toBe(404);
+    expect((await admin.auth('/api/incomes')).status).toBe(200);
+    expect(await (await admin.auth('/api/incomes')).json()).toEqual([]);
+  });
+
+  test('rejects an income with an impossible date as 400', async () => {
+    const admin = await withCreds(adminCredentials);
+    const res = await admin.auth('/api/incomes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Data ruim',
+        source: 'Teste',
+        date: '2026-13-45',
+        valueCents: 100,
+      }),
+    });
+    expect(res.status).toBe(400);
   });
 
   test('settings are admin-only', async () => {

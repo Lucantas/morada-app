@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
 import { proofSchema } from '../../receipts/domain/proof';
-
-export const isoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use AAAA-MM-DD)');
+import { isoDateSchema } from '../../shared/domain/iso-date';
 
 export const incomeSchema = z.object({
   id: z.string().min(1).max(64),

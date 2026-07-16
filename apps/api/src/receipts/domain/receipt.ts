@@ -1,15 +1,14 @@
 import { z } from 'zod';
 
+import { isoDateSchema } from '../../shared/domain/iso-date';
+
+export { isoDateSchema };
+
 export const receiptStatusSchema = z.enum(['pendente', 'em_analise', 'pago']);
 export type ReceiptStatus = z.infer<typeof receiptStatusSchema>;
 
 export const receiptMethodSchema = z.enum(['dinheiro', 'pix']);
 export type ReceiptMethod = z.infer<typeof receiptMethodSchema>;
-
-// ISO calendar date (YYYY-MM-DD), stored in a DATE column and sortable/reportable.
-export const isoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use AAAA-MM-DD)');
 
 export const receiptSchema = z.object({
   id: z.string().min(1),

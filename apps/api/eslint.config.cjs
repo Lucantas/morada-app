@@ -20,6 +20,7 @@ module.exports = tseslint.config(
     files: ['src/**/*.ts'],
     plugins: { boundaries },
     settings: {
+      'import/resolver': { typescript: { project: './tsconfig.json' } },
       'boundaries/include': ['src/**/*'],
       'boundaries/elements': [
         { type: 'domain', pattern: 'src/*/domain/**', capture: ['context'] },
