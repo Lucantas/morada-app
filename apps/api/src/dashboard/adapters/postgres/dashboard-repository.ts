@@ -36,7 +36,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
 
   async getSummary(): Promise<DashboardSummary> {
     const accountsResult = await this.pool.query<AccountRow>(
-      'SELECT id, description, category, date::text AS date, value_cents, status FROM accounts',
+      'SELECT id, description, category, date::text AS date, value_cents, status FROM accounts WHERE visible = true',
     );
     const accounts: LedgerAccount[] = accountsResult.rows.map((row) => ({
       id: row.id,
@@ -48,7 +48,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
     }));
 
     const receiptsResult = await this.pool.query<ReceiptRow>(
-      'SELECT value_cents, status, paid_at::text AS paid_at FROM receipts',
+      'SELECT value_cents, status, paid_at::text AS paid_at FROM receipts WHERE visible = true',
     );
     const receipts: LedgerReceipt[] = receiptsResult.rows.map((row) => ({
       valueCents: row.value_cents,

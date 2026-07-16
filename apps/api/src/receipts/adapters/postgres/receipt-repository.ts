@@ -45,13 +45,15 @@ export class PostgresReceiptRepository implements ReceiptRepository {
   constructor(private readonly pool: Pool) {}
 
   async list(): Promise<Receipt[]> {
-    const { rows } = await this.pool.query<ReceiptRow>(`SELECT ${SELECT_COLUMNS} FROM receipts`);
+    const { rows } = await this.pool.query<ReceiptRow>(
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE visible = true`,
+    );
     return rows.map(toReceipt);
   }
 
   async listByResident(residentId: string): Promise<Receipt[]> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE resident_id = $1`,
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE resident_id = $1 AND visible = true`,
       [residentId],
     );
     return rows.map(toReceipt);
@@ -59,7 +61,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
 
   async listByApartment(apartmentId: string): Promise<Receipt[]> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE apartment_id = $1`,
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE apartment_id = $1 AND visible = true`,
       [apartmentId],
     );
     return rows.map(toReceipt);
@@ -67,7 +69,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
 
   async getById(id: string): Promise<Receipt | null> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE id = $1`,
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE id = $1 AND visible = true`,
       [id],
     );
     return rows[0] ? toReceipt(rows[0]) : null;

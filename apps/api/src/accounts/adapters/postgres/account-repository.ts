@@ -31,13 +31,15 @@ export class PostgresAccountRepository implements AccountRepository {
   constructor(private readonly pool: Pool) {}
 
   async list(): Promise<Account[]> {
-    const { rows } = await this.pool.query<AccountRow>(`SELECT ${SELECT_COLUMNS} FROM accounts`);
+    const { rows } = await this.pool.query<AccountRow>(
+      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE visible = true`,
+    );
     return rows.map(toAccount);
   }
 
   async getById(id: string): Promise<Account | null> {
     const { rows } = await this.pool.query<AccountRow>(
-      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE id = $1`,
+      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE id = $1 AND visible = true`,
       [id],
     );
     return rows[0] ? toAccount(rows[0]) : null;

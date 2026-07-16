@@ -160,4 +160,11 @@ CREATE TABLE incomes (
 );
 `,
   },
+  {
+    id: '009_visible',
+    sql: `
+ALTER TABLE receipts ADD COLUMN visible boolean NOT NULL DEFAULT true;
+ALTER TABLE accounts ADD COLUMN visible boolean NOT NULL DEFAULT true;
+`,
+  },
 ];
