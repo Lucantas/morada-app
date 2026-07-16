@@ -63,4 +63,18 @@ describe('ResidentsScreen', () => {
     expect(screen.getByText(/Bruno Lima/)).toBeInTheDocument();
     expect(screen.queryByText(/Ana Souza/)).not.toBeInTheDocument();
   });
+
+  test('shows an empty state with a CTA when there are no apartments', async () => {
+    const repository = new InMemoryResidentRepository([]);
+    const onOpenResident = jest.fn();
+    renderWithClient(
+      <ResidentsScreen repository={repository} onOpenResident={onOpenResident} bottomNav={null} />,
+    );
+
+    expect(await screen.findByText('Nenhum apartamento cadastrado')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /cadastrar o primeiro apartamento/i }),
+    );
+    expect(onOpenResident).toHaveBeenCalledWith();
+  });
 });

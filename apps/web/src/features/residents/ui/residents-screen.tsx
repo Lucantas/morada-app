@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from 'react';
 
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton, SectionLabel, StatCard, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
+import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import { filterResidents } from '../domain/filter-residents';
@@ -54,9 +56,13 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
         </div>
       </TopBar>
       <ScreenBody>
-        {residents.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando apartamentos…</p>}
+        {residents.isLoading && <StatusView variant="loading" message="Carregando apartamentos…" />}
         {residents.isError && (
-          <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar os apartamentos.</p>
+          <StatusView
+            variant="error"
+            message="Não foi possível carregar os apartamentos."
+            onRetry={() => void residents.refetch()}
+          />
         )}
         {residents.isSuccess && (
           <ResidentsContent
@@ -95,9 +101,20 @@ function ResidentsContent({
       </div>
       <SectionLabel>Lista de apartamentos</SectionLabel>
       {filtered.length === 0 ? (
-        <p style={{ color: 'var(--ink-500)', padding: '4px 2px' }}>
-          Nenhum apartamento encontrado.
-        </p>
+        residents.length === 0 ? (
+          <EmptyState
+            icon="building"
+            title="Nenhum apartamento cadastrado"
+            description="Cadastre o primeiro apartamento e seu morador."
+            action={
+              <PrimaryButton icon="userPlus" onClick={() => onOpenResident()}>
+                Cadastrar o primeiro apartamento
+              </PrimaryButton>
+            }
+          />
+        ) : (
+          <EmptyState title="Nenhum apartamento encontrado" />
+        )
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((resident) => (
