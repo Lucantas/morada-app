@@ -26,6 +26,7 @@ import { useCurrentResident } from '@/features/residents/ui/use-current-resident
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
+import { StatusView } from '@/shared/ui/status-view';
 
 import {
   accountRepository,
@@ -250,7 +251,13 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
     return <StatusScreen message="Carregando…" bottomNav={nav} />;
   }
   if (currentResident.isError || !currentResident.data) {
-    return <StatusScreen message="Não foi possível carregar seus dados." bottomNav={nav} />;
+    return (
+      <StatusScreen
+        variant="error"
+        message="Não foi possível carregar seus dados."
+        bottomNav={nav}
+      />
+    );
   }
   const resident = currentResident.data;
 
@@ -304,13 +311,19 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
   }
 }
 
-function StatusScreen({ message, bottomNav }: { message: string; bottomNav: ReactNode }) {
+function StatusScreen({
+  message,
+  bottomNav,
+  variant = 'loading',
+}: {
+  message: string;
+  bottomNav: ReactNode;
+  variant?: 'loading' | 'error';
+}) {
   return (
     <Screen>
       <ScreenBody>
-        <div style={{ display: 'grid', placeItems: 'center', minHeight: '60%' }}>
-          <p style={{ color: 'var(--ink-500)' }}>{message}</p>
-        </div>
+        <StatusView variant={variant} message={message} />
       </ScreenBody>
       {bottomNav}
     </Screen>
