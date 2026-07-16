@@ -369,4 +369,48 @@ describe('ResidentEditScreen', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(deactivateSpy).not.toHaveBeenCalled();
   });
+
+  test('the Adicionar button opens the inline new-receipt card (no navigation)', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({
+        id: 'r-1',
+        name: 'Maria Ribeiro',
+        apt: 'Apto 302',
+        apartmentId: 'apt-1',
+        active: true,
+      }),
+    ]);
+    const issueCharge = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={new InMemoryReceiptRepository([])}
+        residentId="r-1"
+        dueDay={15}
+        issueCharge={issueCharge}
+        onBack={jest.fn()}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /adicionar/i }));
+
+    expect(screen.getByLabelText('Competência')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Competência'), '04/2026');
+    await user.type(screen.getByLabelText('Valor'), '15000');
+    await user.click(screen.getByRole('button', { name: /adicionar e continuar/i }));
+
+    await waitFor(() =>
+      expect(issueCharge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          residentId: 'r-1',
+          ref: '04/2026',
+          title: 'Taxa condominial',
+          valueCents: 15000,
+          dueDate: '2026-04-15',
+        }),
+      ),
+    );
+  });
 });

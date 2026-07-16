@@ -53,6 +53,7 @@ export async function issueCharge(input: {
   dueDate: string;
   paidAt?: string;
   method?: 'dinheiro' | 'pix';
+  proofDataUrl?: string;
 }): Promise<void> {
   await apiClient.post('/api/receipts', input);
 }

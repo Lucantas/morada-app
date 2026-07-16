@@ -19,11 +19,11 @@ import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-prof
 import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
-import { IssueChargeScreen } from '@/features/residents/ui/issue-charge-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
+import { useSettings } from '@/features/settings/ui/use-settings';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { StatusView } from '@/shared/ui/status-view';
@@ -133,6 +133,8 @@ type RouteProps = {
 function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
   const threads = useThreads(threadRepository);
   const unread = unreadCount(threads.data ?? []);
+  const settings = useSettings(settingsRepository);
+  const dueDay = settings.data?.dueDay ?? 15;
   const nav = <BottomNav items={adminNav(view, go, signOut)} />;
   switch (view) {
     case 'a-residents':
@@ -151,7 +153,8 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
           residentId={residentId}
           onBack={() => go('a-residents')}
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
-          onIssueCharge={residentId ? () => go('a-resident-charge', { residentId }) : undefined}
+          dueDay={dueDay}
+          issueCharge={issueCharge}
           registerPayment={registerPayment}
           onEditReceipt={editReceipt}
           onConfirmPayment={(receiptId) => confirmPayment({ receiptId })}
@@ -164,20 +167,6 @@ function AdminRouter({ view, residentId, go, signOut }: RouteProps) {
         <CreateLoginScreen
           residentId={residentId}
           provision={provisionResidentLogin}
-          onBack={() => go('a-resident-edit', { residentId })}
-        />
-      ) : (
-        <ResidentsScreen
-          repository={residentRepository}
-          onOpenResident={(id) => go('a-resident-edit', { residentId: id })}
-          bottomNav={nav}
-        />
-      );
-    case 'a-resident-charge':
-      return residentId !== undefined ? (
-        <IssueChargeScreen
-          residentId={residentId}
-          issue={issueCharge}
           onBack={() => go('a-resident-edit', { residentId })}
         />
       ) : (

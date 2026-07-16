@@ -19,6 +19,7 @@ import { getResident } from '../domain/get-resident';
 import type { ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
+import { NewReceiptCard } from './new-receipt-card';
 import { residentStatusView } from './resident-status-view';
 import {
   residentsQueryKey,
@@ -58,7 +59,17 @@ type Props = {
   residentId?: string;
   onBack: () => void;
   onCreateLogin?: () => void;
-  onIssueCharge?: () => void;
+  dueDay?: number;
+  issueCharge?: (input: {
+    residentId: string;
+    ref: string;
+    title: string;
+    valueCents: number;
+    dueDate: string;
+    paidAt?: string;
+    method?: ReceiptMethod;
+    proofDataUrl?: string;
+  }) => Promise<void>;
   registerPayment?: RegisterPayment;
   onEditReceipt?: EditReceipt;
   onConfirmPayment?: ConfirmPayment;
@@ -72,7 +83,8 @@ export function ResidentEditScreen({
   residentId,
   onBack,
   onCreateLogin,
-  onIssueCharge,
+  dueDay = 15,
+  issueCharge,
   registerPayment,
   onEditReceipt,
   onConfirmPayment,
@@ -147,6 +159,25 @@ export function ResidentEditScreen({
 
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const submitNewReceipt = issueCharge
+    ? async (input: {
+        ref: string;
+        valueCents: number;
+        dueDate: string;
+        paidAt?: string;
+        method?: ReceiptMethod;
+        proofDataUrl?: string;
+      }) => {
+        await issueCharge({
+          residentId: residentId as string,
+          title: 'Taxa condominial',
+          ...input,
+        });
+        queryClient.invalidateQueries({ queryKey: ['receipts'] });
+        queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+      }
+    : undefined;
 
   const submit = () =>
     save.mutate({ ...form, apt: apartmentLabel(form.apt), id: residentId }, { onSuccess: onBack });
@@ -351,7 +382,8 @@ export function ResidentEditScreen({
 
             <ReceiptsSection
               receipts={receipts.data ?? []}
-              onIssueCharge={onIssueCharge}
+              dueDay={dueDay}
+              issue={submitNewReceipt}
               onRegisterPayment={
                 registerPayment ? (input) => registration.mutate(input) : undefined
               }
@@ -497,7 +529,8 @@ type RejectPaymentHandler = (receiptId: string) => void;
 
 function ReceiptsSection({
   receipts,
-  onIssueCharge,
+  dueDay,
+  issue,
   onRegisterPayment,
   isRegistering,
   onEditReceipt,
@@ -508,7 +541,15 @@ function ReceiptsSection({
   isRejecting,
 }: {
   receipts: Receipt[];
-  onIssueCharge?: () => void;
+  dueDay: number;
+  issue?: (input: {
+    ref: string;
+    valueCents: number;
+    dueDate: string;
+    paidAt?: string;
+    method?: ReceiptMethod;
+    proofDataUrl?: string;
+  }) => Promise<void>;
   onRegisterPayment?: RegisterPaymentHandler;
   isRegistering?: boolean;
   onEditReceipt?: EditReceiptHandler;
@@ -518,12 +559,17 @@ function ReceiptsSection({
   onRejectPayment?: RejectPaymentHandler;
   isRejecting?: boolean;
 }) {
+  const [showNewReceipt, setShowNewReceipt] = useState(false);
   return (
     <>
       <SectionLabel
         right={
-          onIssueCharge ? (
-            <button type="button" onClick={onIssueCharge} style={archiveButtonStyle}>
+          issue ? (
+            <button
+              type="button"
+              onClick={() => setShowNewReceipt(true)}
+              style={archiveButtonStyle}
+            >
               <Icon name="plus" size={15} />
               Adicionar
             </button>
@@ -532,6 +578,9 @@ function ReceiptsSection({
       >
         Recibos de pagamento
       </SectionLabel>
+      {showNewReceipt && issue && (
+        <NewReceiptCard dueDay={dueDay} issue={issue} onClose={() => setShowNewReceipt(false)} />
+      )}
       {receipts.length === 0 ? (
         <p style={{ color: 'var(--ink-500)', padding: '4px 2px', fontSize: '.9rem' }}>
           Nenhum recibo emitido para este apartamento.
