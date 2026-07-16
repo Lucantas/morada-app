@@ -94,11 +94,13 @@ function ResidentsContent({
         <StatCard value={stats.emDia} label="Em dia" valueColor="var(--pago-700)" />
         <StatCard value={stats.pendencias} label="Pendências" valueColor="var(--atraso-700)" />
       </div>
-      <div style={{ marginTop: 12 }}>
-        <PrimaryButton icon="userPlus" onClick={() => onOpenResident()}>
-          Cadastrar apartamento
-        </PrimaryButton>
-      </div>
+      {residents.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <PrimaryButton icon="userPlus" onClick={() => onOpenResident()}>
+            Cadastrar apartamento
+          </PrimaryButton>
+        </div>
+      )}
       <SectionLabel>Lista de apartamentos</SectionLabel>
       {filtered.length === 0 ? (
         residents.length === 0 ? (

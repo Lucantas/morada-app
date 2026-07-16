@@ -72,6 +72,13 @@ describe('ResidentsScreen', () => {
     );
 
     expect(await screen.findByText('Nenhum apartamento cadastrado')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /cadastrar o primeiro apartamento/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^cadastrar apartamento$/i }),
+    ).not.toBeInTheDocument();
+
     await userEvent.click(
       screen.getByRole('button', { name: /cadastrar o primeiro apartamento/i }),
     );

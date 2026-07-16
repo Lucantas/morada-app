@@ -155,7 +155,7 @@ export function ConfirmDialog({
               border: 'none',
               borderRadius: 'var(--r-md)',
               background: danger ? 'var(--atraso-700)' : 'var(--brass-500)',
-              color: danger ? '#fff' : 'var(--petrol-900)',
+              color: danger ? 'var(--on-danger)' : 'var(--petrol-900)',
               fontFamily: "'Inter', sans-serif",
               fontWeight: 600,
               fontSize: '.95rem',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -111,11 +111,19 @@ export function CreateLoginScreen({ residentId, residentName, provision, onBack 
 
 function CredentialRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const copy = async () => {
     await copyText(value);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 2000);
   };
 
   return (
