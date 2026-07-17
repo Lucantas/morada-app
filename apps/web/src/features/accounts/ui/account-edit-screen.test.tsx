@@ -18,6 +18,7 @@ function makeSpyRepo(): { repo: AccountRepository; saved: unknown[] } {
       saved.push(account);
       return account;
     },
+    archive: async () => undefined,
   };
   return { repo, saved };
 }

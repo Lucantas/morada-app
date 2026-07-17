@@ -10,4 +10,5 @@ export interface ReceiptRepository {
     id: string,
     input: { method: ReceiptMethod; proofDataUrl: string },
   ): Promise<Receipt>;
+  archive(id: string): Promise<void>;
 }

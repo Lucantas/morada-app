@@ -43,4 +43,10 @@ export class InMemoryReceiptRepository implements ReceiptRepository {
     this.receipts = new Map(this.receipts).set(id, updated);
     return updated;
   }
+
+  async archive(id: string): Promise<void> {
+    const next = new Map(this.receipts);
+    next.delete(id);
+    this.receipts = next;
+  }
 }

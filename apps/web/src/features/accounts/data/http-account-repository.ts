@@ -28,4 +28,8 @@ export class HttpAccountRepository implements AccountRepository {
     // PUT upserts by the (client-generated) id, so create and update share a path.
     return accountSchema.parse(await this.api.put(`/api/accounts/${account.id}`, account));
   }
+
+  async archive(id: string): Promise<void> {
+    await this.api.del(`/api/accounts/${id}`);
+  }
 }

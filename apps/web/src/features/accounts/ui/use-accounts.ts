@@ -18,3 +18,14 @@ export function useSaveAccount(repository: AccountRepository) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: accountsQueryKey }),
   });
 }
+
+export function useArchiveAccount(repository: AccountRepository) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repository.archive(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: accountsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}

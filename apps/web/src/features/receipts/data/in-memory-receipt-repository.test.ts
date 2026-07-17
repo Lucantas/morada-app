@@ -43,4 +43,13 @@ describe('InMemoryReceiptRepository', () => {
   test('rejects malformed seed data at the boundary', () => {
     expect(() => new InMemoryReceiptRepository([{ id: 'a', ref: 'X' }])).toThrow();
   });
+
+  test('archive removes the receipt from every read', async () => {
+    const repo = new InMemoryReceiptRepository([buildReceipt({ id: 'a' })]);
+
+    await repo.archive('a');
+
+    expect(await repo.getById('a')).toBeNull();
+    expect(await repo.list()).toEqual([]);
+  });
 });

@@ -22,4 +22,10 @@ export class InMemoryAccountRepository implements AccountRepository {
     this.accounts = new Map(this.accounts).set(account.id, account);
     return account;
   }
+
+  async archive(id: string): Promise<void> {
+    const next = new Map(this.accounts);
+    next.delete(id);
+    this.accounts = next;
+  }
 }

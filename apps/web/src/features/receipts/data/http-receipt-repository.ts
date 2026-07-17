@@ -47,4 +47,8 @@ export class HttpReceiptRepository implements ReceiptRepository {
     });
     return receiptSchema.parse(response);
   }
+
+  async archive(id: string): Promise<void> {
+    await this.api.del(`/api/receipts/${id}`);
+  }
 }

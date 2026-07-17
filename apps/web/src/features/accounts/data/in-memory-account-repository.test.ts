@@ -33,4 +33,13 @@ describe('InMemoryAccountRepository', () => {
   test('rejects malformed seed data at the boundary', () => {
     expect(() => new InMemoryAccountRepository([{ id: 'a', description: 'X' }])).toThrow();
   });
+
+  test('archive removes the account from every read', async () => {
+    const repo = new InMemoryAccountRepository([buildAccount({ id: 'a' })]);
+
+    await repo.archive('a');
+
+    expect(await repo.getById('a')).toBeNull();
+    expect(await repo.list()).toEqual([]);
+  });
 });

@@ -56,4 +56,12 @@ describe('HttpReceiptRepository', () => {
     expect(api.post).toHaveBeenCalledWith('/api/receipts/rc-9/pay', { method: 'pix' });
     expect(result).toEqual(receipt);
   });
+
+  test('archive DELETEs the receipt by id', async () => {
+    const api = fakeApi({ del: jest.fn().mockResolvedValue(undefined) });
+
+    await new HttpReceiptRepository(api).archive('rc-9');
+
+    expect(api.del).toHaveBeenCalledWith('/api/receipts/rc-9');
+  });
 });

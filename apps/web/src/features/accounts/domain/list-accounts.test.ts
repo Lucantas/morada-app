@@ -9,6 +9,7 @@ function fakeRepo(accounts: Account[]): AccountRepository {
     list: async () => accounts,
     getById: async (id) => accounts.find((a) => a.id === id) ?? null,
     save: async (a) => a,
+    archive: async () => undefined,
   };
 }
 

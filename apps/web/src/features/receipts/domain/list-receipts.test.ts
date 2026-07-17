@@ -15,6 +15,7 @@ function fakeRepo(receipts: Receipt[]): ReceiptRepository {
       if (!receipt) throw new Error(`Receipt ${id} not found`);
       return { ...receipt, status: 'em_analise', ...input };
     },
+    archive: async () => undefined,
   };
 }
 

@@ -46,4 +46,12 @@ describe('HttpAccountRepository', () => {
     expect(api.put).toHaveBeenCalledWith('/api/accounts/a-9', account);
     expect(result).toEqual(account);
   });
+
+  test('archive DELETEs the account by id', async () => {
+    const api = fakeApi({ del: jest.fn().mockResolvedValue(undefined) });
+
+    await new HttpAccountRepository(api).archive('a-9');
+
+    expect(api.del).toHaveBeenCalledWith('/api/accounts/a-9');
+  });
 });
