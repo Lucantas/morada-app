@@ -1,8 +1,10 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { apartmentReceiptTotals } from '@/features/receipts/domain/apartment-receipt-totals';
 import type { Receipt, ReceiptMethod } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
+import { sortByDueDateDesc } from '@/features/receipts/domain/sort-by-due-date';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
@@ -579,6 +581,8 @@ function ReceiptsSection({
   isArchiving?: boolean;
 }) {
   const [showNewReceipt, setShowNewReceipt] = useState(false);
+  const totals = apartmentReceiptTotals(receipts);
+  const ordered = sortByDueDateDesc(receipts);
   return (
     <>
       <SectionLabel
@@ -597,6 +601,12 @@ function ReceiptsSection({
       >
         Recibos de pagamento
       </SectionLabel>
+      {receipts.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, margin: '4px 0 14px' }}>
+          <SummaryTile label="Recebido" value={formatBRL(totals.paidCents)} />
+          <SummaryTile label="Em aberto" value={formatBRL(totals.openCents)} />
+        </div>
+      )}
       {showNewReceipt && issue && (
         <NewReceiptCard dueDay={dueDay} issue={issue} onClose={() => setShowNewReceipt(false)} />
       )}
@@ -606,7 +616,7 @@ function ReceiptsSection({
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {receipts.map((r) => (
+          {ordered.map((r) => (
             <ReceiptLedgerRow
               key={r.id}
               receipt={r}
@@ -933,6 +943,27 @@ function ReceiptLedgerRow({
         onCancel={() => setConfirmingArchive(false)}
       />
     </SurfaceCard>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        background: 'var(--petrol-50)',
+        borderRadius: 12,
+        padding: '10px 14px',
+      }}
+    >
+      <div style={{ fontSize: '.72rem', color: 'var(--ink-500)', fontWeight: 500 }}>{label}</div>
+      <div
+        className="fraunces"
+        style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--petrol-800)' }}
+      >
+        R$ {value}
+      </div>
+    </div>
   );
 }
 

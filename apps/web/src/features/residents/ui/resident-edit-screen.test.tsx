@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { InMemoryReceiptRepository } from '@/features/receipts/data/in-memory-receipt-repository';
+import { formatBRL } from '@/shared/lib/money';
 import { renderWithClient } from '@/test/render';
 import { buildResident } from '@/test/factories';
 import { buildReceipt } from '@/test/factories.receipts';
@@ -113,6 +114,69 @@ describe('ResidentEditScreen', () => {
 
     expect(await screen.findByText('Recibos de pagamento')).toBeInTheDocument();
     expect(await screen.findByText('Taxa condominial')).toBeInTheDocument();
+  });
+
+  test('shows the apartment summary tiles and orders receipts by most-recent-due first', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        ref: '03/2026',
+        apartmentId: 'apt-1',
+        status: 'pago',
+        valueCents: 12000,
+        dueDate: '2026-03-15',
+      }),
+      buildReceipt({
+        id: 'rc-4',
+        ref: '04/2026',
+        apartmentId: 'apt-1',
+        status: 'pago',
+        valueCents: 15000,
+        dueDate: '2026-04-15',
+      }),
+      buildReceipt({
+        id: 'rc-2',
+        ref: '06/2026',
+        apartmentId: 'apt-1',
+        status: 'pendente',
+        valueCents: 20000,
+        dueDate: '2026-06-15',
+      }),
+      buildReceipt({
+        id: 'rc-3',
+        ref: '05/2026',
+        apartmentId: 'apt-1',
+        status: 'em_analise',
+        valueCents: 10000,
+        dueDate: '2026-05-15',
+      }),
+    ]);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await screen.findByText('Recibos de pagamento');
+
+    expect(await screen.findByText('Recebido')).toBeInTheDocument();
+    expect(screen.getByText(`R$ ${formatBRL(27000)}`)).toBeInTheDocument();
+    expect(screen.getByText('Em aberto')).toBeInTheDocument();
+    expect(screen.getByText(`R$ ${formatBRL(30000)}`)).toBeInTheDocument();
+
+    const refs = screen.getAllByText(/REF ·/).map((el) => el.textContent);
+    expect(refs).toEqual([
+      expect.stringContaining('06/2026'),
+      expect.stringContaining('05/2026'),
+      expect.stringContaining('04/2026'),
+      expect.stringContaining('03/2026'),
+    ]);
   });
 
   test('lets the admin register a payment (baixa) informing the method and date', async () => {
