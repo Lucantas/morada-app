@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
@@ -10,9 +11,12 @@ import { TopBar } from '@/shared/ui/top-bar';
 import type { Account } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
 import { accountTotals } from '../domain/account-totals';
+import { filterAccounts, type AccountFilters } from '../domain/filter-accounts';
 
 import { accountStatusView } from './account-status-view';
 import { useAccounts } from './use-accounts';
+
+const emptyFilters: AccountFilters = { query: '', category: '', from: '', to: '' };
 
 type Props = {
   repository: AccountRepository;
@@ -24,6 +28,7 @@ type Props = {
 export function AccountsScreen({ repository, onOpenAccount, incomeSection, bottomNav }: Props) {
   const accounts = useAccounts(repository);
   const totals = accountTotals(accounts.data ?? []);
+  const [filters, setFilters] = useState<AccountFilters>(emptyFilters);
 
   return (
     <Screen>
@@ -39,7 +44,12 @@ export function AccountsScreen({ repository, onOpenAccount, incomeSection, botto
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as contas.</p>
         )}
         {accounts.isSuccess && (
-          <AccountsContent accounts={accounts.data} onOpenAccount={onOpenAccount} />
+          <AccountsContent
+            accounts={accounts.data}
+            onOpenAccount={onOpenAccount}
+            filters={filters}
+            onFiltersChange={setFilters}
+          />
         )}
         {incomeSection}
       </ScreenBody>
@@ -69,10 +79,17 @@ function HeaderTile({ label, value }: { label: string; value: string }) {
 function AccountsContent({
   accounts,
   onOpenAccount,
+  filters,
+  onFiltersChange,
 }: {
   accounts: Account[];
   onOpenAccount: (id?: string) => void;
+  filters: AccountFilters;
+  onFiltersChange: (filters: AccountFilters) => void;
 }) {
+  const categories = Array.from(new Set(accounts.map((account) => account.category))).sort();
+  const filtered = filterAccounts(accounts, filters);
+
   return (
     <>
       <div style={{ marginTop: 4 }}>
@@ -80,17 +97,95 @@ function AccountsContent({
           Registrar nova conta
         </PrimaryButton>
       </div>
+      <FilterBar filters={filters} categories={categories} onFiltersChange={onFiltersChange} />
       <SectionLabel>Lançamentos · abril</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {accounts.map((account) => (
-          <AccountRow
-            key={account.id}
-            account={account}
-            onClick={() => onOpenAccount(account.id)}
-          />
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <p style={{ color: 'var(--ink-500)' }}>Nenhum lançamento encontrado.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map((account) => (
+            <AccountRow
+              key={account.id}
+              account={account}
+              onClick={() => onOpenAccount(account.id)}
+            />
+          ))}
+        </div>
+      )}
     </>
+  );
+}
+
+function FilterBar({
+  filters,
+  categories,
+  onFiltersChange,
+}: {
+  filters: AccountFilters;
+  categories: string[];
+  onFiltersChange: (filters: AccountFilters) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '10px 0' }}>
+      <input
+        type="text"
+        aria-label="Buscar por nome"
+        placeholder="Buscar por nome"
+        value={filters.query}
+        onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })}
+        style={{
+          padding: '10px 12px',
+          borderRadius: 10,
+          border: '1px solid var(--ink-200, #d9d9d9)',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <select
+          aria-label="Categoria"
+          value={filters.category}
+          onChange={(event) => onFiltersChange({ ...filters, category: event.target.value })}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            borderRadius: 10,
+            border: '1px solid var(--ink-200, #d9d9d9)',
+          }}
+        >
+          <option value="">Todas</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="date"
+          aria-label="De"
+          value={filters.from}
+          onChange={(event) => onFiltersChange({ ...filters, from: event.target.value })}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            borderRadius: 10,
+            border: '1px solid var(--ink-200, #d9d9d9)',
+          }}
+        />
+        <input
+          type="date"
+          aria-label="Até"
+          value={filters.to}
+          onChange={(event) => onFiltersChange({ ...filters, to: event.target.value })}
+          style={{
+            flex: 1,
+            padding: '10px 12px',
+            borderRadius: 10,
+            border: '1px solid var(--ink-200, #d9d9d9)',
+          }}
+        />
+      </div>
+    </div>
   );
 }
 

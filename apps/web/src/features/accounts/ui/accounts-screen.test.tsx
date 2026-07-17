@@ -8,11 +8,8 @@ import { InMemoryAccountRepository } from '../data/in-memory-account-repository'
 
 import { AccountsScreen } from './accounts-screen';
 
-function setup() {
-  const repository = new InMemoryAccountRepository([
-    buildAccount({ id: 'a-1', description: 'Água — abril', valueCents: 124000, status: 'pago' }),
-    buildAccount({ id: 'a-2', description: 'Jardinagem', valueCents: 45000, status: 'pendente' }),
-  ]);
+function setup(accounts = defaultAccounts) {
+  const repository = new InMemoryAccountRepository(accounts);
   const onOpenAccount = jest.fn();
   renderWithClient(
     <AccountsScreen
@@ -24,6 +21,38 @@ function setup() {
   );
   return { onOpenAccount };
 }
+
+const defaultAccounts = [
+  buildAccount({ id: 'a-1', description: 'Água — abril', valueCents: 124000, status: 'pago' }),
+  buildAccount({ id: 'a-2', description: 'Jardinagem', valueCents: 45000, status: 'pendente' }),
+];
+
+const filterableAccounts = [
+  buildAccount({
+    id: 'a-1',
+    description: 'Água — abril',
+    category: 'Utilidades',
+    date: '2026-04-05',
+    valueCents: 124000,
+    status: 'pago',
+  }),
+  buildAccount({
+    id: 'a-2',
+    description: 'Jardinagem',
+    category: 'Manutenção',
+    date: '2026-05-10',
+    valueCents: 45000,
+    status: 'pendente',
+  }),
+  buildAccount({
+    id: 'a-3',
+    description: 'Energia — abril',
+    category: 'Utilidades',
+    date: '2026-04-20',
+    valueCents: 30000,
+    status: 'pago',
+  }),
+];
 
 describe('AccountsScreen', () => {
   test('renders the account rows once loaded', async () => {
@@ -65,5 +94,39 @@ describe('AccountsScreen', () => {
     await screen.findByText('Água — abril');
 
     expect(screen.getByText('outras-entradas-slot')).toBeInTheDocument();
+  });
+
+  test('typing a name filters to only matching rows', async () => {
+    setup(filterableAccounts);
+    await screen.findByText('Água — abril');
+
+    await userEvent.type(screen.getByLabelText('Buscar por nome'), 'jardin');
+
+    expect(screen.queryByText('Água — abril')).not.toBeInTheDocument();
+    expect(screen.queryByText('Energia — abril')).not.toBeInTheDocument();
+    expect(screen.getByText('Jardinagem')).toBeInTheDocument();
+  });
+
+  test('picking a category filters to only that category', async () => {
+    setup(filterableAccounts);
+    await screen.findByText('Água — abril');
+
+    await userEvent.selectOptions(screen.getByLabelText(/categoria/i), 'Manutenção');
+
+    expect(screen.queryByText('Água — abril')).not.toBeInTheDocument();
+    expect(screen.queryByText('Energia — abril')).not.toBeInTheDocument();
+    expect(screen.getByText('Jardinagem')).toBeInTheDocument();
+  });
+
+  test('setting a date range filters to only in-range rows', async () => {
+    setup(filterableAccounts);
+    await screen.findByText('Água — abril');
+
+    await userEvent.type(screen.getByLabelText('De'), '2026-04-01');
+    await userEvent.type(screen.getByLabelText('Até'), '2026-04-10');
+
+    expect(screen.getByText('Água — abril')).toBeInTheDocument();
+    expect(screen.queryByText('Energia — abril')).not.toBeInTheDocument();
+    expect(screen.queryByText('Jardinagem')).not.toBeInTheDocument();
   });
 });
