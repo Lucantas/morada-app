@@ -18,10 +18,11 @@ function input(): HTMLInputElement {
 }
 
 describe('MoneyInput', () => {
-  it('renders the label, a fixed R$ prefix and starts at 0,00', () => {
+  it('renders the label, a fixed R$ prefix and starts empty with a 0,00 placeholder', () => {
     render(<Harness />);
     expect(screen.getByText('R$')).toBeInTheDocument();
-    expect(input().value).toBe('0,00');
+    expect(input().value).toBe('');
+    expect(input()).toHaveAttribute('placeholder', '0,00');
     expect(screen.getByTestId('cents').textContent).toBe('0');
   });
 
@@ -43,11 +44,11 @@ describe('MoneyInput', () => {
     expect(input().value).toBe('1.234,56');
   });
 
-  it('goes back to zero when the field is cleared', () => {
+  it('goes back to zero (empty field) when cleared', () => {
     render(<Harness />);
     fireEvent.change(input(), { target: { value: '999' } });
     fireEvent.change(input(), { target: { value: '' } });
     expect(screen.getByTestId('cents').textContent).toBe('0');
-    expect(input().value).toBe('0,00');
+    expect(input().value).toBe('');
   });
 });
