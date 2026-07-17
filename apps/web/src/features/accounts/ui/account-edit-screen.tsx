@@ -5,13 +5,14 @@ import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 import { MoneyInput } from '@/shared/ui/money-input';
+import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 
 import type { AccountStatus } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
 import { getAccount } from '../domain/get-account';
 
 import { accountStatusView } from './account-status-view';
-import { accountsQueryKey, useSaveAccount } from './use-accounts';
+import { accountsQueryKey, useArchiveAccount, useSaveAccount } from './use-accounts';
 
 const STATUSES: AccountStatus[] = ['pago', 'pendente', 'atrasado'];
 const EMPTY = {
@@ -35,7 +36,9 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
     enabled: accountId !== undefined,
   });
   const save = useSaveAccount(repository);
+  const archive = useArchiveAccount(repository);
   const [form, setForm] = useState(EMPTY);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (existing.data) {
@@ -158,8 +161,43 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
           <PrimaryButton icon="check" onClick={submit}>
             {accountId ? 'Salvar alterações' : 'Registrar conta'}
           </PrimaryButton>
+
+          {accountId && (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginTop: 12,
+                minHeight: 46,
+                border: 'none',
+                borderRadius: 'var(--r-md)',
+                background: 'transparent',
+                color: 'var(--atraso-700)',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: '.92rem',
+                cursor: 'pointer',
+              }}
+            >
+              Excluir lançamento
+            </button>
+          )}
         </div>
       </ScreenBody>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Excluir este lançamento?"
+        confirmLabel="Excluir"
+        tone="danger"
+        isPending={archive.isPending}
+        onConfirm={() => {
+          if (!accountId) return;
+          archive.mutate(accountId, { onSuccess: onBack });
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Screen>
   );
 }

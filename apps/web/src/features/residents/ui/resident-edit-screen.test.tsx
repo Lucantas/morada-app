@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { InMemoryReceiptRepository } from '@/features/receipts/data/in-memory-receipt-repository';
@@ -422,5 +422,71 @@ describe('ResidentEditScreen', () => {
         }),
       ),
     );
+  });
+
+  test('archives a receipt from the ledger after confirmation, for any status', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        status: 'pago',
+      }),
+    ]);
+    const archiveSpy = jest.spyOn(receiptRepository, 'archive');
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+    await user.click(screen.getByRole('button', { name: /excluir/i }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(archiveSpy).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }));
+
+    await waitFor(() => expect(archiveSpy).toHaveBeenCalledWith('rc-1'));
+  });
+
+  test('cancelling the receipt delete confirmation does not archive it', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        status: 'pendente',
+      }),
+    ]);
+    const archiveSpy = jest.spyOn(receiptRepository, 'archive');
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+    await user.click(screen.getByRole('button', { name: /excluir/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(archiveSpy).not.toHaveBeenCalled();
   });
 });

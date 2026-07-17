@@ -128,6 +128,14 @@ export function ResidentEditScreen({
       queryClient.invalidateQueries({ queryKey: residentsQueryKey });
     },
   });
+  const archivingReceipt = useMutation({
+    mutationFn: (receiptId: string) => receiptRepository.archive(receiptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+      queryClient.invalidateQueries({ queryKey: residentsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
   const overridingStatus = useMutation({
     mutationFn: (input: { residentId: string; status: ResidentStatus | null }) =>
       (onOverrideStatus ?? (async () => {}))(input),
@@ -402,6 +410,8 @@ export function ResidentEditScreen({
                 onRejectPayment ? (receiptId) => rejecting.mutate(receiptId) : undefined
               }
               isRejecting={rejecting.isPending}
+              onArchiveReceipt={(receiptId) => archivingReceipt.mutate(receiptId)}
+              isArchiving={archivingReceipt.isPending}
             />
           </>
         )}
@@ -530,6 +540,7 @@ type EditReceiptHandler = (input: {
 
 type ConfirmPaymentHandler = (receiptId: string, paidAt: string) => void;
 type RejectPaymentHandler = (receiptId: string) => void;
+type ArchiveReceiptHandler = (receiptId: string) => void;
 
 function ReceiptsSection({
   receipts,
@@ -543,6 +554,8 @@ function ReceiptsSection({
   isConfirming,
   onRejectPayment,
   isRejecting,
+  onArchiveReceipt,
+  isArchiving,
 }: {
   receipts: Receipt[];
   dueDay: number;
@@ -562,6 +575,8 @@ function ReceiptsSection({
   isConfirming?: boolean;
   onRejectPayment?: RejectPaymentHandler;
   isRejecting?: boolean;
+  onArchiveReceipt?: ArchiveReceiptHandler;
+  isArchiving?: boolean;
 }) {
   const [showNewReceipt, setShowNewReceipt] = useState(false);
   return (
@@ -603,6 +618,8 @@ function ReceiptsSection({
               isConfirming={isConfirming}
               onRejectPayment={onRejectPayment}
               isRejecting={isRejecting}
+              onArchiveReceipt={onArchiveReceipt}
+              isArchiving={isArchiving}
             />
           ))}
         </div>
@@ -621,6 +638,8 @@ function ReceiptLedgerRow({
   isConfirming,
   onRejectPayment,
   isRejecting,
+  onArchiveReceipt,
+  isArchiving,
 }: {
   receipt: Receipt;
   onRegisterPayment?: RegisterPaymentHandler;
@@ -631,6 +650,8 @@ function ReceiptLedgerRow({
   isConfirming?: boolean;
   onRejectPayment?: RejectPaymentHandler;
   isRejecting?: boolean;
+  onArchiveReceipt?: ArchiveReceiptHandler;
+  isArchiving?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState('');
@@ -639,6 +660,7 @@ function ReceiptLedgerRow({
   const [editOpen, setEditOpen] = useState(false);
   const [editRef, setEditRef] = useState(receipt.ref);
   const [editValueCents, setEditValueCents] = useState(receipt.valueCents);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [editDueDate, setEditDueDate] = useState(receipt.dueDate ?? '');
   const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
   const canEdit = onEditReceipt !== undefined;
@@ -675,7 +697,7 @@ function ReceiptLedgerRow({
         />
       </div>
 
-      {(canRegister || canEdit) && !open && !editOpen && (
+      {(canRegister || canEdit || onArchiveReceipt) && !open && !editOpen && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           {canRegister && (
             <button type="button" onClick={() => setOpen(true)} style={archiveButtonStyle}>
@@ -687,6 +709,16 @@ function ReceiptLedgerRow({
             <button type="button" onClick={openEdit} style={archiveButtonStyle}>
               <Icon name="edit" size={15} />
               Editar
+            </button>
+          )}
+          {onArchiveReceipt && (
+            <button
+              type="button"
+              onClick={() => setConfirmingArchive(true)}
+              style={{ ...archiveButtonStyle, color: 'var(--atraso-700)' }}
+            >
+              <Icon name="x" size={15} />
+              Excluir
             </button>
           )}
         </div>
@@ -887,6 +919,19 @@ function ReceiptLedgerRow({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingArchive}
+        title="Excluir este recibo?"
+        confirmLabel="Excluir"
+        tone="danger"
+        isPending={isArchiving}
+        onConfirm={() => {
+          setConfirmingArchive(false);
+          onArchiveReceipt?.(receipt.id);
+        }}
+        onCancel={() => setConfirmingArchive(false)}
+      />
     </SurfaceCard>
   );
 }

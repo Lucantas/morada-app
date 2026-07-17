@@ -72,4 +72,50 @@ describe('AccountEditScreen', () => {
     await waitFor(() => expect(saved).toHaveLength(1));
     expect(saved[0]).toMatchObject({ valueCents: 124000, date: '2026-04-25', status: 'pendente' });
   });
+
+  test('does not show the Excluir button when creating a new account', async () => {
+    const repository = new InMemoryAccountRepository([]);
+    renderWithClient(<AccountEditScreen repository={repository} onBack={jest.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /excluir/i })).not.toBeInTheDocument();
+  });
+
+  test('archives the account after confirmation and navigates back', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryAccountRepository([
+      buildAccount({ id: 'a-7', description: 'Energia', category: 'Utilidades' }),
+    ]);
+    const archiveSpy = jest.spyOn(repository, 'archive');
+    const onBack = jest.fn();
+    renderWithClient(<AccountEditScreen repository={repository} accountId="a-7" onBack={onBack} />);
+
+    await screen.findByDisplayValue('Energia');
+    await user.click(screen.getByRole('button', { name: /excluir/i }));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(archiveSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Excluir' }));
+
+    await waitFor(() => expect(archiveSpy).toHaveBeenCalledWith('a-7'));
+    await waitFor(() => expect(onBack).toHaveBeenCalled());
+  });
+
+  test('cancelling the delete confirmation does not archive the account', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryAccountRepository([
+      buildAccount({ id: 'a-7', description: 'Energia', category: 'Utilidades' }),
+    ]);
+    const archiveSpy = jest.spyOn(repository, 'archive');
+    renderWithClient(
+      <AccountEditScreen repository={repository} accountId="a-7" onBack={jest.fn()} />,
+    );
+
+    await screen.findByDisplayValue('Energia');
+    await user.click(screen.getByRole('button', { name: /excluir/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(archiveSpy).not.toHaveBeenCalled();
+  });
 });
