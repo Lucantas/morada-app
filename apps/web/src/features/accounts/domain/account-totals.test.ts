@@ -104,23 +104,38 @@ describe('accountMonths', () => {
 });
 
 describe('resolveSelectedMonth', () => {
-  test('returns the override when it is present in months', () => {
-    const result = resolveSelectedMonth('2026-04', ['2026-03', '2026-04', '2026-05'], '2026-07');
+  test('returns the fallback month when override is null', () => {
+    const result = resolveSelectedMonth(null, '2026-07', '2026-01', '2026-07');
+    expect(result).toBe('2026-07');
+  });
+
+  test('clamps the fallback month when it is out of range', () => {
+    const result = resolveSelectedMonth(null, '2026-09', '2026-01', '2026-07');
+    expect(result).toBe('2026-07');
+  });
+
+  test('returns the override when it is within bounds', () => {
+    const result = resolveSelectedMonth('2026-04', '2026-07', '2026-01', '2026-07');
     expect(result).toBe('2026-04');
   });
 
-  test('falls back to the latest month when the override is not in months', () => {
-    const result = resolveSelectedMonth('2026-02', ['2026-03', '2026-04', '2026-05'], '2026-07');
-    expect(result).toBe('2026-05');
+  test('clamps the override to the lower bound', () => {
+    const result = resolveSelectedMonth('2025-11', '2026-07', '2026-01', '2026-07');
+    expect(result).toBe('2026-01');
   });
 
-  test('returns the latest month when the override is null', () => {
-    const result = resolveSelectedMonth(null, ['2026-03', '2026-04', '2026-05'], '2026-07');
-    expect(result).toBe('2026-05');
+  test('clamps the override to the upper bound', () => {
+    const result = resolveSelectedMonth('2026-12', '2026-07', '2026-01', '2026-07');
+    expect(result).toBe('2026-07');
   });
 
-  test('returns the fallback month when months is empty', () => {
-    const result = resolveSelectedMonth('2026-02', [], '2026-07');
+  test('returns the override when it equals the lower bound', () => {
+    const result = resolveSelectedMonth('2026-01', '2026-07', '2026-01', '2026-07');
+    expect(result).toBe('2026-01');
+  });
+
+  test('returns the override when it equals the upper bound', () => {
+    const result = resolveSelectedMonth('2026-07', '2026-07', '2026-01', '2026-07');
     expect(result).toBe('2026-07');
   });
 });

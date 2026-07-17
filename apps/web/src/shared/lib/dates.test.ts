@@ -1,4 +1,4 @@
-import { formatIsoDate, formatMonthName } from './dates';
+import { addMonths, formatIsoDate, formatMonthName } from './dates';
 
 describe('formatIsoDate', () => {
   test('formats an ISO date as DD/MM/YYYY', () => {
@@ -41,5 +41,20 @@ describe('formatMonthName', () => {
     ['invalid', ''],
   ])('should format "%s" as "%s"', (input: string, expected: string) => {
     expect(formatMonthName(input)).toBe(expected);
+  });
+});
+
+describe('addMonths', () => {
+  it.each([
+    ['2026-07', -1, '2026-06'],
+    ['2026-07', 1, '2026-08'],
+    ['2026-01', -1, '2025-12'],
+    ['2025-12', 1, '2026-01'],
+    ['2026-05', 3, '2026-08'],
+    ['2026-05', 0, '2026-05'],
+    ['2026-01', -12, '2025-01'],
+    ['2026-01', 12, '2027-01'],
+  ])('addMonths("%s", %i) === "%s"', (monthKey: string, delta: number, expected: string) => {
+    expect(addMonths(monthKey, delta)).toBe(expected);
   });
 });

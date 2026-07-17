@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { addMonths, formatMonthName } from '@/shared/lib/dates';
 import { renderWithClient } from '@/test/render';
 import { buildAccount } from '@/test/factories.accounts';
 
@@ -32,12 +33,16 @@ const defaultAccounts = [
   buildAccount({ id: 'a-2', description: 'Jardinagem', valueCents: 45000, status: 'pendente' }),
 ];
 
+const now = new Date().toISOString().slice(0, 7);
+const previousMonth = addMonths(now, -1);
+const twoMonthsAgo = addMonths(now, -2);
+
 const multiMonthAccounts = [
   buildAccount({
     id: 'a-1',
     description: 'Água — abril',
     category: 'Utilidades',
-    date: '2026-04-05',
+    date: `${previousMonth}-05`,
     valueCents: 124000,
     status: 'pago',
   }),
@@ -45,7 +50,7 @@ const multiMonthAccounts = [
     id: 'a-2',
     description: 'Jardinagem',
     category: 'Manutenção',
-    date: '2026-05-10',
+    date: `${now}-10`,
     valueCents: 45000,
     status: 'pendente',
   }),
@@ -53,7 +58,7 @@ const multiMonthAccounts = [
     id: 'a-3',
     description: 'Energia — abril',
     category: 'Utilidades',
-    date: '2026-04-20',
+    date: `${previousMonth}-20`,
     valueCents: 30000,
     status: 'pago',
   }),
@@ -69,8 +74,8 @@ describe('AccountsScreen', () => {
     expect(screen.getByText('Jardinagem')).toBeInTheDocument();
   });
 
-  test('shows the Entradas and Saídas header totals for the latest month', async () => {
-    setup(multiMonthAccounts, { '2026-04': 200000, '2026-05': 90000 });
+  test('shows the Entradas and Saídas header totals for the current month by default', async () => {
+    setup(multiMonthAccounts, { [previousMonth]: 200000, [now]: 90000 });
 
     await screen.findByText('Água — abril');
 
@@ -80,44 +85,88 @@ describe('AccountsScreen', () => {
     expect(screen.getByText('450,00')).toBeInTheDocument();
   });
 
-  test('default selected month is the latest available and the subtitle names it', async () => {
-    setup(multiMonthAccounts, { '2026-04': 200000, '2026-05': 90000 });
+  test('default selected month is the current calendar month and the subtitle shows its name and year', async () => {
+    setup(multiMonthAccounts, { [previousMonth]: 200000, [now]: 90000 });
 
     await screen.findByText('Água — abril');
 
-    expect(screen.getByText('maio')).toBeInTheDocument();
+    expect(screen.getByText(formatMonthName(now))).toBeInTheDocument();
+    expect(screen.getByText(`- ${now.slice(0, 4)}`, { exact: false })).toBeInTheDocument();
   });
 
   test('clicking the previous-month arrow recomputes the cards, and next returns', async () => {
-    setup(multiMonthAccounts, { '2026-04': 200000, '2026-05': 90000 });
+    setup(multiMonthAccounts, { [previousMonth]: 200000, [now]: 90000 });
     await screen.findByText('Água — abril');
 
     await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }));
 
-    expect(screen.getByText('abril')).toBeInTheDocument();
+    expect(screen.getByText(formatMonthName(previousMonth))).toBeInTheDocument();
     expect(screen.getByText('2.000,00')).toBeInTheDocument();
     expect(screen.getByText('1.540,00')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
 
-    expect(screen.getByText('maio')).toBeInTheDocument();
+    expect(screen.getByText(formatMonthName(now))).toBeInTheDocument();
     expect(screen.getByText('900,00')).toBeInTheDocument();
     expect(screen.getByText('450,00')).toBeInTheDocument();
   });
 
-  test('the arrow at the earliest month is disabled and does not change the cards', async () => {
-    setup(multiMonthAccounts, { '2026-04': 200000, '2026-05': 90000 });
+  test('the next arrow is disabled at the current month by default and is a no-op', async () => {
+    setup(multiMonthAccounts, { [previousMonth]: 200000, [now]: 90000 });
+    await screen.findByText('Água — abril');
+
+    const nextButton = screen.getByRole('button', { name: 'Próximo mês' });
+    expect(nextButton).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(nextButton);
+
+    expect(screen.getByText(formatMonthName(now))).toBeInTheDocument();
+    expect(screen.getByText('900,00')).toBeInTheDocument();
+    expect(screen.getByText('450,00')).toBeInTheDocument();
+  });
+
+  test('the previous arrow is disabled at the earliest data month and is a no-op', async () => {
+    setup(multiMonthAccounts, { [previousMonth]: 200000, [now]: 90000 });
     await screen.findByText('Água — abril');
 
     await userEvent.click(screen.getByRole('button', { name: 'Mês anterior' }));
-    expect(screen.getByText('abril')).toBeInTheDocument();
+    expect(screen.getByText(formatMonthName(previousMonth))).toBeInTheDocument();
 
     const previousButton = screen.getByRole('button', { name: 'Mês anterior' });
     expect(previousButton).toHaveAttribute('aria-disabled', 'true');
 
     await userEvent.click(previousButton);
-    expect(screen.getByText('abril')).toBeInTheDocument();
+    expect(screen.getByText(formatMonthName(previousMonth))).toBeInTheDocument();
     expect(screen.getByText('2.000,00')).toBeInTheDocument();
+  });
+
+  test('browsing back beyond the earliest data month reaches the lower bound and stays put', async () => {
+    const accountsWithOlderData = [
+      ...multiMonthAccounts,
+      buildAccount({
+        id: 'a-4',
+        description: 'Conta antiga',
+        category: 'Utilidades',
+        date: `${twoMonthsAgo}-15`,
+        valueCents: 10000,
+        status: 'pago',
+      }),
+    ];
+    setup(accountsWithOlderData, { [previousMonth]: 200000, [now]: 90000 });
+    await screen.findByText('Água — abril');
+
+    const previousButton = screen.getByRole('button', { name: 'Mês anterior' });
+    await userEvent.click(previousButton);
+    expect(screen.getByText(formatMonthName(previousMonth))).toBeInTheDocument();
+    expect(previousButton).toHaveAttribute('aria-disabled', 'false');
+
+    await userEvent.click(previousButton);
+    expect(screen.getByText(formatMonthName(twoMonthsAgo))).toBeInTheDocument();
+    expect(screen.getByText('100,00')).toBeInTheDocument();
+    expect(previousButton).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(previousButton);
+    expect(screen.getByText(formatMonthName(twoMonthsAgo))).toBeInTheDocument();
   });
 
   test('the filter is collapsed by default', async () => {
@@ -195,8 +244,11 @@ describe('AccountsScreen', () => {
     await screen.findByText('Água — abril');
     await expandFilters();
 
-    fireEvent.change(screen.getByLabelText('De'), { target: { value: '01/04/2026' } });
-    fireEvent.change(screen.getByLabelText('Até'), { target: { value: '10/04/2026' } });
+    const [previousYear, previousMonthNumber] = previousMonth.split('-');
+    const from = `01/${previousMonthNumber}/${previousYear}`;
+    const to = `10/${previousMonthNumber}/${previousYear}`;
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: from } });
+    fireEvent.change(screen.getByLabelText('Até'), { target: { value: to } });
 
     expect(screen.getByText('Água — abril')).toBeInTheDocument();
     expect(screen.queryByText('Energia — abril')).not.toBeInTheDocument();

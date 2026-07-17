@@ -1,3 +1,16 @@
+// Adds `delta` calendar months to a YYYY-MM key, crossing year boundaries.
+export function addMonths(monthKey: string, delta: number): string {
+  const parts = monthKey.split('-');
+  const year = parseInt(parts[0] ?? '', 10);
+  const month = parseInt(parts[1] ?? '', 10);
+
+  const total = year * 12 + (month - 1) + delta;
+  const newYear = Math.floor(total / 12);
+  const newMonth = (total % 12) + 1;
+
+  return `${newYear}-${String(newMonth).padStart(2, '0')}`;
+}
+
 // ISO calendar date (YYYY-MM-DD) -> Brazilian display (DD/MM/YYYY).
 export function formatIsoDate(iso: string): string {
   const [year, month, day] = iso.split('-');

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
-import { formatIsoDate, formatMonthName } from '@/shared/lib/dates';
+import { addMonths, formatIsoDate, formatMonthName } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -43,26 +43,28 @@ export function AccountsScreen({
   const [filters, setFilters] = useState<AccountFilters>(emptyFilters);
 
   const data = accounts.data ?? [];
-  const months = uniqueSortedUnion(accountMonths(data), Object.keys(monthlyIncomeCents));
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const selectedMonth = resolveSelectedMonth(monthOverride, months, currentMonth);
-  const monthIndex = months.indexOf(selectedMonth);
+  const dataMonths = uniqueSortedUnion(accountMonths(data), Object.keys(monthlyIncomeCents));
+  const allMonths = uniqueSortedUnion(dataMonths, [currentMonth]);
+  const lower = allMonths.at(0) ?? currentMonth;
+  const upper = allMonths.at(-1) ?? currentMonth;
+  const selectedMonth = resolveSelectedMonth(monthOverride, currentMonth, lower, upper);
 
   const entradas = monthlyIncomeCents[selectedMonth] ?? 0;
   const saidas = monthlyExpenseCents(data, selectedMonth);
 
-  const canGoPrevious = monthIndex > 0;
-  const canGoNext = monthIndex >= 0 && monthIndex < months.length - 1;
+  const canGoPrevious = selectedMonth > lower;
+  const canGoNext = selectedMonth < upper;
 
   const goToPreviousMonth = () => {
     if (!canGoPrevious) return;
-    setMonthOverride(months[monthIndex - 1] ?? null);
+    setMonthOverride(addMonths(selectedMonth, -1));
   };
 
   const goToNextMonth = () => {
     if (!canGoNext) return;
-    setMonthOverride(months[monthIndex + 1] ?? null);
+    setMonthOverride(addMonths(selectedMonth, 1));
   };
 
   return (
@@ -80,7 +82,8 @@ export function AccountsScreen({
             resumo do mês de{' '}
             <span style={{ textTransform: 'capitalize', color: '#CFE3E4', fontWeight: 500 }}>
               {formatMonthName(selectedMonth)}
-            </span>
+            </span>{' '}
+            - {selectedMonth.slice(0, 4)}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <MonthStepButton

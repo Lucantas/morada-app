@@ -21,11 +21,12 @@ export function accountMonths(accounts: Account[]): string[] {
 
 export function resolveSelectedMonth(
   monthOverride: string | null,
-  months: string[],
   fallbackMonth: string,
+  lower: string,
+  upper: string,
 ): string {
-  if (monthOverride !== null && months.includes(monthOverride)) {
-    return monthOverride;
-  }
-  return months.at(-1) ?? fallbackMonth;
+  const base = monthOverride ?? fallbackMonth;
+  if (base < lower) return lower;
+  if (base > upper) return upper;
+  return base;
 }
