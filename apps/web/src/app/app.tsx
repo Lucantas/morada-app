@@ -41,6 +41,7 @@ import {
   dashboardRepository,
   editReceipt,
   ensureMonthlyReceipts,
+  getResidentLogin,
   incomeRepository,
   issueCharge,
   login,
@@ -50,6 +51,7 @@ import {
   receiptRepository,
   registerPayment,
   rejectPayment,
+  resetResidentLogin,
   residentRepository,
   settingsRepository,
   threadRepository,
@@ -193,6 +195,8 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
         <CreateLoginScreen
           residentId={residentId}
           provision={provisionResidentLogin}
+          fetchLogin={getResidentLogin}
+          reset={resetResidentLogin}
           onBack={() => go('a-resident-edit', { residentId })}
         />
       ) : (
