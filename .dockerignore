@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+.git
+.github
+backups
+**/*.local
+**/.env
+.fly

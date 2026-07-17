@@ -16,6 +16,7 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/main.ts',
+    '!src/migrate-main.ts',
     '!src/**/*.d.ts',
     '!src/**/*.contract.ts',
     '!src/test-support/**',
