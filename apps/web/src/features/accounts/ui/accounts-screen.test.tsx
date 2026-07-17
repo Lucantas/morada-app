@@ -62,8 +62,18 @@ describe('AccountsScreen', () => {
     expect(screen.getByText('Jardinagem')).toBeInTheDocument();
   });
 
-  test('shows the paid and due header totals', async () => {
-    setup();
+  test('shows the paid (this month) and due header totals', async () => {
+    const thisMonth = `${new Date().toISOString().slice(0, 7)}-05`;
+    setup([
+      buildAccount({
+        id: 'a-1',
+        description: 'Água — abril',
+        date: thisMonth,
+        valueCents: 124000,
+        status: 'pago',
+      }),
+      buildAccount({ id: 'a-2', description: 'Jardinagem', valueCents: 45000, status: 'pendente' }),
+    ]);
 
     await screen.findByText('Água — abril');
     expect(screen.getByText('Pago no mês')).toBeInTheDocument();

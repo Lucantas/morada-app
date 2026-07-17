@@ -27,7 +27,7 @@ type Props = {
 
 export function AccountsScreen({ repository, onOpenAccount, incomeSection, bottomNav }: Props) {
   const accounts = useAccounts(repository);
-  const totals = accountTotals(accounts.data ?? []);
+  const totals = accountTotals(accounts.data ?? [], new Date().toISOString().slice(0, 10));
   const [filters, setFilters] = useState<AccountFilters>(emptyFilters);
 
   return (
