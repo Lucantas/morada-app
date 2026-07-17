@@ -25,15 +25,3 @@ export function useSubmitPayment(repository: ReceiptRepository) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: receiptsQueryKey }),
   });
 }
-
-export function useArchiveReceipt(repository: ReceiptRepository) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => repository.archive(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: receiptsQueryKey });
-      void queryClient.invalidateQueries({ queryKey: ['residents'] });
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    },
-  });
-}
