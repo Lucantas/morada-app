@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
+import { DateInput } from '@/shared/ui/date-input';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
@@ -137,7 +138,7 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
             value={form.valueCents}
             onChange={(cents) => setForm((prev) => ({ ...prev, valueCents: cents }))}
           />
-          <Field label="Data" value={form.date} onChange={set('date')} type="date" />
+          <DateInput label="Data" value={form.date} onChange={set('date')} />
 
           <label
             htmlFor="income-proof"

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
+import { DateInput } from '@/shared/ui/date-input';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusPill } from '@/shared/ui/status-pill';
 import { TopBar } from '@/shared/ui/top-bar';
@@ -160,30 +161,20 @@ function FilterBar({
         </select>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          type="date"
-          aria-label="De"
-          value={filters.from}
-          onChange={(event) => onFiltersChange({ ...filters, from: event.target.value })}
-          style={{
-            flex: 1,
-            padding: '10px 12px',
-            borderRadius: 10,
-            border: '1px solid var(--ink-200, #d9d9d9)',
-          }}
-        />
-        <input
-          type="date"
-          aria-label="Até"
-          value={filters.to}
-          onChange={(event) => onFiltersChange({ ...filters, to: event.target.value })}
-          style={{
-            flex: 1,
-            padding: '10px 12px',
-            borderRadius: 10,
-            border: '1px solid var(--ink-200, #d9d9d9)',
-          }}
-        />
+        <div style={{ flex: 1 }}>
+          <DateInput
+            label="De"
+            value={filters.from}
+            onChange={(v) => onFiltersChange({ ...filters, from: v })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <DateInput
+            label="Até"
+            value={filters.to}
+            onChange={(v) => onFiltersChange({ ...filters, to: v })}
+          />
+        </div>
       </div>
     </div>
   );

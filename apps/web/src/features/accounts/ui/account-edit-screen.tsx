@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
+import { DateInput } from '@/shared/ui/date-input';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
@@ -113,7 +114,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
             onChange={set('category')}
             placeholder="Ex.: Utilidades"
           />
-          <Field label="Data" value={form.date} onChange={set('date')} type="date" />
+          <DateInput label="Data" value={form.date} onChange={set('date')} />
           <MoneyInput
             label="Valor"
             value={form.valueCents}

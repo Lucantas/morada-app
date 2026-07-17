@@ -31,7 +31,7 @@ describe('AccountEditScreen', () => {
 
     await userEvent.type(screen.getByLabelText('Descrição'), 'Reparo portão');
     await userEvent.type(screen.getByLabelText('Categoria'), 'Manutenção');
-    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-04-15' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '15/04/2026' } });
     fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
     await userEvent.click(screen.getByRole('button', { name: /registrar conta/i }));
 
@@ -65,7 +65,7 @@ describe('AccountEditScreen', () => {
 
     fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Água — abril' } });
     fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
-    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-04-25' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '25/04/2026' } });
     fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
 

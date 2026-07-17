@@ -9,6 +9,7 @@ import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
+import { DateInput } from '@/shared/ui/date-input';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -749,35 +750,13 @@ function ReceiptLedgerRow({
           )}
           {canReview && (
             <>
-              <label
-                style={{
-                  flexBasis: '100%',
-                  fontSize: '.82rem',
-                  fontWeight: 600,
-                  color: 'var(--ink-900)',
-                }}
-              >
-                Data do pagamento
-                <input
-                  type="date"
+              <div style={{ flexBasis: '100%' }}>
+                <DateInput
+                  label="Data do pagamento"
                   value={confirmPaidAt}
-                  onChange={(e) => setConfirmPaidAt(e.target.value)}
-                  aria-label="Data do pagamento"
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    minHeight: 44,
-                    marginTop: 6,
-                    border: '1.5px solid var(--line)',
-                    borderRadius: 'var(--r-sm)',
-                    padding: '0 12px',
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '.95rem',
-                    color: 'var(--ink-900)',
-                    background: 'var(--surface)',
-                  }}
+                  onChange={setConfirmPaidAt}
                 />
-              </label>
+              </div>
               <button
                 type="button"
                 disabled={isConfirming || isRejecting || !confirmPaidAt}
@@ -809,7 +788,7 @@ function ReceiptLedgerRow({
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <Field label="Referência" value={editRef} onChange={setEditRef} />
           <MoneyInput label="Valor" value={editValueCents} onChange={setEditValueCents} />
-          <Field label="Vencimento" value={editDueDate} onChange={setEditDueDate} type="date" />
+          <DateInput label="Vencimento" value={editDueDate} onChange={setEditDueDate} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
@@ -851,28 +830,7 @@ function ReceiptLedgerRow({
 
       {canRegister && open && (
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <label style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--ink-900)' }}>
-            Data do pagamento
-            <input
-              type="date"
-              value={paidAt}
-              onChange={(e) => setPaidAt(e.target.value)}
-              aria-label="Data do pagamento"
-              style={{
-                display: 'block',
-                width: '100%',
-                minHeight: 44,
-                marginTop: 6,
-                border: '1.5px solid var(--line)',
-                borderRadius: 'var(--r-sm)',
-                padding: '0 12px',
-                fontFamily: "'Inter', sans-serif",
-                fontSize: '.95rem',
-                color: 'var(--ink-900)',
-                background: 'var(--surface)',
-              }}
-            />
-          </label>
+          <DateInput label="Data do pagamento" value={paidAt} onChange={setPaidAt} />
           <div style={{ display: 'flex', gap: 6 }}>
             {METHODS.map((m) => {
               const active = method === m.value;

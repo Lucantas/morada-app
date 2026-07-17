@@ -26,6 +26,8 @@ const PATHS = {
   building2: 'M12 20v-6M6 20v-4M18 20v-9M4 8l8-5 8 5',
   bank: 'M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01',
   x: 'M18 6L6 18M6 6l12 12',
+  calendar:
+    'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

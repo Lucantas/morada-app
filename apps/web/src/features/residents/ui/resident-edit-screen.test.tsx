@@ -210,7 +210,7 @@ describe('ResidentEditScreen', () => {
     expect(screen.getByRole('button', { name: /confirmar baixa/i })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Data do pagamento'), {
-      target: { value: '2026-05-08' },
+      target: { value: '08/05/2026' },
     });
     await userEvent.click(screen.getByRole('button', { name: /confirmar baixa/i }));
 
@@ -255,7 +255,7 @@ describe('ResidentEditScreen', () => {
     const refField = screen.getByLabelText('Referência');
     fireEvent.change(refField, { target: { value: '06/2026' } });
     fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '50000' } });
-    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '2026-06-15' } });
+    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '15/06/2026' } });
     await userEvent.click(screen.getByRole('button', { name: /salvar edição/i }));
 
     await waitFor(() =>
@@ -307,7 +307,7 @@ describe('ResidentEditScreen', () => {
     expect(confirmButton).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Data do pagamento'), {
-      target: { value: '2026-06-20' },
+      target: { value: '20/06/2026' },
     });
     await userEvent.click(confirmButton);
 

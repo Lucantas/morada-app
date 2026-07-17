@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithClient } from '@/test/render';
@@ -132,8 +132,8 @@ describe('AccountsScreen', () => {
     setup(filterableAccounts);
     await screen.findByText('Água — abril');
 
-    await userEvent.type(screen.getByLabelText('De'), '2026-04-01');
-    await userEvent.type(screen.getByLabelText('Até'), '2026-04-10');
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '01/04/2026' } });
+    fireEvent.change(screen.getByLabelText('Até'), { target: { value: '10/04/2026' } });
 
     expect(screen.getByText('Água — abril')).toBeInTheDocument();
     expect(screen.queryByText('Energia — abril')).not.toBeInTheDocument();
