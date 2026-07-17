@@ -7,18 +7,53 @@ import { copyText } from '@/shared/lib/clipboard';
 
 type ProvisionResult = { username: string; tempPassword: string };
 
+type Phase = 'loading' | 'form' | 'existing' | 'done';
+
 type Props = {
   residentId: string;
   residentName?: string;
   provision: (input: { username: string; residentId: string }) => Promise<ProvisionResult>;
+  fetchLogin: (residentId: string) => Promise<{ username: string } | null>;
+  reset: (residentId: string) => Promise<ProvisionResult>;
   onBack: () => void;
 };
 
-export function CreateLoginScreen({ residentId, residentName, provision, onBack }: Props) {
+export function CreateLoginScreen({
+  residentId,
+  residentName,
+  provision,
+  fetchLogin,
+  reset,
+  onBack,
+}: Props) {
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [existingUsername, setExistingUsername] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<ProvisionResult | null>(null);
+  const [credentials, setCredentials] = useState<ProvisionResult | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchLogin(residentId)
+      .then((login) => {
+        if (!active) return;
+        if (login) {
+          setExistingUsername(login.username);
+          setPhase('existing');
+        } else {
+          setPhase('form');
+        }
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'Não foi possível consultar o acesso.');
+        setPhase('form');
+      });
+    return () => {
+      active = false;
+    };
+  }, [fetchLogin, residentId]);
 
   const submit = async () => {
     const u = username.trim();
@@ -26,9 +61,24 @@ export function CreateLoginScreen({ residentId, residentName, provision, onBack 
     setPending(true);
     setError(null);
     try {
-      setCreated(await provision({ username: u, residentId }));
+      setCredentials(await provision({ username: u, residentId }));
+      setPhase('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar o acesso.');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      setCredentials(await reset(residentId));
+      setPhase('done');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
     } finally {
       setPending(false);
     }
@@ -74,15 +124,40 @@ export function CreateLoginScreen({ residentId, residentName, provision, onBack 
         </div>
       </div>
       <ScreenBody>
-        {created ? (
+        {phase === 'loading' && (
+          <p style={{ color: 'var(--ink-500)', fontSize: '.92rem', paddingTop: 2 }}>Carregando…</p>
+        )}
+
+        {phase === 'done' && credentials && (
           <SurfaceCard>
             <p style={{ fontWeight: 600, color: 'var(--ink-900)', marginBottom: 12 }}>
-              Acesso criado. Anote e repasse ao morador — a senha não será mostrada novamente.
+              Anote e repasse ao morador — a senha não será mostrada novamente.
             </p>
-            <CredentialRow label="Usuário" value={created.username} />
-            <CredentialRow label="Senha temporária" value={created.tempPassword} />
+            <CredentialRow label="Usuário" value={credentials.username} />
+            <CredentialRow label="Senha temporária" value={credentials.tempPassword} />
           </SurfaceCard>
-        ) : (
+        )}
+
+        {phase === 'existing' && existingUsername && (
+          <div style={{ paddingTop: 2 }}>
+            <p style={{ color: 'var(--ink-500)', fontSize: '.92rem', marginBottom: 16 }}>
+              Este morador já tem acesso. Redefina a senha para gerar uma nova senha temporária.
+            </p>
+            <SurfaceCard>
+              <CredentialRow label="Usuário" value={existingUsername} />
+            </SurfaceCard>
+            {error && (
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '14px 0' }}>
+                {error}
+              </p>
+            )}
+            <PrimaryButton icon="check" onClick={() => void resetPassword()}>
+              {pending ? 'Redefinindo…' : 'Redefinir senha'}
+            </PrimaryButton>
+          </div>
+        )}
+
+        {phase === 'form' && (
           <div style={{ paddingTop: 2 }}>
             <p style={{ color: 'var(--ink-500)', fontSize: '.92rem', marginBottom: 16 }}>
               Escolha um nome de usuário. O sistema gera uma senha temporária que você entrega ao

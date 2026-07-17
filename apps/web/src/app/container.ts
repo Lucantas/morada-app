@@ -125,3 +125,23 @@ export async function provisionResidentLogin(input: {
   };
   return { username: data.username, tempPassword: data.tempPassword };
 }
+
+/** Admin-only: fetch a resident's existing login, or null when none exists. */
+export async function getResidentLogin(residentId: string): Promise<{ username: string } | null> {
+  const data = (await apiClient.get(`/api/residents/${residentId}/login`)) as {
+    username: string;
+  } | null;
+  return data ? { username: data.username } : null;
+}
+
+/** Admin-only: reset a resident's login password. The API returns a fresh
+ *  one-time temp password. */
+export async function resetResidentLogin(
+  residentId: string,
+): Promise<{ username: string; tempPassword: string }> {
+  const data = (await apiClient.post(`/api/residents/${residentId}/login/reset`, {})) as {
+    username: string;
+    tempPassword: string;
+  };
+  return { username: data.username, tempPassword: data.tempPassword };
+}
