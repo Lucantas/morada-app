@@ -27,6 +27,17 @@ export function runUserRepositoryContract(
       expect(await repo.findByUsername('ghost')).toBeNull();
     });
 
+    test('save then findByResidentId round-trips', async () => {
+      const repo = await makeRepo();
+      await repo.save(maria);
+      expect(await repo.findByResidentId('r-1')).toEqual(maria);
+    });
+
+    test('findByResidentId returns null when the resident has no login', async () => {
+      const repo = await makeRepo();
+      expect(await repo.findByResidentId('r-1')).toBeNull();
+    });
+
     test('existsByUsername reflects saved users', async () => {
       const repo = await makeRepo();
       expect(await repo.existsByUsername('maria302')).toBe(false);

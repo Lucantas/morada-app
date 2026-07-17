@@ -9,6 +9,8 @@ function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
     findByUsername: async (username) => map.get(username) ?? null,
+    findByResidentId: async (residentId) =>
+      [...map.values()].find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => map.has(username),
     existsByResidentId: async (residentId) =>
       [...map.values()].some((u) => u.residentId === residentId),
