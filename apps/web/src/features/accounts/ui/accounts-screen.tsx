@@ -12,7 +12,7 @@ import { TopBar } from '@/shared/ui/top-bar';
 
 import type { Account } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
-import { accountMonths, monthlyExpenseCents } from '../domain/account-totals';
+import { accountMonths, monthlyExpenseCents, resolveSelectedMonth } from '../domain/account-totals';
 import { activeFilterCount, filterAccounts, type AccountFilters } from '../domain/filter-accounts';
 
 import { accountStatusView } from './account-status-view';
@@ -46,7 +46,7 @@ export function AccountsScreen({
   const months = uniqueSortedUnion(accountMonths(data), Object.keys(monthlyIncomeCents));
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const selectedMonth = monthOverride ?? months.at(-1) ?? currentMonth;
+  const selectedMonth = resolveSelectedMonth(monthOverride, months, currentMonth);
   const monthIndex = months.indexOf(selectedMonth);
 
   const entradas = monthlyIncomeCents[selectedMonth] ?? 0;
@@ -268,6 +268,7 @@ function FilterPanel({
       <div
         role="button"
         tabIndex={0}
+        aria-expanded={filterOpen}
         onClick={() => setFilterOpen((open) => !open)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {

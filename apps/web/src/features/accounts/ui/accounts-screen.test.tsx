@@ -132,9 +132,13 @@ describe('AccountsScreen', () => {
     setup(filterableAccounts);
     await screen.findByText('Água — abril');
 
+    const toggle = screen.getByText('Filtrar lançamentos').closest('[role="button"]');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
     await expandFilters();
 
     expect(screen.getByLabelText('Buscar por nome')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 
   test('registering a new account calls back with no id', async () => {

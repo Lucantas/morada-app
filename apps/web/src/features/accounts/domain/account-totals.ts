@@ -18,3 +18,14 @@ export function accountMonths(accounts: Account[]): string[] {
   }
   return Array.from(months).sort();
 }
+
+export function resolveSelectedMonth(
+  monthOverride: string | null,
+  months: string[],
+  fallbackMonth: string,
+): string {
+  if (monthOverride !== null && months.includes(monthOverride)) {
+    return monthOverride;
+  }
+  return months.at(-1) ?? fallbackMonth;
+}
