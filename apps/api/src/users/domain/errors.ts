@@ -37,3 +37,11 @@ export class ResidentLoginExistsError extends Error {
     this.name = 'ResidentLoginExistsError';
   }
 }
+
+export class ResidentLoginNotFoundError extends Error {
+  readonly status = 404;
+  constructor(residentId: string) {
+    super(`Este morador não possui um acesso: ${residentId}`);
+    this.name = 'ResidentLoginNotFoundError';
+  }
+}

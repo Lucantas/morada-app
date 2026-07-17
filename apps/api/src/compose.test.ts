@@ -349,6 +349,57 @@ describe('Morada API — admin provisions resident logins', () => {
   });
 });
 
+describe('Morada API — admin reads and resets resident logins', () => {
+  test('an admin reads the username of a resident that has a login', async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const res = await auth(`/api/residents/${residentCredentials.residentId}/login`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ username: residentCredentials.username });
+  });
+
+  test('reading the login of a resident without one returns null', async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const res = await auth('/api/residents/r-3/login');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+  });
+
+  test('reading a resident login is admin-only', async () => {
+    const app = await makeApp();
+    const token = await tokenFor(app, residentCredentials);
+    const res = await app.request(`/api/residents/${residentCredentials.residentId}/login`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('an admin resets a resident password and the resident logs in with the new one', async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const reset = await auth(`/api/residents/${residentCredentials.residentId}/login/reset`, {
+      method: 'POST',
+    });
+    expect(reset.status).toBe(200);
+    const body = (await reset.json()) as { username: string; tempPassword: string };
+    expect(body.username).toBe(residentCredentials.username);
+    expect(body.tempPassword).toMatch(/.{8,}/);
+    expect(body.tempPassword).not.toBe(residentCredentials.password);
+
+    const loginRes = await login(app, residentCredentials.username, body.tempPassword);
+    expect(loginRes.status).toBe(200);
+    expect(((await loginRes.json()) as { role: string }).role).toBe('resident');
+  });
+
+  test('resetting the password of a resident without a login returns 404', async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const res = await auth('/api/residents/r-3/login/reset', { method: 'POST' });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('Morada API — authorization wiring', () => {
   async function withCreds(creds: { username: string; password: string }) {
     const app = await makeApp();

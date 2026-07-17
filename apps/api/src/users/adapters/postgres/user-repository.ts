@@ -33,6 +33,14 @@ export class PostgresUserRepository implements UserRepository {
     return rows[0] ? toUser(rows[0]) : null;
   }
 
+  async findByResidentId(residentId: string): Promise<User | null> {
+    const { rows } = await this.pool.query<UserRow>(
+      'SELECT id, username, password_hash, role, resident_id FROM users WHERE resident_id = $1',
+      [residentId],
+    );
+    return rows[0] ? toUser(rows[0]) : null;
+  }
+
   async existsByUsername(username: string): Promise<boolean> {
     const { rowCount } = await this.pool.query('SELECT 1 FROM users WHERE username = $1', [
       username,

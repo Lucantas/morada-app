@@ -24,6 +24,7 @@ import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { generateTempPassword } from './platform/temp-password';
 import { createResidentLogin } from './users/app/create-resident-login';
+import { resetResidentPassword } from './users/app/reset-resident-password';
 import { verifyCredentials } from './users/app/verify-credentials';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 import { usernameSchema } from './users/domain/user';
@@ -116,6 +117,19 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.get('/residents/me', async (c) =>
     c.json(await getResident(residents, receipts, c.get('sub'))),
   );
+
+  // Admin-only: read a resident's login username (never the hash), or reset
+  // their password to a fresh temp one. Registered before the '/residents'
+  // mount below or they would be shadowed by its admin group.
+  api.get('/residents/:id/login', requireRole('admin'), async (c) => {
+    const user = await users.findByResidentId(c.req.param('id'));
+    return c.json(user ? { username: user.username } : null);
+  });
+  api.post('/residents/:id/login/reset', requireRole('admin'), async (c) => {
+    const tempPassword = generateTempPassword();
+    const user = await resetResidentPassword(users, hasher, c.req.param('id'), tempPassword);
+    return c.json({ username: user.username, tempPassword });
+  });
 
   // Admin-only resources.
   api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
