@@ -1,6 +1,6 @@
 import { buildAccount } from '@/test/factories.accounts';
 
-import { filterAccounts } from './filter-accounts';
+import { activeFilterCount, filterAccounts } from './filter-accounts';
 
 const accounts = [
   buildAccount({
@@ -88,5 +88,60 @@ describe('filterAccounts', () => {
     const copy = [...accounts];
     filterAccounts(accounts, { ...emptyFilters, category: 'Utilidades' });
     expect(accounts).toEqual(copy);
+  });
+});
+
+describe('activeFilterCount', () => {
+  test('returns 0 when all filters are empty', () => {
+    expect(activeFilterCount({ query: '', category: '', from: '', to: '' })).toBe(0);
+  });
+
+  test('returns 1 when only query is active', () => {
+    expect(activeFilterCount({ query: 'agua', category: '', from: '', to: '' })).toBe(1);
+  });
+
+  test('returns 1 when only category is active', () => {
+    expect(activeFilterCount({ query: '', category: 'Utilidades', from: '', to: '' })).toBe(1);
+  });
+
+  test('returns 1 when only from is active', () => {
+    expect(activeFilterCount({ query: '', category: '', from: '2026-04-01', to: '' })).toBe(1);
+  });
+
+  test('returns 1 when only to is active', () => {
+    expect(activeFilterCount({ query: '', category: '', from: '', to: '2026-04-30' })).toBe(1);
+  });
+
+  test('returns 1 when both from and to are active (counts as one range group)', () => {
+    expect(
+      activeFilterCount({ query: '', category: '', from: '2026-04-01', to: '2026-04-30' }),
+    ).toBe(1);
+  });
+
+  test('returns 2 when query and category are active', () => {
+    expect(activeFilterCount({ query: 'agua', category: 'Utilidades', from: '', to: '' })).toBe(2);
+  });
+
+  test('returns 2 when query and from are active', () => {
+    expect(activeFilterCount({ query: 'agua', category: '', from: '2026-04-01', to: '' })).toBe(2);
+  });
+
+  test('returns 3 when all filter groups are active', () => {
+    expect(
+      activeFilterCount({
+        query: 'agua',
+        category: 'Utilidades',
+        from: '2026-04-01',
+        to: '2026-04-30',
+      }),
+    ).toBe(3);
+  });
+
+  test('treats whitespace-only query as empty', () => {
+    expect(activeFilterCount({ query: '   ', category: '', from: '', to: '' })).toBe(0);
+  });
+
+  test('treats whitespace-only query and active category as 1', () => {
+    expect(activeFilterCount({ query: '  ', category: 'Utilidades', from: '', to: '' })).toBe(1);
   });
 });

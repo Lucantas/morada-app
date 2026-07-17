@@ -40,3 +40,11 @@ export function filterAccounts(accounts: Account[], filters: AccountFilters): Ac
       matchesDateRange(account, filters.from, filters.to),
   );
 }
+
+export function activeFilterCount(filters: AccountFilters): number {
+  let count = 0;
+  if (filters.query.trim().length > 0) count += 1;
+  if (filters.category.length > 0) count += 1;
+  if (filters.from.length > 0 || filters.to.length > 0) count += 1;
+  return count;
+}
