@@ -13,6 +13,9 @@ function fakeReceipts(seed: Receipt[] = []): ReceiptRepository & { all: () => Re
       rows = [...rows.filter((x) => x.id !== r.id), r];
       return r;
     },
+    archive: async (id) => {
+      rows = rows.filter((x) => x.id !== id);
+    },
     all: () => rows,
   };
 }

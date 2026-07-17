@@ -15,6 +15,7 @@ function fakeReceipts(rows: Pick<Receipt, 'residentId' | 'status'>[] = []): Rece
     listByApartment: async () => [],
     getById: async () => null,
     save: async (r) => r,
+    archive: async () => {},
   };
 }
 

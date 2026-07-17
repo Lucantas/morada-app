@@ -51,5 +51,17 @@ export function runAccountRepositoryContract(
       const repo = await makeRepo();
       expect(await repo.getById('nope')).toBeNull();
     });
+
+    test('archive hides an account from every read', async () => {
+      const repo = await makeRepo();
+      const base = { description: 'Energia', category: 'Utilidades', date: '2026-04-05' };
+      await repo.save({ ...base, id: 'a', valueCents: 5000, status: 'pendente' });
+      await repo.save({ ...base, id: 'b', valueCents: 6000, status: 'pendente' });
+
+      await repo.archive('a');
+
+      expect(await repo.getById('a')).toBeNull();
+      expect((await repo.list()).map((a) => a.id)).toEqual(['b']);
+    });
   });
 }

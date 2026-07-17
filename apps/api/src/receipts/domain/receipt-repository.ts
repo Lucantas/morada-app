@@ -6,4 +6,5 @@ export interface ReceiptRepository {
   listByApartment(apartmentId: string): Promise<Receipt[]>;
   getById(id: string): Promise<Receipt | null>;
   save(receipt: Receipt): Promise<Receipt>;
+  archive(id: string): Promise<void>;
 }

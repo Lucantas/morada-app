@@ -41,6 +41,7 @@ function fakeReceipts(
     listByApartment: async () => [],
     getById: async () => null,
     save: async (r) => r,
+    archive: async () => {},
   };
 }
 

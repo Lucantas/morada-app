@@ -582,6 +582,69 @@ describe('Morada API — authorization wiring', () => {
     expect(res.status).toBe(404);
   });
 
+  test('deleting a receipt is admin-only', async () => {
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth('/api/receipts/rc-2', { method: 'DELETE' })).status).toBe(403);
+  });
+
+  test('an admin deletes a receipt (204), it disappears from the apartment ledger, and a repeat 404s', async () => {
+    const admin = await withCreds(adminCredentials);
+    const del = await admin.auth('/api/receipts/rc-2', { method: 'DELETE' });
+    expect(del.status).toBe(204);
+
+    const ledger = await admin.auth('/api/apartments/apt-r-1/receipts');
+    const ids = ((await ledger.json()) as { id: string }[]).map((r) => r.id);
+    expect(ids).not.toContain('rc-2');
+
+    expect((await admin.auth('/api/receipts/rc-2', { method: 'DELETE' })).status).toBe(404);
+  });
+
+  test('deleting a paid receipt removes its value from the dashboard balance', async () => {
+    const admin = await withCreds(adminCredentials);
+    const before = (await (await admin.auth('/api/dashboard')).json()) as {
+      balance: { balanceCents: number };
+    };
+
+    await admin.auth('/api/receipts/rc-2', { method: 'DELETE' });
+
+    const after = (await (await admin.auth('/api/dashboard')).json()) as {
+      balance: { balanceCents: number };
+    };
+    expect(after.balance.balanceCents).toBe(before.balance.balanceCents - 45000);
+  });
+
+  test('deleting an account is admin-only', async () => {
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth('/api/accounts/a-1', { method: 'DELETE' })).status).toBe(403);
+  });
+
+  test('an admin deletes an account (204), it disappears from the list, and a repeat 404s', async () => {
+    const admin = await withCreds(adminCredentials);
+    const del = await admin.auth('/api/accounts/a-1', { method: 'DELETE' });
+    expect(del.status).toBe(204);
+
+    const list = await admin.auth('/api/accounts');
+    const ids = ((await list.json()) as { id: string }[]).map((a) => a.id);
+    expect(ids).not.toContain('a-1');
+
+    expect((await admin.auth('/api/accounts/a-1', { method: 'DELETE' })).status).toBe(404);
+  });
+
+  test('deleting an account no longer counts it in the dashboard summary', async () => {
+    const admin = await withCreds(adminCredentials);
+    const before = (await (await admin.auth('/api/dashboard')).json()) as {
+      recentPaid: { id: string }[];
+    };
+    expect(before.recentPaid.some((item) => item.id === 'a-1')).toBe(true);
+
+    await admin.auth('/api/accounts/a-1', { method: 'DELETE' });
+
+    const after = (await (await admin.auth('/api/dashboard')).json()) as {
+      recentPaid: { id: string }[];
+    };
+    expect(after.recentPaid.some((item) => item.id === 'a-1')).toBe(false);
+  });
+
   test('notices are readable by residents but writable only by admins', async () => {
     const resident = await withCreds(residentCredentials);
     expect((await resident.auth('/api/notices')).status).toBe(200);

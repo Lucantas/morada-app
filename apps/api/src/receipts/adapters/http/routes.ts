@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 
 import type { ApiEnv } from '../../../platform/auth';
+import { archiveReceipt } from '../../app/archive-receipt';
 import { getReceipt } from '../../app/get-receipt';
 import { listReceipts } from '../../app/list-receipts';
 import { listResidentReceipts } from '../../app/list-resident-receipts';
@@ -60,6 +61,12 @@ export function receiptRoutes(repo: ReceiptRepository) {
     const body = await c.req.json();
     const today = new Date().toISOString().slice(0, 10);
     return c.json(await submitPayment(repo, c.req.param('id'), { ...body, today }));
+  });
+
+  app.delete('/:id', async (c) => {
+    if (c.get('role') !== 'admin') return c.json({ error: 'Acesso negado' }, 403);
+    await archiveReceipt(repo, c.req.param('id'));
+    return c.body(null, 204);
   });
 
   return app;

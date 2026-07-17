@@ -16,6 +16,10 @@ function fakeRepo(): ReceiptRepository & { saved: Receipt[] } {
       saved.push(r);
       return r;
     },
+    archive: async (id) => {
+      const index = saved.findIndex((r) => r.id === id);
+      if (index !== -1) saved.splice(index, 1);
+    },
   };
 }
 

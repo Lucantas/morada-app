@@ -64,4 +64,8 @@ export class PostgresAccountRepository implements AccountRepository {
     );
     return account;
   }
+
+  async archive(id: string): Promise<void> {
+    await this.pool.query('UPDATE accounts SET visible = false WHERE id = $1', [id]);
+  }
 }

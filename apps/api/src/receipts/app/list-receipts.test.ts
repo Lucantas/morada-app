@@ -14,6 +14,9 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
       map.set(r.id, r);
       return r;
     },
+    archive: async (id) => {
+      map.delete(id);
+    },
   };
 }
 

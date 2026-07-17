@@ -104,5 +104,18 @@ export function runReceiptRepositoryContract(
       expect(await repo.listByResident('r-2')).toHaveLength(1);
       expect(await repo.listByResident('r-9')).toHaveLength(0);
     });
+
+    test('archive hides a receipt from every read', async () => {
+      const repo = await makeRepo();
+      const base = { ref: '2024-01', title: 'Taxa', dueDate: '2026-05-10', valueCents: 1000 };
+      await repo.save({ ...base, id: 'a', status: 'pendente', apartmentId: 'apt-1' });
+      await repo.save({ ...base, id: 'b', status: 'pendente', apartmentId: 'apt-1' });
+
+      await repo.archive('a');
+
+      expect(await repo.getById('a')).toBeNull();
+      expect((await repo.list()).map((r) => r.id)).not.toContain('a');
+      expect((await repo.listByApartment('apt-1')).map((r) => r.id)).toEqual(['b']);
+    });
   });
 }

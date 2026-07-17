@@ -102,4 +102,8 @@ export class PostgresReceiptRepository implements ReceiptRepository {
     );
     return receipt;
   }
+
+  async archive(id: string): Promise<void> {
+    await this.pool.query('UPDATE receipts SET visible = false WHERE id = $1', [id]);
+  }
 }

@@ -1,11 +1,14 @@
+import { ReceiptNotFoundError } from '../domain/errors';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
-import { getReceipt } from './get-receipt';
+import { archiveReceipt } from './archive-receipt';
 
-function fakeRepo(list: Receipt[]): ReceiptRepository {
+function fakeRepo(list: Receipt[]): ReceiptRepository & { archived: string[] } {
   const map = new Map(list.map((r) => [r.id, r]));
+  const archived: string[] = [];
   return {
+    archived,
     list: async () => [...map.values()],
     listByResident: async (rid) => [...map.values()].filter((r) => r.residentId === rid),
     listByApartment: async (aid) => [...map.values()].filter((r) => r.apartmentId === aid),
@@ -15,12 +18,13 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
       return r;
     },
     archive: async (id) => {
+      archived.push(id);
       map.delete(id);
     },
   };
 }
 
-const receipt: Receipt = {
+const pending: Receipt = {
   id: 'r-1',
   ref: '2024-01',
   title: 'Boleto',
@@ -29,17 +33,17 @@ const receipt: Receipt = {
   status: 'pendente',
 };
 
-describe('getReceipt', () => {
-  test('returns the receipt when present', async () => {
-    expect(await getReceipt(fakeRepo([receipt]), 'r-1')).toEqual(receipt);
+describe('archiveReceipt', () => {
+  test('archives an existing receipt', async () => {
+    const repo = fakeRepo([pending]);
+
+    await archiveReceipt(repo, 'r-1');
+
+    expect(repo.archived).toEqual(['r-1']);
+    expect(await repo.getById('r-1')).toBeNull();
   });
 
-  test('throws with status 404 when missing', async () => {
-    try {
-      await getReceipt(fakeRepo([]), 'nope');
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect((err as { status?: number }).status).toBe(404);
-    }
+  test('throws ReceiptNotFoundError for an unknown id', async () => {
+    await expect(archiveReceipt(fakeRepo([]), 'nope')).rejects.toThrow(ReceiptNotFoundError);
   });
 });

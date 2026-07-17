@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
+import { archiveAccount } from '../../app/archive-account';
 import { getAccount } from '../../app/get-account';
 import { listAccounts } from '../../app/list-accounts';
 import { saveAccount } from '../../app/save-account';
@@ -23,6 +24,11 @@ export function accountRoutes(repo: AccountRepository) {
   app.put('/:id', async (c) => {
     const draft = accountDraftSchema.parse({ ...(await c.req.json()), id: c.req.param('id') });
     return c.json(await saveAccount(repo, draft));
+  });
+
+  app.delete('/:id', async (c) => {
+    await archiveAccount(repo, c.req.param('id'));
+    return c.body(null, 204);
   });
 
   return app;

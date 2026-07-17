@@ -14,6 +14,9 @@ function fakeRepo(): AccountRepository {
       map.set(account.id, account);
       return account;
     },
+    archive: async (id) => {
+      map.delete(id);
+    },
   };
 }
 
