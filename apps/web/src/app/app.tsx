@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
+import { incomeMonthlyTotals } from '@/features/income/domain/income-totals';
 import { IncomeEditScreen } from '@/features/income/ui/income-edit-screen';
 import { IncomeSection } from '@/features/income/ui/income-section';
+import { useIncomes } from '@/features/income/ui/use-income';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
 import { unreadCount } from '@/features/messages/domain/unread-count';
 import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
@@ -152,6 +154,8 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
   const unread = unreadCount(threads.data ?? []);
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
+  const incomes = useIncomes(incomeRepository);
+  const monthlyIncomeCents = incomeMonthlyTotals(incomes.data ?? []);
   const queryClient = useQueryClient();
   const ensureMonthly = useCallback(async () => {
     await ensureMonthlyReceipts();
@@ -209,6 +213,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
               onOpenIncome={(id) => go('a-income-edit', id ? { incomeId: id } : undefined)}
             />
           }
+          monthlyIncomeCents={monthlyIncomeCents}
           bottomNav={nav}
         />
       );
