@@ -158,6 +158,31 @@ describe('Morada API', () => {
     const res = await login(app, residentCredentials.username, residentCredentials.password);
     expect(res.status).toBe(401);
   });
+
+  test('an active resident can read their own record', async () => {
+    const app = await makeApp();
+    const token = await tokenFor(app, residentCredentials);
+    const res = await app.request('/api/residents/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("an inactive resident's existing session is rejected on the next request", async () => {
+    const app = await makeApp();
+    const residentToken = await tokenFor(app, residentCredentials); // issued while active
+    const admin = await tokenFor(app, adminCredentials);
+    const deactivate = await app.request('/api/residents/r-1/deactivate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${admin}` },
+    });
+    expect(deactivate.ok).toBe(true);
+
+    const res = await app.request('/api/residents/me', {
+      headers: { Authorization: `Bearer ${residentToken}` },
+    });
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('Morada API — real credentials', () => {

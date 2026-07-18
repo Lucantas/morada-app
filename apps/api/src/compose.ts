@@ -97,6 +97,13 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
 
+  api.use('*', async (c, next) => {
+    if (c.get('role') === 'resident' && !(await isResidentActive(c.get('sub')))) {
+      return c.json({ error: 'Sessão inválida' }, 401);
+    }
+    await next();
+  });
+
   // Admin-only: provision a resident login. Returns the generated temp password
   // once for the admin to relay; only the hash is ever stored.
   api.post('/users', requireRole('admin'), async (c) => {
