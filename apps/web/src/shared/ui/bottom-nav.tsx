@@ -16,7 +16,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
         borderTop: '1px solid var(--line)',
         display: 'flex',
         alignItems: 'center',
-        padding: '8px 6px',
+        padding: '8px 6px calc(8px + env(safe-area-inset-bottom))',
         boxShadow: '0 -2px 12px rgba(27,36,34,.05)',
         flex: 'none',
       }}
