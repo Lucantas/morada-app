@@ -5,16 +5,9 @@ Feature-first clean architecture. Layers per feature, enforced by
 
 ## Layers and allowed imports
 
-| Layer               | Contains                                                                      | May import                                                                        |
-| ------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `features/*/domain` | Entities (Zod schema + type), use cases, repository interfaces, domain errors | own/other feature `domain`, `shared/lib`, and (external) only `zod`               |
-| `features/*/data`   | Repository implementations, DTOs, mappers                                     | any `domain`, own `data`, `shared/lib`. Denied: `react`, `@tanstack/*`, `zustand` |
-| `features/*/ui`     | Screens, components, query hooks, stores                                      | any `domain`, own `ui`, `shared/ui`, `shared/lib`, `shared/config`                |
-| `shared/ui`         | Design-system primitives                                                      | `shared/ui`, `shared/lib`                                                         |
-| `shared/lib`        | Pure utilities + ports (Database)                                             | `shared/lib`                                                                      |
-| `shared/config`     | Env, constants                                                                | `shared/config`, `shared/lib`                                                     |
-| `app`               | Composition root (view router, providers, seed)                               | everything                                                                        |
-| `test`              | Factories, in-memory adapter                                                  | everything (test-only)                                                            |
+See [LAYERING.md](./LAYERING.md) — the shared layering contract for both apps
+(web `domain/data/ui` ↔ API `domain/app/adapters`), the dependency-direction
+rule, and the documented layer exceptions.
 
 ## Key patterns
 
