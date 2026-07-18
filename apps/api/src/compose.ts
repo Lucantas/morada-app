@@ -17,12 +17,9 @@ import { createReceipt } from './receipts/app/create-receipt';
 import { editReceipt } from './receipts/app/edit-receipt';
 import { generateMonthlyReceipts } from './receipts/app/generate-monthly-receipts';
 import { rejectPayment } from './receipts/app/reject-payment';
-import { getResident } from './residents/app/get-resident';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
-import { generateTempPassword } from './platform/temp-password';
-import { resetResidentPassword } from './users/app/reset-resident-password';
 import { authRoutes } from './users/adapters/http/auth-routes';
 import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
@@ -85,27 +82,11 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // once for the admin to relay; only the hash is ever stored.
   api.route('/users', userRoutes({ users, hasher, residents }));
 
-  // A resident reads their own record by their JWT subject (before the
-  // admin-only group below, which would otherwise 403 this).
-  api.get('/residents/me', async (c) =>
-    c.json(await getResident(residents, receipts, c.get('sub'))),
-  );
-
-  // Admin-only: read a resident's login username (never the hash), or reset
-  // their password to a fresh temp one. Registered before the '/residents'
-  // mount below or they would be shadowed by its admin group.
-  api.get('/residents/:id/login', requireRole('admin'), async (c) => {
-    const user = await users.findByResidentId(c.req.param('id'));
-    return c.json(user ? { username: user.username } : null);
-  });
-  api.post('/residents/:id/login/reset', requireRole('admin'), async (c) => {
-    const tempPassword = generateTempPassword();
-    const user = await resetResidentPassword(users, hasher, c.req.param('id'), tempPassword);
-    return c.json({ username: user.username, tempPassword });
-  });
+  // Residents router self-guards per-route: '/me' is resident-accessible,
+  // everything else (including '/:id/login*') is admin-only.
+  api.route('/residents', residentRoutes({ residents, receipts, users, hasher }));
 
   // Admin-only resources.
-  api.route('/residents', guarded('admin', residentRoutes(residents, receipts)));
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));
   api.route('/incomes', guarded('admin', incomeRoutes(incomes)));
   api.route(
