@@ -51,11 +51,12 @@ html {
 html,
 body,
 #root {
-  height: 100%;
+  height: 100dvh;
 }
 
 body {
   margin: 0;
+  overflow: hidden;
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--sand);
   color: var(--ink-900);
