@@ -1,14 +1,14 @@
-import type { Account } from './account';
+import type { Account, AccountStatus } from './account';
 import { sortAccountsByDateDesc } from './sort-accounts';
 
-function account(id: string, date: string | null): Account {
+function account(id: string, date: string | null, status: AccountStatus = 'pago'): Account {
   return {
     id,
     description: `Conta ${id}`,
     category: 'Utilidades',
     date,
     valueCents: 10000,
-    status: 'pago',
+    status,
   };
 }
 
@@ -23,10 +23,26 @@ describe('sortAccountsByDateDesc', () => {
     expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'c', 'a']);
   });
 
-  test('places undated accounts last', () => {
-    const accounts = [account('a', null), account('b', '2026-07-01'), account('c', null)];
+  test('places undated accounts first (freshly added, still pending)', () => {
+    const accounts = [account('a', '2026-07-01'), account('b', null), account('c', '2026-06-01')];
 
     expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  test('breaks date ties by status (atrasado, then pendente, then pago)', () => {
+    const accounts = [
+      account('a', '2026-07-10', 'pago'),
+      account('b', '2026-07-10', 'atrasado'),
+      account('c', '2026-07-10', 'pendente'),
+    ];
+
+    expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  test('breaks ties among undated accounts by status', () => {
+    const accounts = [account('a', null, 'pago'), account('b', null, 'pendente')];
+
+    expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'a']);
   });
 
   test('does not mutate the input array', () => {
