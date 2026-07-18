@@ -28,6 +28,7 @@ import { resetResidentPassword } from './users/app/reset-resident-password';
 import { verifyCredentials } from './users/app/verify-credentials';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 import { usernameSchema } from './users/domain/user';
+import { InvalidCredentialsError } from './users/domain/errors';
 
 const loginSchema = z.object({
   username: z.string().min(1).max(60),
@@ -60,6 +61,8 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     incomes,
   } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
+  const isResidentActive = async (residentId: string | null): Promise<boolean> =>
+    residentId !== null && (await residents.getById(residentId))?.active === true;
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
   if (!config.isProduction || process.env.SEED_DEMO_DATA === '1') {
@@ -84,6 +87,9 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   app.post('/auth/login', async (c) => {
     const { username, password } = loginSchema.parse(await c.req.json());
     const user = await verifyCredentials(users, hasher, username, password);
+    if (user.role === 'resident' && !(await isResidentActive(user.residentId))) {
+      throw new InvalidCredentialsError();
+    }
     const subject = user.role === 'resident' ? (user.residentId ?? user.id) : user.id;
     return c.json({ token: await signSession(user.role, subject), role: user.role });
   });

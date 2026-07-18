@@ -139,6 +139,25 @@ describe('Morada API', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  test('an active resident can still log in', async () => {
+    const app = await makeApp();
+    const res = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(res.status).toBe(200);
+  });
+
+  test('an inactive (moved-out) resident cannot log in', async () => {
+    const app = await makeApp();
+    const admin = await tokenFor(app, adminCredentials);
+    const deactivate = await app.request('/api/residents/r-1/deactivate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${admin}` },
+    });
+    expect(deactivate.ok).toBe(true);
+
+    const res = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('Morada API — real credentials', () => {
