@@ -14,6 +14,7 @@ import type { Account } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
 import { accountMonths, monthlyExpenseCents, resolveSelectedMonth } from '../domain/account-totals';
 import { activeFilterCount, filterAccounts, type AccountFilters } from '../domain/filter-accounts';
+import { sortAccountsByDateDesc } from '../domain/sort-accounts';
 
 import { accountStatusView } from './account-status-view';
 import { useAccounts } from './use-accounts';
@@ -210,7 +211,7 @@ function AccountsContent({
   onFiltersChange: (filters: AccountFilters) => void;
 }) {
   const categories = Array.from(new Set(accounts.map((account) => account.category))).sort();
-  const filtered = filterAccounts(accounts, filters);
+  const filtered = sortAccountsByDateDesc(filterAccounts(accounts, filters));
 
   return (
     <>
