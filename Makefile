@@ -22,7 +22,7 @@ export DATABASE_URL
 # `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
 TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
 
-.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down
+.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down spec-gate
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -113,3 +113,6 @@ db-up: ## Start the local Postgres (docker compose) the API + tests run against
 
 db-down: ## Stop the local Postgres
 	docker compose down
+
+spec-gate: ## Check the pushed range for spec trailers
+	node scripts/check-spec-trailer.mjs --range origin/main..HEAD

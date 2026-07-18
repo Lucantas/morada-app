@@ -25,6 +25,8 @@ commit-msg:
   commands:
     commitlint:
       run: pnpm commitlint --edit {1}
+    spec-gate:
+      run: node scripts/check-spec-trailer.mjs --commit-msg {1}
 
 pre-push:
   commands:
@@ -33,3 +35,5 @@ pre-push:
       run: pnpm test:coverage
     api-test:
       run: make api-test
+    spec-gate:
+      run: node scripts/check-spec-trailer.mjs --range origin/main..HEAD
