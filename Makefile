@@ -22,7 +22,7 @@ export DATABASE_URL
 # `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
 TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
 
-.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down spec-gate
+.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down spec-gate spec-index new-feature
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -120,3 +120,6 @@ spec-gate: ## Check the pushed range for spec trailers
 spec-index: ## Regenerate docs/superpowers/INDEX.md from git trailers
 	node scripts/build-spec-index.mjs
 	./node_modules/.bin/prettier --write docs/superpowers/INDEX.md
+
+new-feature: ## Scaffold a feature: make new-feature app=api|web name=<kebab> spec=<path>
+	node scripts/new-feature.mjs app=$(app) name=$(name) spec=$(spec)

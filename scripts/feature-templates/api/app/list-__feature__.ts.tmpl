@@ -1,0 +1,6 @@
+import type { __Feature__ } from '../domain/__feature__';
+import type { __Feature__Repository } from '../domain/__feature__-repository';
+
+export function list__Feature__(repo: __Feature__Repository): Promise<__Feature__[]> {
+  return repo.list();
+}

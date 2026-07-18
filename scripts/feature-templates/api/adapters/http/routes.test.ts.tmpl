@@ -1,0 +1,10 @@
+import { __feature__Routes } from './routes';
+import type { __Feature__Repository } from '../../domain/__feature__-repository';
+
+test('lists __feature__ entities', async () => {
+  const repo: __Feature__Repository = { list: async () => [{ id: '1', name: 'Seed' }] };
+  const app = __feature__Routes(repo);
+  const res = await app.request('/');
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual([{ id: '1', name: 'Seed' }]);
+});

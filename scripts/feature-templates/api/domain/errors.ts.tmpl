@@ -1,0 +1,6 @@
+export class __Feature__NotFoundError extends Error {
+  constructor(id: string) {
+    super(`__Feature__ ${id} not found`);
+    this.name = '__Feature__NotFoundError';
+  }
+}

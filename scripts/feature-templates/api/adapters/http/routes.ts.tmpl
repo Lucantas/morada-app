@@ -1,0 +1,11 @@
+import { Hono } from 'hono';
+
+import type { ApiEnv } from '../../../platform/auth';
+import { list__Feature__ } from '../../app/list-__feature__';
+import type { __Feature__Repository } from '../../domain/__feature__-repository';
+
+export function __feature__Routes(repo: __Feature__Repository) {
+  const app = new Hono<ApiEnv>();
+  app.get('/', async (c) => c.json(await list__Feature__(repo)));
+  return app;
+}
