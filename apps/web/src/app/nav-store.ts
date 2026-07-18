@@ -19,11 +19,15 @@ export type View =
   | 'r-profile'
   | 'r-help';
 
-type NavState = {
+export type NavSnapshot = {
   view: View;
   residentId?: string;
   incomeId?: string;
+};
+
+type NavState = NavSnapshot & {
   go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
+  restore: (snapshot: NavSnapshot) => void;
 };
 
 export const useNavStore = create<NavState>((set) => ({
@@ -31,4 +35,10 @@ export const useNavStore = create<NavState>((set) => ({
   residentId: undefined,
   incomeId: undefined,
   go: (view, opts) => set({ view, residentId: opts?.residentId, incomeId: opts?.incomeId }),
+  restore: (snapshot) =>
+    set({
+      view: snapshot.view,
+      residentId: snapshot.residentId,
+      incomeId: snapshot.incomeId,
+    }),
 }));
