@@ -116,3 +116,6 @@ db-down: ## Stop the local Postgres
 
 spec-gate: ## Check the pushed range for spec trailers
 	node scripts/check-spec-trailer.mjs --range origin/main..HEAD
+
+spec-index: ## Regenerate docs/superpowers/INDEX.md from git trailers
+	node scripts/build-spec-index.mjs
