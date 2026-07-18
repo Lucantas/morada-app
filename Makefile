@@ -119,3 +119,4 @@ spec-gate: ## Check the pushed range for spec trailers
 
 spec-index: ## Regenerate docs/superpowers/INDEX.md from git trailers
 	node scripts/build-spec-index.mjs
+	./node_modules/.bin/prettier --write docs/superpowers/INDEX.md
