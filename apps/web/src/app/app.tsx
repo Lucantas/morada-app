@@ -103,8 +103,14 @@ function Router() {
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
   const go = useNavStore((s) => s.go);
+  const queryClient = useQueryClient();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const handleSignOut = useCallback(() => {
+    queryClient.clear();
+    signOut();
+  }, [queryClient, signOut]);
 
   if (!role) {
     return (
@@ -115,7 +121,10 @@ function Router() {
           setPending(true);
           setLoginError(null);
           login(username, password)
-            .then((r) => go(r === 'admin' ? 'a-home' : 'r-home'))
+            .then((r) => {
+              queryClient.clear();
+              go(r === 'admin' ? 'a-home' : 'r-home');
+            })
             .catch((err: unknown) =>
               setLoginError(err instanceof Error ? err.message : 'Não foi possível entrar.'),
             )
@@ -132,7 +141,7 @@ function Router() {
         residentId={residentId}
         incomeId={incomeId}
         go={go}
-        signOut={signOut}
+        signOut={handleSignOut}
       />
     );
   }
@@ -142,7 +151,7 @@ function Router() {
       residentId={residentId}
       subject={subject}
       go={go}
-      signOut={signOut}
+      signOut={handleSignOut}
     />
   );
 }
