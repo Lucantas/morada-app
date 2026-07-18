@@ -110,6 +110,39 @@ describe('buildDashboardSummary', () => {
     });
   });
 
+  test('maintenances are ordered newest-first', () => {
+    const withManyMaintenances: LedgerAccount[] = [
+      {
+        id: 'm-1',
+        description: 'Antiga',
+        category: 'Manutenção',
+        date: '2026-02-10',
+        valueCents: 1000,
+        status: 'pago',
+      },
+      {
+        id: 'm-2',
+        description: 'Nova',
+        category: 'Manutenção',
+        date: '2026-05-20',
+        valueCents: 1000,
+        status: 'pago',
+      },
+      {
+        id: 'm-3',
+        description: 'Média',
+        category: 'Manutenção',
+        date: '2026-03-15',
+        valueCents: 1000,
+        status: 'pago',
+      },
+    ];
+
+    const { maintenances } = buildDashboardSummary(withManyMaintenances, [], [], TODAY);
+
+    expect(maintenances.map((m) => m.id)).toEqual(['m-2', 'm-3', 'm-1']);
+  });
+
   test('paid accounts and maintenances without a date omit it gracefully', () => {
     const summary = buildDashboardSummary(
       [

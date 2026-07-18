@@ -81,6 +81,7 @@ export function buildDashboardSummary(
 
   const maintenances = accounts
     .filter((a) => /manuten/i.test(a.category))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
     .map((a) => ({
       id: a.id,
       title: a.description,
