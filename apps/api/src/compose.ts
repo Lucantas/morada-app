@@ -8,7 +8,7 @@ import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
-import { authMiddleware, requireRole, signSession, type ApiEnv, type Role } from './platform/auth';
+import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
 import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
@@ -25,15 +25,9 @@ import { settingsRoutes } from './settings/adapters/http/routes';
 import { generateTempPassword } from './platform/temp-password';
 import { createResidentLogin } from './users/app/create-resident-login';
 import { resetResidentPassword } from './users/app/reset-resident-password';
-import { verifyCredentials } from './users/app/verify-credentials';
+import { authRoutes } from './users/adapters/http/auth-routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 import { usernameSchema } from './users/domain/user';
-import { InvalidCredentialsError } from './users/domain/errors';
-
-const loginSchema = z.object({
-  username: z.string().min(1).max(60),
-  password: z.string().min(1).max(200),
-});
 
 const provisionSchema = z.object({
   username: usernameSchema,
@@ -82,17 +76,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   app.get('/healthz', (c) => c.json({ status: 'ok' }));
 
-  // Verifies real credentials and issues a JWT whose `sub` is the resident's own
-  // id (admins get their user id), so per-resident data stays scoped by subject.
-  app.post('/auth/login', async (c) => {
-    const { username, password } = loginSchema.parse(await c.req.json());
-    const user = await verifyCredentials(users, hasher, username, password);
-    if (user.role === 'resident' && !(await isResidentActive(user.residentId))) {
-      throw new InvalidCredentialsError();
-    }
-    const subject = user.role === 'resident' ? (user.residentId ?? user.id) : user.id;
-    return c.json({ token: await signSession(user.role, subject), role: user.role });
-  });
+  app.route('/auth', authRoutes({ users, hasher, isResidentActive }));
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
