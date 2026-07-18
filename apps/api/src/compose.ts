@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { z } from 'zod';
 
 import { accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
@@ -23,16 +22,10 @@ import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { generateTempPassword } from './platform/temp-password';
-import { createResidentLogin } from './users/app/create-resident-login';
 import { resetResidentPassword } from './users/app/reset-resident-password';
 import { authRoutes } from './users/adapters/http/auth-routes';
+import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
-import { usernameSchema } from './users/domain/user';
-
-const provisionSchema = z.object({
-  username: usernameSchema,
-  residentId: z.string().min(1).max(64),
-});
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   const group = new Hono<ApiEnv>();
@@ -90,24 +83,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   // Admin-only: provision a resident login. Returns the generated temp password
   // once for the admin to relay; only the hash is ever stored.
-  api.post('/users', requireRole('admin'), async (c) => {
-    const { username, residentId } = provisionSchema.parse(await c.req.json());
-    const tempPassword = generateTempPassword();
-    const user = await createResidentLogin(
-      users,
-      hasher,
-      async (id) => (await residents.getById(id)) !== null,
-      {
-        username,
-        password: tempPassword,
-        residentId,
-      },
-    );
-    return c.json(
-      { id: user.id, username: user.username, residentId: user.residentId, tempPassword },
-      201,
-    );
-  });
+  api.route('/users', userRoutes({ users, hasher, residents }));
 
   // A resident reads their own record by their JWT subject (before the
   // admin-only group below, which would otherwise 403 this).
