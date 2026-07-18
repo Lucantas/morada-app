@@ -5,7 +5,7 @@ import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
-import type { IconName } from '@/shared/ui/icon';
+import { Icon, type IconName } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { StatusView } from '@/shared/ui/status-view';
@@ -35,7 +35,11 @@ export function ResidentHomeScreen({
 
   return (
     <Screen>
-      <TopBar eyebrow={`${resident.apt} · Bloco 2`} title={`Olá, ${firstName(resident.name)}`} />
+      <TopBar
+        eyebrow={`${resident.apt} · Bloco 2`}
+        title={`Olá, ${firstName(resident.name)}`}
+        right={<NoticesButton onClick={onGoNotices} />}
+      />
       <ScreenBody>
         {home.isLoading && <StatusView variant="loading" message="Carregando…" />}
         {home.isError && (
@@ -46,12 +50,7 @@ export function ResidentHomeScreen({
           />
         )}
         {home.isSuccess && (
-          <HomeContent
-            receipts={home.data}
-            onGoReceipts={onGoReceipts}
-            onGoFinance={onGoFinance}
-            onGoNotices={onGoNotices}
-          />
+          <HomeContent receipts={home.data} onGoReceipts={onGoReceipts} onGoFinance={onGoFinance} />
         )}
       </ScreenBody>
       {bottomNav}
@@ -63,12 +62,10 @@ function HomeContent({
   receipts,
   onGoReceipts,
   onGoFinance,
-  onGoNotices,
 }: {
   receipts: Receipt[];
   onGoReceipts: () => void;
   onGoFinance: () => void;
-  onGoNotices: () => void;
 }) {
   const pending = pendingReceipt(receipts);
   return (
@@ -77,12 +74,33 @@ function HomeContent({
       {pending ? <NextFeeHero receipt={pending} onPay={onGoReceipts} /> : <AllClearHero />}
 
       <SectionLabel>Atalhos</SectionLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <Shortcut icon="receipt" title="Recibos" onClick={onGoReceipts} />
         <Shortcut icon="building" title="Condomínio" onClick={onGoFinance} />
-        <Shortcut icon="bell" title="Avisos" onClick={onGoNotices} />
       </div>
     </>
+  );
+}
+
+function NoticesButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="Avisos"
+      onClick={onClick}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        background: 'rgba(255,255,255,.12)',
+        display: 'grid',
+        placeItems: 'center',
+        border: 'none',
+        cursor: 'pointer',
+      }}
+    >
+      <Icon name="bell" size={19} color="#fff" />
+    </button>
   );
 }
 

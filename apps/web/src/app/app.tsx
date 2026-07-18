@@ -15,8 +15,13 @@ import { ThreadScreen } from '@/features/messages/ui/thread-screen';
 import { useThreads } from '@/features/messages/ui/use-threads';
 import { NoticesScreen } from '@/features/notices/ui/notices-screen';
 import { SendNoticeScreen } from '@/features/notices/ui/send-notice-screen';
+import {
+  mergeMonthlyTotals,
+  paidReceiptMonthlyTotals,
+} from '@/features/receipts/domain/receipt-income-totals';
 import { PayScreen } from '@/features/receipts/ui/pay-screen';
 import { ReceiptsScreen } from '@/features/receipts/ui/receipts-screen';
+import { useReceipts } from '@/features/receipts/ui/use-receipts';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
@@ -75,7 +80,7 @@ const RESIDENT_TAB: Partial<Record<View, string>> = {
   'r-home': 'home',
   'r-receipts': 'receipts',
   'r-pay': 'receipts',
-  'r-notices': 'notices',
+  'r-finance': 'condominio',
   'r-help': 'help',
   'r-profile': 'profile',
 };
@@ -157,7 +162,11 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
   const incomes = useIncomes(incomeRepository);
-  const monthlyIncomeCents = incomeMonthlyTotals(incomes.data ?? []);
+  const receipts = useReceipts(receiptRepository);
+  const monthlyIncomeCents = mergeMonthlyTotals(
+    incomeMonthlyTotals(incomes.data ?? []),
+    paidReceiptMonthlyTotals(receipts.data ?? []),
+  );
   const queryClient = useQueryClient();
   const ensureMonthly = useCallback(async () => {
     await ensureMonthlyReceipts();
@@ -428,11 +437,11 @@ function residentNav(view: View, go: (v: View) => void): NavItem[] {
       onClick: () => go('r-receipts'),
     },
     {
-      key: 'notices',
-      label: 'Avisos',
-      icon: 'bell',
-      active: active === 'notices',
-      onClick: () => go('r-notices'),
+      key: 'condominio',
+      label: 'Condomínio',
+      icon: 'building',
+      active: active === 'condominio',
+      onClick: () => go('r-finance'),
     },
     {
       key: 'help',
