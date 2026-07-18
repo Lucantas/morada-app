@@ -1,0 +1,5 @@
+import { z } from 'zod';
+
+export const __feature__Schema = z.object({ id: z.string(), name: z.string() });
+export const __feature__ListSchema = z.array(__feature__Schema);
+export type __Feature__ = z.infer<typeof __feature__Schema>;

@@ -48,3 +48,9 @@ test('validate accepts good input', () => {
     }),
   );
 });
+
+test('planFiles maps web templates to features dir', () => {
+  const files = planFiles({ app: 'web', name: 'water' });
+  assert.ok(files.some((f) => f.to === 'apps/web/src/features/water/domain/water.ts'));
+  assert.ok(files.some((f) => f.to === 'apps/web/src/features/water/ui/WaterScreen.tsx'));
+});

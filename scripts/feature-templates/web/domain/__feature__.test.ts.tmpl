@@ -1,0 +1,5 @@
+import { __feature__Schema } from './__feature__';
+
+test('rejects an entity without a name', () => {
+  expect(() => __feature__Schema.parse({ id: '1', name: '' })).toThrow();
+});

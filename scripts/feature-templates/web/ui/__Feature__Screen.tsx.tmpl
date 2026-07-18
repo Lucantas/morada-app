@@ -1,0 +1,15 @@
+import { use__Feature__ } from './use-__feature__';
+import type { __Feature__ } from '../domain/__feature__';
+
+export function __Feature__Screen({ list }: { list: () => Promise<__Feature__[]> }) {
+  const query = use__Feature__(list);
+  if (query.isLoading) return <p>Carregando…</p>;
+  if (query.isError) return <p>Erro ao carregar.</p>;
+  return (
+    <ul>
+      {(query.data ?? []).map((item) => (
+        <li key={item.id}>{item.name}</li>
+      ))}
+    </ul>
+  );
+}

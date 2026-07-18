@@ -1,0 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
+
+import type { __Feature__ } from '../domain/__feature__';
+
+export function use__Feature__(list: () => Promise<__Feature__[]>) {
+  return useQuery({ queryKey: ['__feature__'], queryFn: list });
+}
