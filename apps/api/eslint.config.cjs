@@ -77,7 +77,7 @@ module.exports = tseslint.config(
         'error',
         {
           selector:
-            "CallExpression[callee.object.name!='c'][callee.property.name=/^(get|post|put|patch|delete|on)$/]",
+            "CallExpression[callee.object.name!='c'][callee.property.name=/^(get|post|put|patch|delete|all|on)$/]",
           message:
             'Define routes in a feature adapters/http router; compose.ts only wires (.route/.use).',
         },

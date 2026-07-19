@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateSpecTrailer, isFeaturePath } from './check-spec-trailer.mjs';
+import { evaluateSpecTrailer, evaluateRange, isFeaturePath } from './check-spec-trailer.mjs';
 
 const specExistsTrue = () => true;
 const specExistsFalse = () => false;
@@ -67,4 +67,62 @@ test('"none" with empty reason → fail', () => {
     specExists: specExistsFalse,
   });
   assert.equal(r.ok, false);
+});
+
+test('"None — reason" escape hatch is case-insensitive → ok', () => {
+  const r = evaluateSpecTrailer({
+    touchedPaths: ['apps/api/src/receipts/app/pay-receipt.ts'],
+    message: 'fix: typo\n\nSpec: None — one-line copy fix',
+    specExists: specExistsFalse,
+  });
+  assert.equal(r.ok, true);
+});
+
+test('"NONE — reason" escape hatch is case-insensitive → ok', () => {
+  const r = evaluateSpecTrailer({
+    touchedPaths: ['apps/api/src/receipts/app/pay-receipt.ts'],
+    message: 'fix: typo\n\nSpec: NONE — one-line copy fix',
+    specExists: specExistsFalse,
+  });
+  assert.equal(r.ok, true);
+});
+
+test('evaluateRange: every feature-touching commit has a valid trailer → ok', () => {
+  const commits = [
+    {
+      sha: 'aaa1111',
+      message: 'chore: tidy',
+      touchedPaths: ['docs/x.md'],
+    },
+    {
+      sha: 'bbb2222',
+      message: 'feat: pay\n\nSpec: docs/superpowers/specs/x-design.md',
+      touchedPaths: ['apps/api/src/receipts/app/pay-receipt.ts'],
+    },
+    {
+      sha: 'ccc3333',
+      message: 'fix: typo\n\nSpec: none — one-line copy fix',
+      touchedPaths: ['apps/web/src/features/residents/ui/x.tsx'],
+    },
+  ];
+  const r = evaluateRange(commits, specExistsTrue);
+  assert.equal(r.ok, true);
+});
+
+test('evaluateRange: one feature-touching commit lacks a trailer even though another commit has one → fail, names offending commit', () => {
+  const commits = [
+    {
+      sha: 'aaa1111',
+      message: 'feat: notices\n\nSpec: docs/superpowers/specs/x-design.md',
+      touchedPaths: ['apps/api/src/notices/app/send-notice.ts'],
+    },
+    {
+      sha: 'bbb2222',
+      message: 'feat: pay receipt without trailer',
+      touchedPaths: ['apps/api/src/receipts/app/pay-receipt.ts'],
+    },
+  ];
+  const r = evaluateRange(commits, specExistsTrue);
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /bbb2222/);
 });

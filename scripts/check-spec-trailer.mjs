@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const FEATURE_PATTERNS = [
@@ -32,7 +32,7 @@ export function evaluateSpecTrailer({ touchedPaths, message, specExists }) {
         `Add a trailer: "Spec: docs/superpowers/specs/<file>.md" or "Spec: none — <reason>".`,
     };
   }
-  const none = trailer.match(/^none\s*[—-]\s*(.+)$/);
+  const none = trailer.match(/^none\s*[—-]\s*(.+)$/i);
   if (none) {
     return none[1].trim().length > 0
       ? { ok: true, reason: 'escape hatch with reason' }
@@ -44,40 +44,63 @@ export function evaluateSpecTrailer({ touchedPaths, message, specExists }) {
   return { ok: true, reason: 'valid spec path' };
 }
 
+export function evaluateRange(commits, specExists) {
+  for (const commit of commits) {
+    const result = evaluateSpecTrailer({
+      touchedPaths: commit.touchedPaths,
+      message: commit.message,
+      specExists,
+    });
+    if (!result.ok) {
+      const label = commit.sha ? commit.sha.slice(0, 7) : (commit.message.split('\n')[0] ?? '');
+      return { ok: false, reason: `Commit ${label} failed:\n${result.reason}` };
+    }
+  }
+  return { ok: true, reason: 'every commit in range is ok' };
+}
+
 function gitTouchedPathsForMessageMode() {
   const out = execFileSync('git', ['diff', '--cached', '--name-only'], { encoding: 'utf8' });
   return out.split('\n').filter(Boolean);
 }
 
-function gitTouchedPathsForRange(range) {
-  const out = execFileSync('git', ['diff', '--name-only', range], { encoding: 'utf8' });
-  return out.split('\n').filter(Boolean);
+function gitCommitsForRange(range) {
+  const shas = execFileSync('git', ['rev-list', range], { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+  return shas.map((sha) => {
+    const message = execFileSync('git', ['log', '-1', '--format=%B', sha], { encoding: 'utf8' });
+    const touchedPaths = execFileSync(
+      'git',
+      ['diff-tree', '--no-commit-id', '--name-only', '-r', sha],
+      { encoding: 'utf8' },
+    )
+      .split('\n')
+      .filter(Boolean);
+    return { sha, message, touchedPaths };
+  });
 }
 
 function readMessageFile(path) {
-  return execFileSync('cat', [path], { encoding: 'utf8' });
+  return readFileSync(path, 'utf8');
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const mode = process.argv[2];
-  let touchedPaths;
-  let message;
+  const specExists = (p) => existsSync(p);
+  let result;
   if (mode === '--commit-msg') {
-    message = readMessageFile(process.argv[3]);
-    touchedPaths = gitTouchedPathsForMessageMode();
+    const message = readMessageFile(process.argv[3]);
+    const touchedPaths = gitTouchedPathsForMessageMode();
+    result = evaluateSpecTrailer({ touchedPaths, message, specExists });
   } else if (mode === '--range') {
     const range = process.argv[3];
-    touchedPaths = gitTouchedPathsForRange(range);
-    message = execFileSync('git', ['log', '--format=%B', range], { encoding: 'utf8' });
+    const commits = gitCommitsForRange(range);
+    result = evaluateRange(commits, specExists);
   } else {
     console.error('usage: check-spec-trailer.mjs --commit-msg <file> | --range <range>');
     process.exit(2);
   }
-  const result = evaluateSpecTrailer({
-    touchedPaths,
-    message,
-    specExists: (p) => existsSync(p),
-  });
   if (!result.ok) {
     console.error(`\n[spec-gate] ${result.reason}\n`);
     process.exit(1);
