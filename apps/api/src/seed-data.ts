@@ -1,3 +1,4 @@
+import { config } from './platform/config';
 import type { PasswordHasher } from './users/domain/password-hasher';
 import type { User } from './users/domain/user';
 import type { UserRepository } from './users/domain/user-repository';
@@ -10,9 +11,14 @@ import type { UserRepository } from './users/domain/user-repository';
 export const adminCredentials = { username: 'admin', password: 'morada-admin' } as const;
 
 // Seeds only the admin login, through the repository. Idempotent: a no-op once
-// the admin exists.
+// the admin exists. In production, refuses to seed into an already-populated
+// database instead of silently no-op'ing, to surface misconfiguration loudly.
 export async function seedAdmin(users: UserRepository, hasher: PasswordHasher): Promise<void> {
-  if (await users.findByUsername(adminCredentials.username)) return;
+  const adminExists = await users.existsByUsername(adminCredentials.username);
+  if (adminExists) return;
+  if (config.isProduction && (await users.hasAny())) {
+    throw new Error('Refusing to seed demo admin into a populated production database');
+  }
   const admin: User = {
     id: 'u-admin',
     username: adminCredentials.username,

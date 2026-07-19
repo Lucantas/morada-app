@@ -5,5 +5,6 @@ export interface UserRepository {
   findByResidentId(residentId: string): Promise<User | null>;
   existsByUsername(username: string): Promise<boolean>;
   existsByResidentId(residentId: string): Promise<boolean>;
+  hasAny(): Promise<boolean>;
   save(user: User): Promise<User>;
 }

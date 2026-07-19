@@ -14,6 +14,7 @@ function fakeRepo(users: User[] = []): UserRepository {
     existsByUsername: async (username) => map.has(username),
     existsByResidentId: async (residentId) =>
       [...map.values()].some((u) => u.residentId === residentId),
+    hasAny: async () => map.size > 0,
     save: async (u) => {
       map.set(u.username, u);
       return u;

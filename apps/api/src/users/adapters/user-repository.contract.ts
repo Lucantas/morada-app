@@ -53,6 +53,13 @@ export function runUserRepositoryContract(
       expect(await repo.existsByResidentId('r-2')).toBe(false);
     });
 
+    test('hasAny reflects whether the store is populated', async () => {
+      const repo = await makeRepo();
+      expect(await repo.hasAny()).toBe(false);
+      await repo.save(maria);
+      expect(await repo.hasAny()).toBe(true);
+    });
+
     test('rejects a second login for the same resident (unique index)', async () => {
       const repo = await makeRepo();
       await repo.save(maria);

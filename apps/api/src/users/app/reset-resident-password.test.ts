@@ -12,6 +12,7 @@ function fakeRepo(users: User[] = []): UserRepository {
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => list.some((u) => u.username === username),
     existsByResidentId: async (residentId) => list.some((u) => u.residentId === residentId),
+    hasAny: async () => list.length > 0,
     save: async (u) => {
       list = [...list.filter((existing) => existing.id !== u.id), u];
       return u;

@@ -55,6 +55,11 @@ export class PostgresUserRepository implements UserRepository {
     return (rowCount ?? 0) > 0;
   }
 
+  async hasAny(): Promise<boolean> {
+    const { rowCount } = await this.pool.query('SELECT 1 FROM users LIMIT 1');
+    return (rowCount ?? 0) > 0;
+  }
+
   async save(user: User): Promise<User> {
     if (user.residentId !== null) {
       const taken = await this.pool.query(
