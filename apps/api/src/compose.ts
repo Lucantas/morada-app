@@ -13,6 +13,7 @@ import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { healthRoutes } from './platform/http/health-routes';
+import { createRateLimiter } from './platform/rate-limit';
 import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { apartmentResidentRoutes } from './residents/adapters/http/apartment-routes';
@@ -83,7 +84,8 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   app.route('/healthz', healthRoutes());
 
-  app.route('/auth', authRoutes({ users, hasher, isResidentActive }));
+  const loginLimiter = createRateLimiter();
+  app.route('/auth', authRoutes({ users, hasher, isResidentActive, limiter: loginLimiter }));
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);

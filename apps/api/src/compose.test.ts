@@ -212,6 +212,30 @@ describe('Morada API — real credentials', () => {
     expect(res.status).toBe(401);
   });
 
+  test('repeated bad logins are rate-limited after 5 attempts', async () => {
+    const app = await makeApp();
+
+    for (let i = 0; i < 5; i++) {
+      const res = await login(app, adminCredentials.username, 'senha-errada');
+      expect(res.status).toBe(401);
+    }
+
+    const sixth = await login(app, adminCredentials.username, 'senha-errada');
+    expect(sixth.status).toBe(429);
+  });
+
+  test('a good login still succeeds when under the rate limit', async () => {
+    const app = await makeApp();
+
+    for (let i = 0; i < 4; i++) {
+      const res = await login(app, adminCredentials.username, 'senha-errada');
+      expect(res.status).toBe(401);
+    }
+
+    const res = await login(app, adminCredentials.username, adminCredentials.password);
+    expect(res.status).toBe(200);
+  });
+
   test('a resident reads their own record via GET /api/residents/me', async () => {
     const app = await makeApp();
     const token = await tokenFor(app, residentCredentials);
