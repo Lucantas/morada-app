@@ -13,6 +13,7 @@ import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
+import { apartmentResidentRoutes } from './residents/adapters/http/apartment-routes';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
@@ -100,15 +101,13 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   );
   api.route('/settings', guarded('admin', settingsRoutes(settings)));
 
-  // Admin: an apartment's occupant history — the current resident plus everyone
-  // who has moved out (active-first). Powers the "moradores antigos" view.
-  api.get('/apartments/:id/residents', requireRole('admin'), async (c) =>
-    c.json(await residents.listByApartment(c.req.param('id'))),
-  );
-
-  // Admin: an apartment's full receipt ledger, across every resident who has
-  // occupied it (the resident-facing view stays scoped to their own receipts).
-  api.route('/apartments', apartmentReceiptRoutes({ receipts }));
+  // Admin: apartment-scoped views — full receipt ledger and occupant history,
+  // across every resident who has occupied the apartment (the resident-facing
+  // view stays scoped to their own receipts).
+  const apartments = new Hono<ApiEnv>();
+  apartments.route('/', apartmentReceiptRoutes({ receipts }));
+  apartments.route('/', apartmentResidentRoutes({ residents }));
+  api.route('/apartments', apartments);
 
   // Any authenticated user (reads are scoped to the caller inside the routes).
   api.route('/receipts', receiptRoutes({ receipts, residents, settings }));
