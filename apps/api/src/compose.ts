@@ -11,12 +11,8 @@ import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/
 import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
+import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
-import { confirmPayment } from './receipts/app/confirm-payment';
-import { createReceipt } from './receipts/app/create-receipt';
-import { editReceipt } from './receipts/app/edit-receipt';
-import { generateMonthlyReceipts } from './receipts/app/generate-monthly-receipts';
-import { rejectPayment } from './receipts/app/reject-payment';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
@@ -104,60 +100,18 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   );
   api.route('/settings', guarded('admin', settingsRoutes(settings)));
 
-  // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
-  api.post('/receipts', requireRole('admin'), async (c) =>
-    c.json(
-      await createReceipt(receipts, (id) => residents.apartmentOf(id), await c.req.json()),
-      201,
-    ),
-  );
-
-  // Editing a receipt (ref/title/valueCents/dueDate) is admin-only; must be
-  // registered before the '/receipts' mount below or it would be shadowed.
-  api.put('/receipts/:id', requireRole('admin'), async (c) =>
-    c.json(await editReceipt(receipts, c.req.param('id'), await c.req.json())),
-  );
-
-  // Admin: confirm or reject a resident's submitted payment (status
-  // 'em_analise'); both must be registered before the '/receipts' mount
-  // below or they would be shadowed.
-  api.post('/receipts/:id/confirm', requireRole('admin'), async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { paidAt?: string };
-    const paidAt = body.paidAt ?? new Date().toISOString().slice(0, 10);
-    return c.json(await confirmPayment(receipts, c.req.param('id'), paidAt));
-  });
-  api.post('/receipts/:id/reject', requireRole('admin'), async (c) =>
-    c.json(await rejectPayment(receipts, c.req.param('id'))),
-  );
-
-  // Admin-only: create the missing monthly condo-fee receipts, idempotently
-  // (one 'pendente' charge per active resident for the current ref/month).
-  api.post('/receipts/ensure-month', requireRole('admin'), async (c) =>
-    c.json(
-      await generateMonthlyReceipts(
-        receipts,
-        residents,
-        settings,
-        new Date().toISOString().slice(0, 10),
-      ),
-      201,
-    ),
-  );
-
-  // Admin: an apartment's full receipt ledger, across every resident who has
-  // occupied it (the resident-facing view stays scoped to their own receipts).
-  api.get('/apartments/:id/receipts', requireRole('admin'), async (c) =>
-    c.json(await receipts.listByApartment(c.req.param('id'))),
-  );
-
   // Admin: an apartment's occupant history — the current resident plus everyone
   // who has moved out (active-first). Powers the "moradores antigos" view.
   api.get('/apartments/:id/residents', requireRole('admin'), async (c) =>
     c.json(await residents.listByApartment(c.req.param('id'))),
   );
 
+  // Admin: an apartment's full receipt ledger, across every resident who has
+  // occupied it (the resident-facing view stays scoped to their own receipts).
+  api.route('/apartments', apartmentReceiptRoutes({ receipts }));
+
   // Any authenticated user (reads are scoped to the caller inside the routes).
-  api.route('/receipts', receiptRoutes(receipts));
+  api.route('/receipts', receiptRoutes({ receipts, residents, settings }));
   api.route('/dashboard', dashboardRoutes(dashboard));
 
   // Notices: reads and per-resident dismiss are open to any authenticated user;

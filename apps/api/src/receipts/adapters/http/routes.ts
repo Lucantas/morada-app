@@ -2,12 +2,19 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { requireRole, type ApiEnv } from '../../../platform/auth';
+import type { ResidentRepository } from '../../../residents/domain/resident-repository';
+import type { SettingsRepository } from '../../../settings/domain/settings-repository';
 import { archiveReceipt } from '../../app/archive-receipt';
+import { confirmPayment } from '../../app/confirm-payment';
+import { createReceipt } from '../../app/create-receipt';
+import { editReceipt } from '../../app/edit-receipt';
+import { generateMonthlyReceipts } from '../../app/generate-monthly-receipts';
 import { getReceipt } from '../../app/get-receipt';
 import { listReceipts } from '../../app/list-receipts';
 import { listResidentReceipts } from '../../app/list-resident-receipts';
 import { payReceipt } from '../../app/pay-receipt';
+import { rejectPayment } from '../../app/reject-payment';
 import { submitPayment } from '../../app/submit-payment';
 import type { Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
@@ -28,8 +35,52 @@ function denyForeignReceipt(c: Context<ApiEnv>, receipt: Receipt): Response | nu
   return null;
 }
 
-export function receiptRoutes(repo: ReceiptRepository) {
+interface ReceiptRoutesDeps {
+  receipts: ReceiptRepository;
+  residents: ResidentRepository;
+  settings: SettingsRepository;
+}
+
+export function receiptRoutes({ receipts: repo, residents, settings }: ReceiptRoutesDeps) {
   const app = new Hono<ApiEnv>();
+
+  // Issuing a charge is admin-only; reads/pay (mounted below) are per-resident.
+  app.post('/', requireRole('admin'), async (c) =>
+    c.json(await createReceipt(repo, (id) => residents.apartmentOf(id), await c.req.json()), 201),
+  );
+
+  // Editing a receipt (ref/title/valueCents/dueDate) is admin-only; must be
+  // registered before the generic resident '/:id' route below or it would be
+  // shadowed.
+  app.put('/:id', requireRole('admin'), async (c) =>
+    c.json(await editReceipt(repo, c.req.param('id'), await c.req.json())),
+  );
+
+  // Admin: confirm or reject a resident's submitted payment (status
+  // 'em_analise'); both must be registered before the generic resident
+  // '/:id' route below or they would be shadowed.
+  app.post('/:id/confirm', requireRole('admin'), async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { paidAt?: string };
+    const paidAt = body.paidAt ?? new Date().toISOString().slice(0, 10);
+    return c.json(await confirmPayment(repo, c.req.param('id'), paidAt));
+  });
+  app.post('/:id/reject', requireRole('admin'), async (c) =>
+    c.json(await rejectPayment(repo, c.req.param('id'))),
+  );
+
+  // Admin-only: create the missing monthly condo-fee receipts, idempotently
+  // (one 'pendente' charge per active resident for the current ref/month).
+  app.post('/ensure-month', requireRole('admin'), async (c) =>
+    c.json(
+      await generateMonthlyReceipts(
+        repo,
+        residents,
+        settings,
+        new Date().toISOString().slice(0, 10),
+      ),
+      201,
+    ),
+  );
 
   app.get('/', async (c) =>
     c.json(

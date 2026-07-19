@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
+import type { ResidentRepository } from '../../../residents/domain/resident-repository';
+import type { SettingsRepository } from '../../../settings/domain/settings-repository';
 import type { Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
@@ -33,6 +35,9 @@ const pending: Receipt = {
   residentId: 'r-1',
 };
 
+const fakeResidents = {} as unknown as ResidentRepository;
+const fakeSettings = {} as unknown as SettingsRepository;
+
 function mount(repo: ReceiptRepository, role?: 'admin' | 'resident', sub = 'r-1'): Hono<ApiEnv> {
   const app = new Hono<ApiEnv>();
   app.use('*', async (c, next) => {
@@ -40,7 +45,10 @@ function mount(repo: ReceiptRepository, role?: 'admin' | 'resident', sub = 'r-1'
     c.set('sub', sub);
     await next();
   });
-  app.route('/receipts', receiptRoutes(repo));
+  app.route(
+    '/receipts',
+    receiptRoutes({ receipts: repo, residents: fakeResidents, settings: fakeSettings }),
+  );
   return app;
 }
 
