@@ -37,25 +37,27 @@ export function buildIndex(commits) {
   );
 }
 
-function collectCommits() {
-  const raw = execFileSync('git', ['log', '--format=%x00%s%x00%b%x01', '--name-only'], {
-    encoding: 'utf8',
-  });
+export function parseGitLog(raw) {
   return raw
     .split('\x01')
-    .map((block) => block.trim())
+    .map((record) => record.trim())
     .filter(Boolean)
-    .map((block) => {
-      const [, subject, rest = ''] = block.split('\x00');
-      const bodyEnd = rest.indexOf('\n\n');
-      const body = bodyEnd === -1 ? rest : rest.slice(0, bodyEnd);
-      const files = rest
+    .map((record) => {
+      const [subject = '', body = '', filesBlock = ''] = record.split('\x00');
+      const files = filesBlock
         .split('\n')
         .map((l) => l.trim())
         .filter((l) => l.includes('/') && !l.startsWith('Spec:'));
       const specMatch = body.match(/^Spec:\s*(.+)$/m);
       return { subject, spec: specMatch ? specMatch[1].trim() : null, files };
     });
+}
+
+function collectCommits() {
+  const raw = execFileSync('git', ['log', '--format=%x01%s%x00%b%x00', '--name-only'], {
+    encoding: 'utf8',
+  });
+  return parseGitLog(raw);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
