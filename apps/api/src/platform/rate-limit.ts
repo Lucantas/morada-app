@@ -33,7 +33,9 @@ export function createRateLimiter(opts?: {
 
     fail(key, now) {
       const existing = entries.get(key);
-      const withinWindow = existing !== undefined && now - existing.windowStart <= windowMs;
+      const stillLocked = existing !== undefined && existing.lockedUntil > now;
+      const withinWindow =
+        existing !== undefined && (stillLocked || now - existing.windowStart <= windowMs);
       const entry: RateLimitEntry = withinWindow
         ? { ...existing, count: existing.count + 1 }
         : { count: 1, windowStart: now, lockedUntil: 0 };

@@ -1,4 +1,4 @@
-import { createRateLimiter, LOCKOUT_MS, MAX_ATTEMPTS } from './rate-limit';
+import { createRateLimiter, LOCKOUT_MS, MAX_ATTEMPTS, WINDOW_MS } from './rate-limit';
 
 describe('createRateLimiter', () => {
   test('allows attempts under the max', () => {
@@ -70,6 +70,36 @@ describe('createRateLimiter', () => {
     limiter.fail('ip:user', laterNow);
 
     expect(limiter.check('ip:user', laterNow)).toEqual({ allowed: true });
+  });
+
+  test('keeps the lock in force when a fail arrives after the window but before the lockout expires', () => {
+    const limiter = createRateLimiter();
+
+    limiter.fail('ip:user', 0);
+    limiter.fail('ip:user', 1);
+    limiter.fail('ip:user', 2);
+    limiter.fail('ip:user', 3);
+    limiter.fail('ip:user', WINDOW_MS - 1);
+
+    expect(limiter.check('ip:user', WINDOW_MS)).toEqual({ allowed: false });
+
+    limiter.fail('ip:user', WINDOW_MS + 1);
+
+    expect(limiter.check('ip:user', WINDOW_MS + 2)).toEqual({ allowed: false });
+  });
+
+  test('unlocks once LOCKOUT_MS has elapsed even after a mid-lockout fail', () => {
+    const limiter = createRateLimiter();
+
+    limiter.fail('ip:user', 0);
+    limiter.fail('ip:user', 1);
+    limiter.fail('ip:user', 2);
+    limiter.fail('ip:user', 3);
+    limiter.fail('ip:user', WINDOW_MS - 1);
+    limiter.fail('ip:user', WINDOW_MS + 1);
+
+    const unlockAt = WINDOW_MS + 1 + LOCKOUT_MS + 1;
+    expect(limiter.check('ip:user', unlockAt)).toEqual({ allowed: true });
   });
 
   test('respects custom options', () => {
