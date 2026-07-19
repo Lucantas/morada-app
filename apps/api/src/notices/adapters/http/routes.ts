@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { createNotice } from '../../app/create-notice';
 import { dismissNotice } from '../../app/dismiss-notice';
 import { listNotices } from '../../app/list-notices';
@@ -12,14 +12,14 @@ export function noticeRoutes(repo: NoticeRepository) {
 
   app.get('/', async (c) => c.json(await listNotices(repo)));
 
-  app.post('/', async (c) => {
+  app.post('/', requireRole('admin'), async (c) => {
     const draft = noticeDraftSchema.parse(await c.req.json());
     return c.json(await createNotice(repo, draft), 201);
   });
 
   app.post('/:id/dismiss', async (c) => c.json(await dismissNotice(repo, c.req.param('id'))));
 
-  app.delete('/:id', async (c) => {
+  app.delete('/:id', requireRole('admin'), async (c) => {
     await repo.remove(c.req.param('id'));
     return c.body(null, 204);
   });

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { ApiEnv, Role } from '../../../platform/auth';
 import type { Thread } from '../../domain/message';
 import type { ThreadRepository } from '../../domain/thread-repository';
 
@@ -32,8 +33,14 @@ function mount(
     name: 'Morador',
     apt: 'Apto',
   }),
+  role: Role = 'admin',
 ) {
-  const app = new Hono();
+  const app = new Hono<ApiEnv>();
+  app.use('*', async (c, next) => {
+    c.set('role', role);
+    c.set('sub', 't-1');
+    await next();
+  });
   app.route('/threads', threadRoutes(repo, lookup));
   return app;
 }
@@ -46,6 +53,12 @@ describe('threadRoutes', () => {
     const body = (await res.json()) as Thread[];
     expect(body).toHaveLength(1);
     expect(body[0]?.residentName).toBe('Ana');
+  });
+
+  test('GET / is forbidden for non-admins', async () => {
+    const app = mount(fakeRepo([build({ id: 't-1' })]), undefined, 'resident');
+    const res = await app.request('/threads');
+    expect(res.status).toBe(403);
   });
 
   test('GET /:id materialises an empty thread when none exists yet', async () => {

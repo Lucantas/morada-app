@@ -70,4 +70,18 @@ module.exports = tseslint.config(
     files: ['src/**/*.test.ts', 'src/**/testing/**'],
     rules: { 'boundaries/element-types': 'off', 'boundaries/external': 'off' },
   },
+  {
+    files: ['src/compose.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name!='c'][callee.property.name=/^(get|post|put|patch|delete|on)$/]",
+          message:
+            'Define routes in a feature adapters/http router; compose.ts only wires (.route/.use).',
+        },
+      ],
+    },
+  },
 );

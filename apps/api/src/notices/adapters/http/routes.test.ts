@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { ApiEnv, Role } from '../../../platform/auth';
 import type { Notice } from '../../domain/notice';
 import type { NoticeRepository } from '../../domain/notice-repository';
 
@@ -31,8 +32,13 @@ const build = (over: Partial<Notice>): Notice => ({
   ...over,
 });
 
-function mount(repo: NoticeRepository) {
-  const app = new Hono();
+function mount(repo: NoticeRepository, role: Role = 'admin') {
+  const app = new Hono<ApiEnv>();
+  app.use('*', async (c, next) => {
+    c.set('role', role);
+    c.set('sub', 'admin');
+    await next();
+  });
   app.route('/notices', noticeRoutes(repo));
   return app;
 }
@@ -79,5 +85,28 @@ describe('noticeRoutes', () => {
     const res = await app.request('/notices/n-1', { method: 'DELETE' });
     expect(res.status).toBe(204);
     expect(await repo.getById('n-1')).toBeNull();
+  });
+
+  test('POST / is forbidden for non-admins', async () => {
+    const app = mount(fakeRepo(), 'resident');
+    const res = await app.request('/notices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Novo aviso',
+        body: 'Mensagem',
+        kind: 'aviso',
+        audience: 'todos',
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('DELETE /:id is forbidden for non-admins', async () => {
+    const repo = fakeRepo([build({ id: 'n-1' })]);
+    const app = mount(repo, 'resident');
+    const res = await app.request('/notices/n-1', { method: 'DELETE' });
+    expect(res.status).toBe(403);
+    expect(await repo.getById('n-1')).not.toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { ThreadNotFoundError } from '../../domain/errors';
 import type { Thread } from '../../domain/message';
 import { listThreads } from '../../app/list-threads';
@@ -47,7 +47,7 @@ export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResid
     return { id, residentName: resident.name, apt: resident.apt, unread: false, messages: [] };
   }
 
-  app.get('/', async (c) => c.json(await listThreads(repo)));
+  app.get('/', requireRole('admin'), async (c) => c.json(await listThreads(repo)));
 
   app.get('/:id', async (c) => {
     const id = c.req.param('id');

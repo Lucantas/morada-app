@@ -11,6 +11,7 @@ import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/
 import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
+import { healthRoutes } from './platform/http/health-routes';
 import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
 import { apartmentResidentRoutes } from './residents/adapters/http/apartment-routes';
@@ -61,7 +62,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     }),
   );
 
-  app.get('/healthz', (c) => c.json({ status: 'ok' }));
+  app.route('/healthz', healthRoutes());
 
   app.route('/auth', authRoutes({ users, hasher, isResidentActive }));
 
@@ -114,14 +115,12 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route('/dashboard', dashboardRoutes(dashboard));
 
   // Notices: reads and per-resident dismiss are open to any authenticated user;
-  // creating and deleting notices is admin-only.
-  api.on('POST', '/notices', requireRole('admin'));
-  api.on('DELETE', '/notices/*', requireRole('admin'));
+  // creating and deleting notices is admin-only (guarded inside noticeRoutes).
   api.route('/notices', noticeRoutes(notices));
 
-  // Threads: listing all conversations is admin-only; per-thread access stays open.
-  // A resident's thread is created lazily from their record on first use.
-  api.on('GET', '/threads', requireRole('admin'));
+  // Threads: listing all conversations is admin-only (guarded inside threadRoutes);
+  // per-thread access stays open. A resident's thread is created lazily from
+  // their record on first use.
   api.route(
     '/threads',
     threadRoutes(threads, async (id) => {
