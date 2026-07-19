@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 
 import { accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
@@ -59,6 +60,24 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
       origin: config.webOrigin,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
+    }),
+  );
+  app.use(
+    '*',
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+      },
+      xFrameOptions: 'DENY',
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      strictTransportSecurity: config.isProduction ? true : false,
+      permissionsPolicy: {
+        camera: [],
+        microphone: [],
+        geolocation: [],
+      },
     }),
   );
 

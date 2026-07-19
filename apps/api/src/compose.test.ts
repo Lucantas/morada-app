@@ -49,6 +49,14 @@ describe('Morada API', () => {
     expect(await res.json()).toEqual({ status: 'ok' });
   });
 
+  test('every response carries security headers', async () => {
+    const res = await (await makeApp()).request('/healthz');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('X-Frame-Options')).toBe('DENY');
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+    expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'none'");
+  });
+
   test('rejects unauthenticated access to protected resources', async () => {
     const res = await (await makeApp()).request('/api/residents');
     expect(res.status).toBe(401);
