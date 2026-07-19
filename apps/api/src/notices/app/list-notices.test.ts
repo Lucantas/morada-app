@@ -12,6 +12,13 @@ function fakeRepo(list: Notice[]): NoticeRepository {
       map.set(n.id, n);
       return n;
     },
+    dismiss: async (id) => {
+      const notice = map.get(id);
+      if (!notice) throw new Error('not found');
+      const dismissed = { ...notice, dismissed: true };
+      map.set(id, dismissed);
+      return dismissed;
+    },
     remove: async (id) => {
       map.delete(id);
     },
@@ -32,10 +39,19 @@ const build = (over: Partial<Notice>): Notice => ({
 describe('listNotices', () => {
   test('returns every notice from the repository', async () => {
     const repo = fakeRepo([build({ id: 'a' }), build({ id: 'b' }), build({ id: 'c' })]);
-    expect((await listNotices(repo)).map((n) => n.id)).toEqual(['a', 'b', 'c']);
+    expect((await listNotices(repo, null)).map((n) => n.id)).toEqual(['a', 'b', 'c']);
   });
 
   test('returns an empty array when there are no notices', async () => {
-    expect(await listNotices(fakeRepo([]))).toEqual([]);
+    expect(await listNotices(fakeRepo([]), null)).toEqual([]);
+  });
+
+  test('passes the viewer resident id through to the repository', async () => {
+    const repo = fakeRepo([build({ id: 'a' })]);
+    const listSpy = jest.spyOn(repo, 'list');
+
+    await listNotices(repo, 'resident-a');
+
+    expect(listSpy).toHaveBeenCalledWith('resident-a');
   });
 });

@@ -13,6 +13,11 @@ function fakeRepo(): NoticeRepository {
       map.set(n.id, n);
       return n;
     },
+    dismiss: async (id) => {
+      const notice = map.get(id);
+      if (!notice) throw new Error('not found');
+      return { ...notice, dismissed: true };
+    },
     remove: async (id) => {
       map.delete(id);
     },

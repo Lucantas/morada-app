@@ -197,7 +197,6 @@ const notices = [
     kind: 'manutencao',
     audience: 'Todos os moradores',
     date_label: 'Há 2 dias',
-    dismissed: false,
   },
   {
     id: 'n-2',
@@ -206,7 +205,6 @@ const notices = [
     kind: 'aviso',
     audience: 'Bloco 2',
     date_label: 'Há 5 dias',
-    dismissed: false,
   },
   {
     id: 'n-3',
@@ -215,7 +213,6 @@ const notices = [
     kind: 'urgente',
     audience: 'Todos os moradores',
     date_label: 'Há 1 semana',
-    dismissed: false,
   },
 ];
 
@@ -314,7 +311,7 @@ export async function seedFixtures(pool: Pool): Promise<void> {
   await insertRows(
     pool,
     'notices',
-    ['id', 'title', 'body', 'kind', 'audience', 'date_label', 'dismissed'],
+    ['id', 'title', 'body', 'kind', 'audience', 'date_label'],
     notices,
   );
   await insertRows(pool, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);

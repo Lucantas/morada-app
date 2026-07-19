@@ -13,7 +13,7 @@ interface NoticeRow {
   dismissed: boolean;
 }
 
-const COLUMNS = 'id, title, body, kind, audience, date_label, dismissed';
+const BASE_COLUMNS = 'id, title, body, kind, audience, date_label';
 
 function toNotice(row: NoticeRow): Notice {
   return noticeSchema.parse({
@@ -30,14 +30,28 @@ function toNotice(row: NoticeRow): Notice {
 export class PostgresNoticeRepository implements NoticeRepository {
   constructor(private readonly pool: Pool) {}
 
-  async list(): Promise<Notice[]> {
-    const { rows } = await this.pool.query<NoticeRow>(`SELECT ${COLUMNS} FROM notices`);
+  async list(viewerResidentId: string | null): Promise<Notice[]> {
+    if (viewerResidentId === null) {
+      const { rows } = await this.pool.query<NoticeRow>(
+        `SELECT ${BASE_COLUMNS}, false AS dismissed FROM notices`,
+      );
+      return rows.map(toNotice);
+    }
+
+    const { rows } = await this.pool.query<NoticeRow>(
+      `SELECT n.id, n.title, n.body, n.kind, n.audience, n.date_label,
+              (d.resident_id IS NOT NULL) AS dismissed
+       FROM notices n
+       LEFT JOIN notice_dismissals d
+         ON d.notice_id = n.id AND d.resident_id = $1`,
+      [viewerResidentId],
+    );
     return rows.map(toNotice);
   }
 
   async getById(id: string): Promise<Notice | null> {
     const { rows } = await this.pool.query<NoticeRow>(
-      `SELECT ${COLUMNS} FROM notices WHERE id = $1`,
+      `SELECT ${BASE_COLUMNS}, false AS dismissed FROM notices WHERE id = $1`,
       [id],
     );
     return rows[0] ? toNotice(rows[0]) : null;
@@ -45,26 +59,30 @@ export class PostgresNoticeRepository implements NoticeRepository {
 
   async save(notice: Notice): Promise<Notice> {
     await this.pool.query(
-      `INSERT INTO notices (${COLUMNS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO notices (${BASE_COLUMNS})
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO UPDATE SET
          title = EXCLUDED.title, body = EXCLUDED.body, kind = EXCLUDED.kind,
-         audience = EXCLUDED.audience, date_label = EXCLUDED.date_label,
-         dismissed = EXCLUDED.dismissed`,
-      [
-        notice.id,
-        notice.title,
-        notice.body,
-        notice.kind,
-        notice.audience,
-        notice.dateLabel,
-        notice.dismissed,
-      ],
+         audience = EXCLUDED.audience, date_label = EXCLUDED.date_label`,
+      [notice.id, notice.title, notice.body, notice.kind, notice.audience, notice.dateLabel],
     );
-    return notice;
+    return { ...notice, dismissed: false };
+  }
+
+  async dismiss(noticeId: string, residentId: string): Promise<Notice> {
+    await this.pool.query(
+      `INSERT INTO notice_dismissals (notice_id, resident_id)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [noticeId, residentId],
+    );
+    const notice = await this.getById(noticeId);
+    if (!notice) throw new Error(`Notice ${noticeId} not found after dismiss`);
+    return { ...notice, dismissed: true };
   }
 
   async remove(id: string): Promise<void> {
+    await this.pool.query('DELETE FROM notice_dismissals WHERE notice_id = $1', [id]);
     await this.pool.query('DELETE FROM notices WHERE id = $1', [id]);
   }
 }

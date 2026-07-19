@@ -8,12 +8,24 @@ import { noticeRoutes } from './routes';
 
 function fakeRepo(list: Notice[] = []): NoticeRepository {
   const map = new Map(list.map((n) => [n.id, n]));
+  const dismissals = new Set<string>();
   return {
-    list: async () => [...map.values()],
+    list: async (viewerResidentId) =>
+      [...map.values()].map((n) => ({
+        ...n,
+        dismissed: viewerResidentId !== null && dismissals.has(`${n.id}:${viewerResidentId}`),
+      })),
     getById: async (id) => map.get(id) ?? null,
     save: async (n) => {
-      map.set(n.id, n);
-      return n;
+      const saved = { ...n, dismissed: false };
+      map.set(n.id, saved);
+      return saved;
+    },
+    dismiss: async (id, residentId) => {
+      const notice = map.get(id);
+      if (!notice) throw new Error('not found');
+      dismissals.add(`${id}:${residentId}`);
+      return { ...notice, dismissed: true };
     },
     remove: async (id) => {
       map.delete(id);
@@ -32,11 +44,11 @@ const build = (over: Partial<Notice>): Notice => ({
   ...over,
 });
 
-function mount(repo: NoticeRepository, role: Role = 'admin') {
+function mount(repo: NoticeRepository, role: Role = 'admin', sub = 'admin') {
   const app = new Hono<ApiEnv>();
   app.use('*', async (c, next) => {
     c.set('role', role);
-    c.set('sub', 'admin');
+    c.set('sub', sub);
     await next();
   });
   app.route('/notices', noticeRoutes(repo));
@@ -71,12 +83,29 @@ describe('noticeRoutes', () => {
     expect(await repo.getById(body.id)).not.toBeNull();
   });
 
-  test('POST /:id/dismiss flips dismissed to true', async () => {
-    const app = mount(fakeRepo([build({ id: 'n-1', dismissed: false })]));
+  test('POST /:id/dismiss flips dismissed to true for the dismissing resident', async () => {
+    const app = mount(fakeRepo([build({ id: 'n-1', dismissed: false })]), 'resident', 'resident-a');
     const res = await app.request('/notices/n-1/dismiss', { method: 'POST' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Notice;
     expect(body.dismissed).toBe(true);
+  });
+
+  test('dismissing a notice as one resident does not hide it for another resident or the admin', async () => {
+    const repo = fakeRepo([build({ id: 'n-1', dismissed: false })]);
+    const appA = mount(repo, 'resident', 'resident-a');
+    const appB = mount(repo, 'resident', 'resident-b');
+    const appAdmin = mount(repo, 'admin', 'admin');
+
+    await appA.request('/notices/n-1/dismiss', { method: 'POST' });
+
+    const bodyA = (await (await appA.request('/notices')).json()) as Notice[];
+    const bodyB = (await (await appB.request('/notices')).json()) as Notice[];
+    const bodyAdmin = (await (await appAdmin.request('/notices')).json()) as Notice[];
+
+    expect(bodyA.find((n) => n.id === 'n-1')?.dismissed).toBe(true);
+    expect(bodyB.find((n) => n.id === 'n-1')?.dismissed).toBe(false);
+    expect(bodyAdmin.find((n) => n.id === 'n-1')?.dismissed).toBe(false);
   });
 
   test('DELETE /:id returns 204', async () => {

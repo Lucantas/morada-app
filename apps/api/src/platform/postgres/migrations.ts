@@ -167,4 +167,16 @@ ALTER TABLE receipts ADD COLUMN visible boolean NOT NULL DEFAULT true;
 ALTER TABLE accounts ADD COLUMN visible boolean NOT NULL DEFAULT true;
 `,
   },
+  {
+    id: '010_notice_dismissals',
+    sql: `
+CREATE TABLE notice_dismissals (
+  notice_id TEXT NOT NULL REFERENCES notices(id),
+  resident_id TEXT NOT NULL,
+  PRIMARY KEY (notice_id, resident_id)
+);
+
+ALTER TABLE notices DROP COLUMN dismissed;
+`,
+  },
 ];
