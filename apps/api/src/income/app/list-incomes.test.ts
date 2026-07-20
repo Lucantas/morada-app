@@ -26,4 +26,25 @@ describe('listIncomes', () => {
 
     expect(result).toEqual([income]);
   });
+
+  test('returns incomes ordered by date, most recent first', async () => {
+    const older: Income = {
+      id: 'i-1',
+      description: 'Entrada antiga',
+      source: 'Fonte A',
+      date: '2026-05-10',
+      valueCents: 10000,
+    };
+    const newer: Income = {
+      id: 'i-2',
+      description: 'Entrada recente',
+      source: 'Fonte B',
+      date: '2026-07-01',
+      valueCents: 20000,
+    };
+
+    const result = await listIncomes(fakeRepo([older, newer]));
+
+    expect(result.map((it) => it.id)).toEqual(['i-2', 'i-1']);
+  });
 });
