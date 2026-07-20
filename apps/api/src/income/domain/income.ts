@@ -13,5 +13,8 @@ export const incomeSchema = z.object({
 });
 export type Income = z.infer<typeof incomeSchema>;
 
-export const incomeDraftSchema = incomeSchema.extend({ id: z.string().min(1).optional() });
+export const incomeDraftSchema = incomeSchema.extend({
+  id: z.string().min(1).optional(),
+  date: isoDateSchema,
+});
 export type IncomeDraft = z.infer<typeof incomeDraftSchema>;

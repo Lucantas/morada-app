@@ -61,4 +61,58 @@ describe('saveIncome', () => {
     expect(updated.description).toBe('Aluguel atualizado');
     expect(await repo.list()).toHaveLength(1);
   });
+
+  test('rejects a null date', async () => {
+    await expect(
+      saveIncome(fakeRepo(), {
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: null,
+        valueCents: 20000,
+      }),
+    ).rejects.toThrow(IncomeValidationError);
+  });
+
+  test('rejects a missing date', async () => {
+    await expect(
+      saveIncome(fakeRepo(), {
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        valueCents: 20000,
+      }),
+    ).rejects.toThrow(IncomeValidationError);
+  });
+
+  test('rejects an empty string date', async () => {
+    await expect(
+      saveIncome(fakeRepo(), {
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: '',
+        valueCents: 20000,
+      }),
+    ).rejects.toThrow(IncomeValidationError);
+  });
+
+  test('rejects a date with an invalid month', async () => {
+    await expect(
+      saveIncome(fakeRepo(), {
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: '2026-13-40',
+        valueCents: 20000,
+      }),
+    ).rejects.toThrow(IncomeValidationError);
+  });
+
+  test('rejects a date that does not exist on the calendar', async () => {
+    await expect(
+      saveIncome(fakeRepo(), {
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: '2026-02-31',
+        valueCents: 20000,
+      }),
+    ).rejects.toThrow(IncomeValidationError);
+  });
 });
