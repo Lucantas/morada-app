@@ -58,6 +58,65 @@ describe('saveAccount', () => {
       }),
     ).rejects.toThrow(AccountValidationError);
   });
+
+  test('rejects a null date', async () => {
+    await expect(
+      saveAccount(fakeRepo(), {
+        description: 'Energia',
+        category: 'Utilidades',
+        date: null,
+        valueCents: 5000,
+        status: 'pendente',
+      }),
+    ).rejects.toThrow(AccountValidationError);
+  });
+
+  test('rejects a missing date', async () => {
+    await expect(
+      saveAccount(fakeRepo(), {
+        description: 'Energia',
+        category: 'Utilidades',
+        valueCents: 5000,
+        status: 'pendente',
+      }),
+    ).rejects.toThrow(AccountValidationError);
+  });
+
+  test('rejects an empty string date', async () => {
+    await expect(
+      saveAccount(fakeRepo(), {
+        description: 'Energia',
+        category: 'Utilidades',
+        date: '',
+        valueCents: 5000,
+        status: 'pendente',
+      }),
+    ).rejects.toThrow(AccountValidationError);
+  });
+
+  test('rejects a date with an invalid month', async () => {
+    await expect(
+      saveAccount(fakeRepo(), {
+        description: 'Energia',
+        category: 'Utilidades',
+        date: '2026-13-40',
+        valueCents: 5000,
+        status: 'pendente',
+      }),
+    ).rejects.toThrow(AccountValidationError);
+  });
+
+  test('rejects a date that does not exist on the calendar', async () => {
+    await expect(
+      saveAccount(fakeRepo(), {
+        description: 'Energia',
+        category: 'Utilidades',
+        date: '2026-02-31',
+        valueCents: 5000,
+        status: 'pendente',
+      }),
+    ).rejects.toThrow(AccountValidationError);
+  });
 });
 
 describe('getAccount', () => {
