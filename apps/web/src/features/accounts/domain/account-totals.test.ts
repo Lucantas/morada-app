@@ -51,6 +51,18 @@ describe('monthlyExpenseCents', () => {
     expect(monthlyExpenseCents(accounts, '2026-02')).toBe(20000);
     expect(monthlyExpenseCents(accounts, '2026-03')).toBe(30000);
   });
+
+  test('only sums accounts with status pago, excluding pendente and atrasado', () => {
+    const result = monthlyExpenseCents(
+      [
+        buildAccount({ date: '2026-04-05', valueCents: 100000, status: 'pago' }),
+        buildAccount({ date: '2026-04-10', valueCents: 50000, status: 'pendente' }),
+        buildAccount({ date: '2026-04-15', valueCents: 30000, status: 'atrasado' }),
+      ],
+      '2026-04',
+    );
+    expect(result).toBe(100000);
+  });
 });
 
 describe('accountMonths', () => {

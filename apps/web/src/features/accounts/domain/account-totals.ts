@@ -2,7 +2,7 @@ import type { Account } from './account';
 
 export function monthlyExpenseCents(accounts: Account[], month: string): number {
   return accounts.reduce<number>((total, account) => {
-    if (account.date?.slice(0, 7) === month) {
+    if (account.date?.slice(0, 7) === month && account.status === 'pago') {
       return total + account.valueCents;
     }
     return total;

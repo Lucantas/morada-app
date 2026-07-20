@@ -82,7 +82,7 @@ describe('AccountsScreen', () => {
     expect(screen.getByText('Entradas')).toBeInTheDocument();
     expect(screen.getByText('Saídas')).toBeInTheDocument();
     expect(screen.getByText('900,00')).toBeInTheDocument();
-    expect(screen.getByText('450,00')).toBeInTheDocument();
+    expect(screen.getByText('0,00')).toBeInTheDocument();
   });
 
   test('default selected month is the current calendar month and the subtitle shows its name and year', async () => {
@@ -108,7 +108,7 @@ describe('AccountsScreen', () => {
 
     expect(screen.getByText(formatMonthName(now))).toBeInTheDocument();
     expect(screen.getByText('900,00')).toBeInTheDocument();
-    expect(screen.getByText('450,00')).toBeInTheDocument();
+    expect(screen.getByText('0,00')).toBeInTheDocument();
   });
 
   test('the next arrow is disabled at the current month by default and is a no-op', async () => {
@@ -122,7 +122,7 @@ describe('AccountsScreen', () => {
 
     expect(screen.getByText(formatMonthName(now))).toBeInTheDocument();
     expect(screen.getByText('900,00')).toBeInTheDocument();
-    expect(screen.getByText('450,00')).toBeInTheDocument();
+    expect(screen.getByText('0,00')).toBeInTheDocument();
   });
 
   test('the previous arrow is disabled at the earliest data month and is a no-op', async () => {
