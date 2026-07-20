@@ -14,6 +14,7 @@ import { pendingReceipt } from '../domain/pending-receipt';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 import { buildReceiptProof, proofFileName } from '../domain/receipt-proof';
+import { sortByDueDateDesc } from '../domain/sort-by-due-date';
 
 import { methodLabel, receiptStatusView } from './receipt-status-view';
 import { useReceipts } from './use-receipts';
@@ -96,6 +97,7 @@ function ReceiptsContent({
   }
 
   const pending = pendingReceipt(receipts);
+  const ordered = sortByDueDateDesc(receipts);
   return (
     <>
       {pending && (
@@ -123,7 +125,7 @@ function ReceiptsContent({
       )}
       <SectionLabel>2026</SectionLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {receipts.map((receipt) => (
+        {ordered.map((receipt) => (
           <ReceiptTicket key={receipt.id} receipt={receipt} resident={resident} onPay={onPay} />
         ))}
       </div>

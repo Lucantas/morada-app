@@ -64,6 +64,30 @@ describe('ReceiptsScreen', () => {
     expect(screen.getByRole('button', { name: /baixar comprovante/i })).toBeInTheDocument();
   });
 
+  test('lists receipts most recent first by due date', async () => {
+    const repository = new InMemoryReceiptRepository([
+      buildReceipt({ id: 'rc-old', ref: '02/2026', dueDate: '2026-02-10' }),
+      buildReceipt({ id: 'rc-new', ref: '05/2026', dueDate: '2026-05-10' }),
+      buildReceipt({ id: 'rc-mid', ref: '03/2026', dueDate: '2026-03-10' }),
+    ]);
+    renderWithClient(
+      <ReceiptsScreen
+        repository={repository}
+        resident={{ name: 'Maria', apt: 'Apto 302' }}
+        onPay={jest.fn()}
+        bottomNav={null}
+      />,
+    );
+
+    const refs = await screen.findAllByText(/^REF · /);
+
+    expect(refs.map((element) => element.textContent)).toEqual([
+      'REF · 05/2026',
+      'REF · 03/2026',
+      'REF · 02/2026',
+    ]);
+  });
+
   test('shows an empty state when the resident has no receipts', async () => {
     const repository = new InMemoryReceiptRepository([]);
     renderWithClient(
