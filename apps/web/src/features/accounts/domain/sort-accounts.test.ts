@@ -23,10 +23,24 @@ describe('sortAccountsByDateDesc', () => {
     expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'c', 'a']);
   });
 
-  test('places undated accounts first (freshly added, still pending)', () => {
+  test('places undated accounts last, never above dated ones', () => {
     const accounts = [account('a', '2026-07-01'), account('b', null), account('c', '2026-06-01')];
 
-    expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['b', 'a', 'c']);
+    expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual(['a', 'c', 'b']);
+  });
+
+  test('keeps a dated July account above a last-year account and an undated one', () => {
+    const accounts = [
+      account('undated', null, 'pendente'),
+      account('last-year', '2025-08-10'),
+      account('july', '2026-07-15'),
+    ];
+
+    expect(sortAccountsByDateDesc(accounts).map((it) => it.id)).toEqual([
+      'july',
+      'last-year',
+      'undated',
+    ]);
   });
 
   test('breaks date ties by status (atrasado, then pendente, then pago)', () => {

@@ -22,10 +22,10 @@ describe('sortIncomesByDateDesc', () => {
     expect(sortIncomesByDateDesc(incomes).map((it) => it.id)).toEqual(['b', 'c', 'a']);
   });
 
-  test('places undated incomes first', () => {
+  test('places undated incomes last, never above dated ones', () => {
     const incomes = [income('a', '2026-07-01'), income('b', null), income('c', '2026-06-01')];
 
-    expect(sortIncomesByDateDesc(incomes).map((it) => it.id)).toEqual(['b', 'a', 'c']);
+    expect(sortIncomesByDateDesc(incomes).map((it) => it.id)).toEqual(['a', 'c', 'b']);
   });
 
   test('breaks date ties by id (localeCompare)', () => {
