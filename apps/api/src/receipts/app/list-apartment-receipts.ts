@@ -2,9 +2,9 @@ import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 import { sortReceiptsByRecencyDesc } from '../domain/sort-receipts';
 
-export async function listResidentReceipts(
+export async function listApartmentReceipts(
   repo: ReceiptRepository,
-  residentId: string,
+  apartmentId: string,
 ): Promise<Receipt[]> {
-  return sortReceiptsByRecencyDesc(await repo.listByResident(residentId));
+  return sortReceiptsByRecencyDesc(await repo.listByApartment(apartmentId));
 }

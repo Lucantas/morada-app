@@ -22,21 +22,21 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
 
 const build = (over: Partial<Receipt>): Receipt => ({
   id: 'x',
-  ref: '2024-01',
+  ref: '01/2026',
   title: 'Boleto',
-  dueDate: '2026-05-10',
+  dueDate: '2026-01-15',
   valueCents: 1000,
   status: 'pendente',
   ...over,
 });
 
 describe('listReceipts', () => {
-  test('returns receipts sorted by ref', async () => {
+  test('returns receipts most recent first', async () => {
     const repo = fakeRepo([
-      build({ id: 'b', ref: '2024-03' }),
-      build({ id: 'a', ref: '2024-01' }),
-      build({ id: 'c', ref: '2024-02' }),
+      build({ id: 'a', ref: '01/2026', dueDate: '2026-01-15' }),
+      build({ id: 'c', ref: '11/2025', dueDate: '2025-11-15' }),
+      build({ id: 'b', ref: '07/2026', dueDate: '2026-07-15' }),
     ]);
-    expect((await listReceipts(repo)).map((r) => r.ref)).toEqual(['2024-01', '2024-02', '2024-03']);
+    expect((await listReceipts(repo)).map((r) => r.ref)).toEqual(['07/2026', '01/2026', '11/2025']);
   });
 });

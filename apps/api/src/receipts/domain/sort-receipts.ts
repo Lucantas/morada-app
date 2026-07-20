@@ -9,7 +9,7 @@ function recencyKey(receipt: Receipt): string {
   return '0000-00-00';
 }
 
-export function sortByDueDateDesc(receipts: Receipt[]): Receipt[] {
+export function sortReceiptsByRecencyDesc(receipts: Receipt[]): Receipt[] {
   return [...receipts].sort((a, b) => {
     const keyA = recencyKey(a);
     const keyB = recencyKey(b);

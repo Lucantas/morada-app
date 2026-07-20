@@ -29,12 +29,16 @@ const build = (over: Partial<Account>): Account => ({
 });
 
 describe('listAccounts', () => {
-  test('returns accounts in insertion order', async () => {
+  test('returns accounts most recent first', async () => {
     const repo = fakeRepo([
-      build({ id: 'b', description: 'Bruno' }),
-      build({ id: 'a', description: 'Ana' }),
-      build({ id: 'c', description: 'Carla' }),
+      build({ id: 'b', description: 'Maio', date: '2026-05-10' }),
+      build({ id: 'a', description: 'Julho', date: '2026-07-25' }),
+      build({ id: 'c', description: 'Junho', date: '2026-06-01' }),
     ]);
-    expect((await listAccounts(repo)).map((a) => a.description)).toEqual(['Bruno', 'Ana', 'Carla']);
+    expect((await listAccounts(repo)).map((a) => a.description)).toEqual([
+      'Julho',
+      'Junho',
+      'Maio',
+    ]);
   });
 });
