@@ -73,6 +73,41 @@ describe('AccountEditScreen', () => {
     expect(saved[0]).toMatchObject({ valueCents: 124000, date: '2026-04-25', status: 'pendente' });
   });
 
+  test('shows a validation error and does not save when the date is blank', async () => {
+    const { repo, saved } = makeSpyRepo();
+    const onBack = jest.fn();
+    renderWithClient(<AccountEditScreen repository={repo} onBack={onBack} />);
+
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Água — abril' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Preencha descrição, categoria, valor e uma data válida.',
+    );
+    expect(saved).toHaveLength(0);
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  test('shows a validation error and does not save when the date is invalid', async () => {
+    const { repo, saved } = makeSpyRepo();
+    const onBack = jest.fn();
+    renderWithClient(<AccountEditScreen repository={repo} onBack={onBack} />);
+
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Água — abril' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '31/02/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Preencha descrição, categoria, valor e uma data válida.',
+    );
+    expect(saved).toHaveLength(0);
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
   test('does not show the Excluir button when creating a new account', async () => {
     const repository = new InMemoryAccountRepository([]);
     renderWithClient(<AccountEditScreen repository={repository} onBack={jest.fn()} />);

@@ -16,5 +16,6 @@ export type Account = z.infer<typeof accountSchema>;
 
 export const accountDraftSchema = accountSchema.extend({
   id: z.string().min(1).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe uma data válida'),
 });
 export type AccountDraft = z.infer<typeof accountDraftSchema>;

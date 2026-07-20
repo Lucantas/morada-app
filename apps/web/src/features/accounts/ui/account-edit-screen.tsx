@@ -40,6 +40,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
   const archive = useArchiveAccount(repository);
   const [form, setForm] = useState(EMPTY);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (existing.data) {
@@ -52,11 +53,17 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = () => {
-    const { valueCents, date, ...rest } = form;
-    save.mutate(
-      { ...rest, date: date === '' ? null : date, valueCents, id: accountId },
-      { onSuccess: onBack },
-    );
+    if (
+      form.description.trim() === '' ||
+      form.category.trim() === '' ||
+      form.valueCents <= 0 ||
+      form.date === ''
+    ) {
+      setValidationError('Preencha descrição, categoria, valor e uma data válida.');
+      return;
+    }
+    setValidationError(null);
+    save.mutate({ ...form, id: accountId }, { onSuccess: onBack });
   };
 
   const title = accountId ? (existing.data?.description ?? 'Editar conta') : 'Nova conta';
@@ -158,6 +165,12 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
               );
             })}
           </div>
+
+          {validationError && (
+            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
+              {validationError}
+            </p>
+          )}
 
           <PrimaryButton icon="check" onClick={submit}>
             {accountId ? 'Salvar alterações' : 'Registrar conta'}
