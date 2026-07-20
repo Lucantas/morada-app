@@ -6,6 +6,7 @@ import { StatusView } from '@/shared/ui/status-view';
 
 import type { Income } from '../domain/income';
 import type { IncomeRepository } from '../domain/income-repository';
+import { sortIncomesByDateDesc } from '../domain/sort-incomes';
 
 import { useIncomes } from './use-income';
 
@@ -31,7 +32,7 @@ export function IncomeSection({ repository, onOpenIncome }: Props) {
       )}
       {incomes.isSuccess && incomes.data.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {incomes.data.map((income) => (
+          {sortIncomesByDateDesc(incomes.data).map((income) => (
             <IncomeRow key={income.id} income={income} onClick={() => onOpenIncome(income.id)} />
           ))}
         </div>

@@ -48,4 +48,30 @@ describe('IncomeSection', () => {
 
     expect(await screen.findByText('Nenhuma entrada registrada')).toBeInTheDocument();
   });
+
+  test('orders incomes with the most recent date first', async () => {
+    setup({
+      incomes: [
+        {
+          id: 'i-1',
+          description: 'Entrada antiga',
+          source: 'Fonte A',
+          date: '2026-05-10',
+          valueCents: 10000,
+        },
+        {
+          id: 'i-2',
+          description: 'Entrada recente',
+          source: 'Fonte B',
+          date: '2026-07-01',
+          valueCents: 20000,
+        },
+      ],
+    });
+
+    await screen.findByText('Entrada antiga');
+
+    const descriptions = screen.getAllByText(/^Entrada (antiga|recente)$/);
+    expect(descriptions.map((el) => el.textContent)).toEqual(['Entrada recente', 'Entrada antiga']);
+  });
 });
