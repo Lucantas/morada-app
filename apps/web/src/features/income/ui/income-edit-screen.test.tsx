@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderWithClient } from '@/test/render';
@@ -14,6 +14,7 @@ describe('IncomeEditScreen', () => {
 
     await userEvent.type(screen.getByLabelText('Descrição'), 'Aluguel salão de festas');
     await userEvent.type(screen.getByLabelText('Origem'), 'Salão de festas');
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '10/05/2026' } });
     await userEvent.type(screen.getByLabelText('Valor'), '35000');
     await userEvent.click(screen.getByRole('button', { name: /salvar entrada/i }));
 
@@ -21,6 +22,41 @@ describe('IncomeEditScreen', () => {
     const saved = await repository.list();
     const created = saved.find((income) => income.description === 'Aluguel salão de festas');
     expect(created).toMatchObject({ source: 'Salão de festas', valueCents: 35000 });
+  });
+
+  test('shows a validation error and does not save when the date is blank', async () => {
+    const repository = new InMemoryIncomeRepository([]);
+    const onBack = jest.fn();
+    renderWithClient(<IncomeEditScreen repository={repository} onBack={onBack} />);
+
+    await userEvent.type(screen.getByLabelText('Descrição'), 'Aluguel salão de festas');
+    await userEvent.type(screen.getByLabelText('Origem'), 'Salão de festas');
+    await userEvent.type(screen.getByLabelText('Valor'), '35000');
+    await userEvent.click(screen.getByRole('button', { name: /salvar entrada/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Preencha descrição, origem, um valor maior que zero e uma data válida.',
+    );
+    expect(await repository.list()).toHaveLength(0);
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  test('shows a validation error and does not save when the date is invalid', async () => {
+    const repository = new InMemoryIncomeRepository([]);
+    const onBack = jest.fn();
+    renderWithClient(<IncomeEditScreen repository={repository} onBack={onBack} />);
+
+    await userEvent.type(screen.getByLabelText('Descrição'), 'Aluguel salão de festas');
+    await userEvent.type(screen.getByLabelText('Origem'), 'Salão de festas');
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '31/02/2026' } });
+    await userEvent.type(screen.getByLabelText('Valor'), '35000');
+    await userEvent.click(screen.getByRole('button', { name: /salvar entrada/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Preencha descrição, origem, um valor maior que zero e uma data válida.',
+    );
+    expect(await repository.list()).toHaveLength(0);
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   test('deletes an existing income after confirming', async () => {

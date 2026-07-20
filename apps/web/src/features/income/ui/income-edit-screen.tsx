@@ -60,8 +60,13 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
   };
 
   const submit = () => {
-    if (form.description.trim() === '' || form.source.trim() === '' || form.valueCents <= 0) {
-      setValidationError('Preencha descrição, origem e um valor maior que zero.');
+    if (
+      form.description.trim() === '' ||
+      form.source.trim() === '' ||
+      form.valueCents <= 0 ||
+      form.date === ''
+    ) {
+      setValidationError('Preencha descrição, origem, um valor maior que zero e uma data válida.');
       return;
     }
     setValidationError(null);
@@ -70,7 +75,7 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
         id: incomeId,
         description: form.description,
         source: form.source,
-        date: form.date === '' ? null : form.date,
+        date: form.date,
         valueCents: form.valueCents,
         proofDataUrl: form.proofDataUrl,
       },
