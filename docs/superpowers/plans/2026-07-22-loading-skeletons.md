@@ -1,6 +1,6 @@
 # Loading Skeletons Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. **This is the Morada project standard** (CLAUDE.md non-negotiable #9): a fresh subagent per task, reviewed between tasks — never batch tasks inline unless explicitly told to. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace every "Carregando…" text/spinner loading state on the 14 active logged-in screens (admin + resident) with shimmer skeletons that mirror the real content layout.
 
