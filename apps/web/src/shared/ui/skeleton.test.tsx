@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
-import { Skeleton, SkeletonScreen, SkeletonRows } from './skeleton';
+import { Skeleton, SkeletonScreen, SkeletonRows, SkeletonField, SkeletonButton } from './skeleton';
 
 describe('Skeleton', () => {
   test('renders a block with the skeleton class and the given size', () => {
@@ -30,5 +30,15 @@ describe('Skeleton', () => {
   test('SkeletonRows renders at least one skeleton block per requested row', () => {
     render(<SkeletonRows count={3} />);
     expect(document.querySelectorAll('.skeleton').length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('SkeletonField renders a label block and an input block', () => {
+    render(<SkeletonField />);
+    expect(document.querySelectorAll('.skeleton')).toHaveLength(2);
+  });
+
+  test('SkeletonButton renders a single skeleton block', () => {
+    render(<SkeletonButton />);
+    expect(document.querySelectorAll('.skeleton')).toHaveLength(1);
   });
 });
