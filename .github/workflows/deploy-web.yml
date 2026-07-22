@@ -1,7 +1,9 @@
 name: Deploy Web
 
-# Builds the web with the production API URL and deploys it to Cloudflare Pages
-# on a green CI run on main, and on manual dispatch.
+# Builds the web and deploys it to Cloudflare Pages on a green CI run on main,
+# and on manual dispatch. The Pages worker (public/_worker.js) proxies /api/*
+# and /auth/* to the API origin, so the web calls it same-origin and no
+# cross-site API URL is needed at build time.
 on:
   workflow_dispatch:
   workflow_run:
@@ -30,7 +32,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @morada/web build
         env:
-          VITE_API_URL: https://morada-api.fly.dev
+          VITE_API_URL: ''
       - run: pnpm dlx wrangler@4 pages deploy apps/web/dist --project-name=morada --branch=main --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
