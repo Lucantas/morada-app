@@ -282,9 +282,10 @@ describe('Morada API — real credentials', () => {
   test('valid demo credentials return a token and role', async () => {
     const res = await login(await makeApp(), adminCredentials.username, adminCredentials.password);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { token: string; role: string };
-    expect(body.token).toMatch(/.+/);
+    const body = (await res.json()) as { role: string; subject: string };
+    expect(body).not.toHaveProperty('token');
     expect(body.role).toBe('admin');
+    expect(body.subject).toMatch(/.+/);
   });
 
   test('a wrong password is rejected with 401', async () => {

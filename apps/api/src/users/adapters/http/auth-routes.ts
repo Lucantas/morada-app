@@ -67,7 +67,7 @@ export function authRoutes(deps: {
     const token = await signSession(user.role, subject);
     setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
     setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
-    return c.json({ token, role: user.role, subject });
+    return c.json({ role: user.role, subject });
   });
 
   app.post('/logout', csrfMiddleware, (c) => {
