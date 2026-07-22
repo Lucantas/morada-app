@@ -8,6 +8,7 @@ import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/pri
 
 import type { SettingsRepository } from '../domain/settings-repository';
 import { useSettings, useSaveSettings } from './use-settings';
+import { SettingsSkeleton } from './settings-skeleton';
 
 type Props = {
   repository: SettingsRepository;
@@ -133,7 +134,7 @@ export function SettingsScreen({
         {(settings.isError || categoriesError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
         )}
-        {settings.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
+        {settings.isLoading && <SettingsSkeleton />}
         {settings.isSuccess && (
           <div style={{ paddingTop: 2 }}>
             <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
