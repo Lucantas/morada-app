@@ -23,6 +23,8 @@ import type { UserRepository } from './users/domain/user-repository';
 
 import { migrate } from './platform/postgres/migrate';
 import { createPool } from './platform/postgres/pool';
+import { config } from './platform/config';
+import { R2ProofStorage } from './receipts/adapters/r2/r2-proof-storage';
 
 // The domain repositories the composition root wires into the app, backed by
 // Postgres. ui/app/domain depend only on the interfaces, never on the store.
@@ -40,17 +42,18 @@ export interface Repositories {
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
+  const proofStorage = config.r2 ? new R2ProofStorage(config.r2) : null;
   return {
     residents: new PostgresResidentRepository(pool),
     accounts: new PostgresAccountRepository(pool),
-    receipts: new PostgresReceiptRepository(pool, null),
+    receipts: new PostgresReceiptRepository(pool, proofStorage),
     notices: new PostgresNoticeRepository(pool),
     threads: new PostgresThreadRepository(pool),
     dashboard: new PostgresDashboardRepository(pool),
     users: new PostgresUserRepository(pool),
     settings: new PostgresSettingsRepository(pool),
     categories: new PostgresCategoryRepository(pool),
-    incomes: new PostgresIncomeRepository(pool, null),
+    incomes: new PostgresIncomeRepository(pool, proofStorage),
   };
 }
 

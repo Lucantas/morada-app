@@ -35,6 +35,10 @@ function denyForeignReceipt(c: Context<ApiEnv>, receipt: Receipt): Response | nu
   return null;
 }
 
+function toArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(bytes);
+}
+
 interface ReceiptRoutesDeps {
   receipts: ReceiptRepository;
   residents: ResidentRepository;
@@ -94,6 +98,16 @@ export function receiptRoutes({ receipts: repo, residents, settings }: ReceiptRo
     const receipt = await getReceipt(repo, c.req.param('id'));
     const denied = denyForeignReceipt(c, receipt);
     return denied ?? c.json(receipt);
+  });
+
+  app.get('/:id/proof', async (c) => {
+    const receipt = await repo.getById(c.req.param('id'));
+    if (!receipt) return c.json({ error: 'Recibo não encontrado' }, 404);
+    const forbidden = denyForeignReceipt(c, receipt);
+    if (forbidden) return forbidden;
+    const proof = await repo.getProof(receipt.id);
+    if (!proof) return c.json({ error: 'Comprovante não encontrado' }, 404);
+    return c.body(toArrayBufferView(proof.body), 200, { 'Content-Type': proof.contentType });
   });
 
   app.post('/:id/pay', async (c) => {

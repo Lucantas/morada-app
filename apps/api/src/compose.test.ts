@@ -980,4 +980,91 @@ describe('Morada API — authorization wiring', () => {
     const last = thread.messages[thread.messages.length - 1];
     expect(last?.author).toBe('resident');
   });
+
+  test('a receipt proof is servable by its owning resident and by an admin', async () => {
+    const app = await makeApp();
+    const residentAuth = await authFor(app, residentCredentials); // r-1 owns rc-1
+    const submit = await app.request('/api/receipts/rc-1/submit-payment', {
+      method: 'POST',
+      headers: {
+        Cookie: residentAuth.cookie,
+        'X-CSRF-Token': residentAuth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        method: 'pix',
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+    });
+    expect(submit.status).toBe(200);
+
+    const ownerRes = await app.request('/api/receipts/rc-1/proof', {
+      headers: { Cookie: residentAuth.cookie },
+    });
+    expect(ownerRes.status).toBe(200);
+    expect(ownerRes.headers.get('Content-Type')).toBe('image/png');
+    expect(new Uint8Array(await ownerRes.arrayBuffer()).length).toBeGreaterThan(0);
+
+    const adminAuth = await authFor(app, adminCredentials);
+    const adminRes = await app.request('/api/receipts/rc-1/proof', {
+      headers: { Cookie: adminAuth.cookie },
+    });
+    expect(adminRes.status).toBe(200);
+    expect(adminRes.headers.get('Content-Type')).toBe('image/png');
+  });
+
+  test('a resident cannot read another resident receipt proof (403)', async () => {
+    const { auth } = await withCreds(residentCredentials); // r-1, rc-5 belongs to r-3
+    const res = await auth('/api/receipts/rc-5/proof');
+    expect(res.status).toBe(403);
+  });
+
+  test('a receipt without a proof returns 404', async () => {
+    const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1, no proof yet
+    const res = await auth('/api/receipts/rc-1/proof');
+    expect(res.status).toBe(404);
+  });
+
+  test('a missing receipt proof route returns 404', async () => {
+    const { auth } = await withCreds(adminCredentials);
+    const res = await auth('/api/receipts/ghost-id/proof');
+    expect(res.status).toBe(404);
+  });
+
+  test('an income proof is servable by an admin, admin-only, and 404 without one', async () => {
+    const admin = await withCreds(adminCredentials);
+    const created = await admin.auth('/api/incomes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: '2026-05-10',
+        valueCents: 20000,
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+    });
+    expect(created.status).toBe(201);
+    const income = (await created.json()) as { id: string };
+
+    const proofRes = await admin.auth(`/api/incomes/${income.id}/proof`);
+    expect(proofRes.status).toBe(200);
+    expect(proofRes.headers.get('Content-Type')).toBe('image/png');
+
+    const resident = await withCreds(residentCredentials);
+    expect((await resident.auth(`/api/incomes/${income.id}/proof`)).status).toBe(403);
+
+    const withoutProof = await admin.auth('/api/incomes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Sem comprovante',
+        source: 'Teste',
+        date: '2026-05-11',
+        valueCents: 5000,
+      }),
+    });
+    const incomeNoProof = (await withoutProof.json()) as { id: string };
+    expect((await admin.auth(`/api/incomes/${incomeNoProof.id}/proof`)).status).toBe(404);
+  });
 });
