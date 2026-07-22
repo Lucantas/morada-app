@@ -54,3 +54,8 @@ test('planFiles maps web templates to features dir', () => {
   assert.ok(files.some((f) => f.to === 'apps/web/src/features/water/domain/water.ts'));
   assert.ok(files.some((f) => f.to === 'apps/web/src/features/water/ui/WaterScreen.tsx'));
 });
+
+test('planFiles includes the web repository interface', () => {
+  const files = planFiles({ app: 'web', name: 'water-bill' });
+  assert.ok(files.some((f) => f.to === 'apps/web/src/features/water-bill/domain/water-bill-repository.ts'));
+});

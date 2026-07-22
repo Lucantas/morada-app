@@ -24,6 +24,7 @@ const API_TEMPLATES = [
 const WEB_TEMPLATES = [
   ['domain/__feature__.ts.tmpl', 'domain/__feature__.ts'],
   ['domain/__feature__.test.ts.tmpl', 'domain/__feature__.test.ts'],
+  ['domain/__feature__-repository.ts.tmpl', 'domain/__feature__-repository.ts'],
   ['data/http-__feature__-repository.ts.tmpl', 'data/http-__feature__-repository.ts'],
   ['ui/use-__feature__.ts.tmpl', 'ui/use-__feature__.ts'],
   ['ui/__Feature__Screen.tsx.tmpl', 'ui/__Feature__Screen.tsx'],

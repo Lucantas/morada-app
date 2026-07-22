@@ -1,8 +1,9 @@
 import type { ApiClient } from '@/shared/lib/api-client';
 
 import { __feature__ListSchema, type __Feature__ } from '../domain/__feature__';
+import type { __Feature__Repository } from '../domain/__feature__-repository';
 
-export function http__Feature__Repository(api: ApiClient) {
+export function http__Feature__Repository(api: ApiClient): __Feature__Repository {
   return {
     async list(): Promise<__Feature__[]> {
       return __feature__ListSchema.parse(await api.get('/api/__feature__'));
