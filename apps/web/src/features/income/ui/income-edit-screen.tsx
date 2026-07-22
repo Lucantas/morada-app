@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 
 import type { IncomeRepository } from '../domain/income-repository';
+import { IncomeEditSkeleton } from './income-edit-skeleton';
 import { useArchiveIncome, useIncomes, useSaveIncome } from './use-income';
 
 const EMPTY = {
@@ -125,125 +126,128 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
         </div>
       </div>
       <ScreenBody>
-        <div style={{ paddingTop: 2 }}>
-          <Field
-            label="Descrição"
-            value={form.description}
-            onChange={set('description')}
-            placeholder="Ex.: Aluguel salão de festas"
-          />
-          <Field
-            label="Origem"
-            value={form.source}
-            onChange={set('source')}
-            placeholder="Ex.: Salão de festas"
-          />
-          <MoneyInput
-            label="Valor"
-            value={form.valueCents}
-            onChange={(cents) => setForm((prev) => ({ ...prev, valueCents: cents }))}
-          />
-          <DateInput label="Data" value={form.date} onChange={set('date')} />
+        {incomeId && incomes.isLoading && <IncomeEditSkeleton />}
+        {(!incomeId || !incomes.isLoading) && (
+          <div style={{ paddingTop: 2 }}>
+            <Field
+              label="Descrição"
+              value={form.description}
+              onChange={set('description')}
+              placeholder="Ex.: Aluguel salão de festas"
+            />
+            <Field
+              label="Origem"
+              value={form.source}
+              onChange={set('source')}
+              placeholder="Ex.: Salão de festas"
+            />
+            <MoneyInput
+              label="Valor"
+              value={form.valueCents}
+              onChange={(cents) => setForm((prev) => ({ ...prev, valueCents: cents }))}
+            />
+            <DateInput label="Data" value={form.date} onChange={set('date')} />
 
-          <label
-            htmlFor="income-proof"
-            style={{
-              display: 'block',
-              fontWeight: 600,
-              fontSize: '.9rem',
-              marginBottom: 9,
-              color: 'var(--ink-900)',
-            }}
-          >
-            Anexar comprovante
-          </label>
-          {existing?.hasProof && (
-            <a
-              href={`/api/incomes/${existing.id}/proof`}
-              target="_blank"
-              rel="noreferrer"
+            <label
+              htmlFor="income-proof"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                marginBottom: 12,
-                color: 'var(--petrol-700)',
+                display: 'block',
                 fontWeight: 600,
-                fontSize: '.86rem',
-                textDecoration: 'none',
+                fontSize: '.9rem',
+                marginBottom: 9,
+                color: 'var(--ink-900)',
               }}
             >
-              <Icon name="receipt" size={15} />
-              Ver comprovante
-            </a>
-          )}
-          <input
-            id="income-proof"
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(event) => void handleProofChange(event)}
-            style={{
-              display: 'block',
-              width: '100%',
-              marginBottom: 8,
-              fontFamily: "'Inter', sans-serif",
-              fontSize: '.86rem',
-            }}
-          />
-          {proofName && (
-            <p style={{ color: 'var(--ink-500)', marginBottom: 12, fontSize: '.86rem' }}>
-              {proofName}
-            </p>
-          )}
-          {proofError && (
-            <p style={{ color: 'var(--atraso-700)', marginBottom: 12, fontSize: '.88rem' }}>
-              {proofError}
-            </p>
-          )}
-
-          {validationError && (
-            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
-              {validationError}
-            </p>
-          )}
-          {save.isError && (
-            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
-              Não foi possível salvar a entrada. Tente novamente.
-            </p>
-          )}
-          {archiveIncome.isError && (
-            <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
-              Não foi possível excluir a entrada. Tente novamente.
-            </p>
-          )}
-
-          <PrimaryButton icon="check" onClick={submit}>
-            Salvar entrada
-          </PrimaryButton>
-
-          {incomeId && (
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
+              Anexar comprovante
+            </label>
+            {existing?.hasProof && (
+              <a
+                href={`/api/incomes/${existing.id}/proof`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginBottom: 12,
+                  color: 'var(--petrol-700)',
+                  fontWeight: 600,
+                  fontSize: '.86rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <Icon name="receipt" size={15} />
+                Ver comprovante
+              </a>
+            )}
+            <input
+              id="income-proof"
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(event) => void handleProofChange(event)}
               style={{
                 display: 'block',
                 width: '100%',
-                marginTop: 12,
-                minHeight: 46,
-                border: 'none',
-                borderRadius: 'var(--r-md)',
-                background: 'transparent',
-                color: 'var(--atraso-700)',
+                marginBottom: 8,
                 fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: '.92rem',
-                cursor: 'pointer',
+                fontSize: '.86rem',
               }}
-            >
-              Excluir entrada
-            </button>
-          )}
-        </div>
+            />
+            {proofName && (
+              <p style={{ color: 'var(--ink-500)', marginBottom: 12, fontSize: '.86rem' }}>
+                {proofName}
+              </p>
+            )}
+            {proofError && (
+              <p style={{ color: 'var(--atraso-700)', marginBottom: 12, fontSize: '.88rem' }}>
+                {proofError}
+              </p>
+            )}
+
+            {validationError && (
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
+                {validationError}
+              </p>
+            )}
+            {save.isError && (
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
+                Não foi possível salvar a entrada. Tente novamente.
+              </p>
+            )}
+            {archiveIncome.isError && (
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
+                Não foi possível excluir a entrada. Tente novamente.
+              </p>
+            )}
+
+            <PrimaryButton icon="check" onClick={submit}>
+              Salvar entrada
+            </PrimaryButton>
+
+            {incomeId && (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  marginTop: 12,
+                  minHeight: 46,
+                  border: 'none',
+                  borderRadius: 'var(--r-md)',
+                  background: 'transparent',
+                  color: 'var(--atraso-700)',
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '.92rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Excluir entrada
+              </button>
+            )}
+          </div>
+        )}
       </ScreenBody>
       <ConfirmDialog
         open={confirmingDelete}
