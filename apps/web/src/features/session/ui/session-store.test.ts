@@ -9,14 +9,17 @@ describe('useSessionStore', () => {
     expect(useSessionStore.getState().role).toBeNull();
   });
 
-  test('authenticate stores role, token and subject; signOut clears all', () => {
-    act(() => useSessionStore.getState().authenticate('resident', 'jwt-abc', 'r-1'));
-    expect(useSessionStore.getState()).toMatchObject({
-      role: 'resident',
-      token: 'jwt-abc',
-      subject: 'r-1',
-    });
+  test('authenticate stores role and subject without a token', () => {
+    act(() => useSessionStore.getState().authenticate('admin', 'admin'));
+    const state = useSessionStore.getState();
+    expect(state.role).toBe('admin');
+    expect(state.subject).toBe('admin');
+    expect('token' in state).toBe(false);
+  });
+
+  test('signOut clears role and subject', () => {
+    act(() => useSessionStore.getState().authenticate('resident', 'r-1'));
     act(() => useSessionStore.getState().signOut());
-    expect(useSessionStore.getState()).toMatchObject({ role: null, token: null, subject: null });
+    expect(useSessionStore.getState()).toMatchObject({ role: null, subject: null });
   });
 });

@@ -50,6 +50,7 @@ import {
   incomeRepository,
   issueCharge,
   login,
+  logout,
   noticeRepository,
   overrideResidentStatus,
   provisionResidentLogin,
@@ -98,7 +99,6 @@ export function App() {
 function Router() {
   const role = useSessionStore((s) => s.role);
   const subject = useSessionStore((s) => s.subject);
-  const signOut = useSessionStore((s) => s.signOut);
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
@@ -109,8 +109,8 @@ function Router() {
 
   const handleSignOut = useCallback(() => {
     queryClient.clear();
-    signOut();
-  }, [queryClient, signOut]);
+    void logout();
+  }, [queryClient]);
 
   if (!role) {
     return (

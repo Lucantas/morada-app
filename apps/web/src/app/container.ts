@@ -10,7 +10,6 @@ import { HttpSettingsRepository } from '@/features/settings/data/http-settings-r
 import type { Role } from '@/features/session/domain/session';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
-import { decodeJwtSubject } from '@/shared/lib/jwt';
 
 // The app always talks to the real API. Point it elsewhere with VITE_API_URL;
 // it defaults to the local API from `make start` / `make start-backend`.
@@ -31,19 +30,30 @@ export const settingsRepository = new HttpSettingsRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
 
-/** Authenticate with a username and password against the API, storing the JWT
- *  (with the real subject decoded from it) and returning the resolved role. */
+/** Authenticate with a username and password against the API. The API sets the
+ *  session cookie; the body only carries the role and subject to store. */
 export async function login(username: string, password: string): Promise<Role> {
   const res = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
   if (res.status === 401) throw new Error('Usuário ou senha inválidos.');
   if (!res.ok) throw new Error('Não foi possível entrar. Verifique a conexão com o servidor.');
-  const data = (await res.json()) as { token: string; role: Role };
-  useSessionStore.getState().authenticate(data.role, data.token, decodeJwtSubject(data.token));
+  const data = (await res.json()) as { role: Role; subject: string | null };
+  useSessionStore.getState().authenticate(data.role, data.subject);
   return data.role;
+}
+
+/** Sign out: tell the server to clear the session cookie, then clear local state
+ *  regardless of whether the server call succeeds. */
+export async function logout(): Promise<void> {
+  try {
+    await apiClient.post('/auth/logout');
+  } finally {
+    useSessionStore.getState().signOut();
+  }
 }
 
 /** Admin-only: issue a pending charge (receipt) to a resident. Optionally
