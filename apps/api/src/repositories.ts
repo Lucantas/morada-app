@@ -50,7 +50,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     users: new PostgresUserRepository(pool),
     settings: new PostgresSettingsRepository(pool),
     categories: new PostgresCategoryRepository(pool),
-    incomes: new PostgresIncomeRepository(pool),
+    incomes: new PostgresIncomeRepository(pool, null),
   };
 }
 

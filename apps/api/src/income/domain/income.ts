@@ -9,7 +9,12 @@ export const incomeSchema = z.object({
   source: z.string().min(1).max(120),
   date: isoDateSchema.nullable(),
   valueCents: z.number().int().min(0).max(1_000_000_000),
-  proofDataUrl: proofSchema.optional(),
+  // string = new upload; null = explicit clear; undefined = leave the
+  // existing proof untouched (e.g. updateIncome re-saving without a fresh proof).
+  proofDataUrl: proofSchema.nullable().optional(),
+  // Persistence-derived (whether a proof exists in storage or as legacy base64),
+  // never a write input — not enforced as an invariant, just carried through reads.
+  hasProof: z.boolean().optional(),
 });
 export type Income = z.infer<typeof incomeSchema>;
 

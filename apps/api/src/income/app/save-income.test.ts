@@ -20,6 +20,7 @@ function fakeRepo(): IncomeRepository & { saved: Income[] } {
       const index = saved.findIndex((i) => i.id === id);
       if (index !== -1) saved.splice(index, 1);
     },
+    getProof: async () => null,
   };
 }
 

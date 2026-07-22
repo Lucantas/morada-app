@@ -7,7 +7,7 @@ export function runIncomeRepositoryContract(
   makeRepo: () => Promise<IncomeRepository>,
 ): void {
   describe(label, () => {
-    test('save then getById round-trips (including date and proofDataUrl)', async () => {
+    test('save then getById round-trips (including date), exposing hasProof (not the raw proof)', async () => {
       const repo = await makeRepo();
       const income = {
         id: 'i-1',
@@ -20,7 +20,9 @@ export function runIncomeRepositoryContract(
 
       await repo.save(income);
 
-      expect(await repo.getById('i-1')).toEqual(income);
+      const { proofDataUrl, ...withoutProof } = income;
+      void proofDataUrl;
+      expect(await repo.getById('i-1')).toEqual({ ...withoutProof, hasProof: true });
     });
 
     test('list returns saved incomes', async () => {
@@ -36,7 +38,7 @@ export function runIncomeRepositoryContract(
 
       await repo.save(income);
 
-      expect(await repo.list()).toEqual([income]);
+      expect(await repo.list()).toEqual([{ ...income, proofDataUrl: undefined, hasProof: false }]);
     });
 
     test('save upserts on conflicting id', async () => {
