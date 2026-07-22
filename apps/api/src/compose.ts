@@ -59,7 +59,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   app.use(
     '*',
     cors({
-      origin: config.webOrigin,
+      origin: config.webOrigins,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
     }),
