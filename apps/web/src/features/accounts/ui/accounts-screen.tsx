@@ -16,6 +16,7 @@ import { accountMonths, monthlyExpenseCents, resolveSelectedMonth } from '../dom
 import { activeFilterCount, filterAccounts, type AccountFilters } from '../domain/filter-accounts';
 import { sortAccountsByDateDesc } from '../domain/sort-accounts';
 
+import { AccountsSkeleton } from './accounts-skeleton';
 import { accountStatusView } from './account-status-view';
 import { useAccounts } from './use-accounts';
 
@@ -106,7 +107,7 @@ export function AccountsScreen({
         </div>
       </TopBar>
       <ScreenBody>
-        {accounts.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando contas…</p>}
+        {accounts.isLoading && <AccountsSkeleton />}
         {accounts.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as contas.</p>
         )}
