@@ -58,6 +58,30 @@ fly deploy --remote-only
 defaults to 12. The demo admin seed stays off in production (it is gated behind
 `SEED_DEMO_DATA=1`) — production admin/data come from the restored database.
 
+#### Payment-proof storage (Cloudflare R2)
+
+Payment proofs are stored in the R2 bucket `morada-proofs` (S3-compatible API). Set the
+four secrets on Fly (create the token in the Cloudflare dashboard → R2 → **Manage API
+Tokens** → Object Read & Write, scoped to the bucket):
+
+```bash
+fly secrets set --app morada-api --stage \
+  R2_ENDPOINT="https://<account_id>.r2.cloudflarestorage.com" \
+  R2_ACCESS_KEY_ID="<r2 access key id>" \
+  R2_SECRET_ACCESS_KEY="<r2 secret access key>" \
+  R2_BUCKET="morada-proofs"
+```
+
+When all four are set, new proofs are written to R2 and served via
+`GET /api/receipts/:id/proof` / `GET /api/incomes/:id/proof`. When any is missing, the API
+falls back to storing the proof base64 in Postgres (dev/test default). Legacy base64 rows
+keep being served by the same endpoints — no backfill needed.
+
+> **Do not unset these once any row has a `proof_key`.** A proof written to R2 lives only in
+> R2 (its DB `proof_data_url` is NULL); if the secrets are removed or you roll back to
+> pre-R2 code, those proofs become unreadable (the receipt still reports `hasProof: true`
+> but "Ver comprovante" 404s) until R2 is restored. They are not lost, just unreachable.
+
 ### 3. Cloudflare Pages (web)
 
 ```bash
