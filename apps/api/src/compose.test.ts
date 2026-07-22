@@ -795,6 +795,33 @@ describe('Morada API — authorization wiring', () => {
     expect(ids).toContain(created.id);
   });
 
+  test('issuing a duplicate condo-fee charge for the same resident/month is rejected with 409', async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+    const issue = () =>
+      app.request('/api/receipts', {
+        method: 'POST',
+        headers: {
+          Cookie: admin.cookie,
+          'X-CSRF-Token': admin.csrf,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          residentId: 'r-1',
+          ref: '05/2026',
+          title: 'Taxa condominial',
+          valueCents: 45000,
+          dueDate: '2026-05-10',
+        }),
+      });
+    expect((await issue()).status).toBe(201);
+
+    const second = await issue();
+    expect(second.status).toBe(409);
+    const body = (await second.json()) as { error: string };
+    expect(body.error).toMatch(/já existe/);
+  });
+
   test('issuing a charge is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);

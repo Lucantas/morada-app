@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { ResidentRepository } from '../../residents/domain/resident-repository';
 import type { SettingsRepository } from '../../settings/domain/settings-repository';
+import { MonthlyReceiptExistsError } from '../domain/errors';
 import { ensureMonthlyReceipts } from '../domain/monthly-receipts';
 import { receiptSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
@@ -28,7 +29,14 @@ export async function generateMonthlyReceipts(
   const created: Receipt[] = [];
   for (const draft of drafts) {
     const receipt = receiptSchema.parse({ ...draft, id: randomUUID() });
-    created.push(await receipts.save(receipt));
+    try {
+      created.push(await receipts.save(receipt));
+    } catch (error) {
+      // A concurrent ensure-month call already created this resident's receipt
+      // for the month (DB unique-index race): idempotent under race counts as
+      // success, so skip it and keep generating the rest.
+      if (!(error instanceof MonthlyReceiptExistsError)) throw error;
+    }
   }
   return created;
 }

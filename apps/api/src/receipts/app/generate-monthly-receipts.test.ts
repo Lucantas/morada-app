@@ -1,3 +1,4 @@
+import { MonthlyReceiptExistsError } from '../domain/errors';
 import type { Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 import { generateMonthlyReceipts } from './generate-monthly-receipts';
@@ -10,6 +11,32 @@ function fakeReceipts(seed: Receipt[] = []): ReceiptRepository & { all: () => Re
     listByApartment: async (aid) => rows.filter((r) => r.apartmentId === aid),
     getById: async (id) => rows.find((r) => r.id === id) ?? null,
     save: async (r) => {
+      rows = [...rows.filter((x) => x.id !== r.id), r];
+      return r;
+    },
+    archive: async (id) => {
+      rows = rows.filter((x) => x.id !== id);
+    },
+    all: () => rows,
+  };
+}
+
+// Simulates a race: the repo throws MonthlyReceiptExistsError for the given
+// residentIds' draft (as the real Postgres unique index would under a
+// concurrent ensure-month call), regardless of how many drafts are saved.
+function fakeReceiptsCollidingFor(
+  collidingResidentIds: Set<string>,
+): ReceiptRepository & { all: () => Receipt[] } {
+  let rows: Receipt[] = [];
+  return {
+    list: async () => rows,
+    listByResident: async (rid) => rows.filter((r) => r.residentId === rid),
+    listByApartment: async (aid) => rows.filter((r) => r.apartmentId === aid),
+    getById: async (id) => rows.find((r) => r.id === id) ?? null,
+    save: async (r) => {
+      if (r.residentId !== undefined && collidingResidentIds.has(r.residentId)) {
+        throw new MonthlyReceiptExistsError();
+      }
       rows = [...rows.filter((x) => x.id !== r.id), r];
       return r;
     },
@@ -66,5 +93,14 @@ describe('generateMonthlyReceipts', () => {
     const second = await generateMonthlyReceipts(receipts, residents, settings, TODAY);
     expect(second).toHaveLength(0);
     expect(receipts.all()).toHaveLength(2);
+  });
+
+  it('keeps generating the rest when one draft collides with an already-created receipt (race)', async () => {
+    const receipts = fakeReceiptsCollidingFor(new Set(['r-1']));
+
+    const created = await generateMonthlyReceipts(receipts, residents, settings, TODAY);
+
+    expect(created.map((r) => r.residentId)).toEqual(['r-2']);
+    expect(receipts.all().map((r) => r.residentId)).toEqual(['r-2']);
   });
 });
