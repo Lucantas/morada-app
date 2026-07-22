@@ -8,24 +8,21 @@ import { InMemoryDashboardRepository } from '../data/in-memory-dashboard-reposit
 
 import { DashboardScreen } from './dashboard-screen';
 
-function setup(unreadCount = 3) {
+function setup() {
   const repository = new InMemoryDashboardRepository(buildDashboardSummary());
   const onSendNotice = jest.fn();
-  const onOpenMessages = jest.fn();
   const onSeeAccounts = jest.fn();
   const onOpenSettings = jest.fn();
   renderWithClient(
     <DashboardScreen
       repository={repository}
       onSendNotice={onSendNotice}
-      onOpenMessages={onOpenMessages}
       onSeeAccounts={onSeeAccounts}
       onOpenSettings={onOpenSettings}
-      unreadCount={unreadCount}
       bottomNav={null}
     />,
   );
-  return { onSendNotice, onOpenMessages, onSeeAccounts, onOpenSettings };
+  return { onSendNotice, onSeeAccounts, onOpenSettings };
 }
 
 describe('DashboardScreen', () => {
@@ -43,18 +40,12 @@ describe('DashboardScreen', () => {
     expect(onSendNotice).toHaveBeenCalledTimes(1);
   });
 
-  test('firing "Mensagens" calls onOpenMessages', async () => {
-    const { onOpenMessages } = setup();
+  test('does not expose the messages entry point', async () => {
+    setup();
 
-    await userEvent.click(await screen.findByText('Mensagens'));
+    await screen.findByText('Enviar aviso');
 
-    expect(onOpenMessages).toHaveBeenCalledTimes(1);
-  });
-
-  test('shows the unread badge with the count', async () => {
-    setup(3);
-
-    expect(await screen.findByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('Mensagens')).not.toBeInTheDocument();
   });
 
   test('firing "Ver todas" calls onSeeAccounts', async () => {

@@ -8,11 +8,6 @@ import { IncomeEditScreen } from '@/features/income/ui/income-edit-screen';
 import { IncomeSection } from '@/features/income/ui/income-section';
 import { useIncomes } from '@/features/income/ui/use-income';
 import { DashboardScreen } from '@/features/dashboard/ui/dashboard-screen';
-import { unreadCount } from '@/features/messages/domain/unread-count';
-import { AdminMessagesScreen } from '@/features/messages/ui/admin-messages-screen';
-import { SupportScreen } from '@/features/messages/ui/support-screen';
-import { ThreadScreen } from '@/features/messages/ui/thread-screen';
-import { useThreads } from '@/features/messages/ui/use-threads';
 import { NoticesScreen } from '@/features/notices/ui/notices-screen';
 import { SendNoticeScreen } from '@/features/notices/ui/send-notice-screen';
 import {
@@ -60,7 +55,6 @@ import {
   resetResidentLogin,
   residentRepository,
   settingsRepository,
-  threadRepository,
 } from './container';
 import { useNavStore, type View } from './nav-store';
 
@@ -166,8 +160,6 @@ type RouteProps = {
 };
 
 function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
-  const threads = useThreads(threadRepository);
-  const unread = unreadCount(threads.data ?? []);
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
   const incomes = useIncomes(incomeRepository);
@@ -265,31 +257,14 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           onBack={() => go('a-home')}
         />
       );
-    case 'a-messages':
-      return residentId === undefined ? (
-        <AdminMessagesScreen
-          repository={threadRepository}
-          onOpenThread={(id) => go('a-messages', { residentId: id })}
-          bottomNav={nav}
-        />
-      ) : (
-        <ThreadScreen
-          key={residentId}
-          repository={threadRepository}
-          threadId={residentId}
-          onBack={() => go('a-messages')}
-        />
-      );
     case 'a-home':
     default:
       return (
         <DashboardScreen
           repository={dashboardRepository}
           onSendNotice={() => go('a-notice')}
-          onOpenMessages={() => go('a-messages')}
           onSeeAccounts={() => go('a-accounts')}
           onOpenSettings={() => go('a-settings')}
-          unreadCount={unread}
           bottomNav={nav}
           ensureMonthlyReceipts={ensureMonthly}
         />
@@ -360,10 +335,6 @@ function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) 
       return <NoticesScreen repository={noticeRepository} bottomNav={nav} />;
     case 'r-finance':
       return <ResidentFinanceScreen dashboardRepository={dashboardRepository} bottomNav={nav} />;
-    case 'r-help':
-      return (
-        <SupportScreen repository={threadRepository} threadId={subject ?? 'r-1'} bottomNav={nav} />
-      );
     case 'r-profile':
       return <ResidentProfileScreen resident={resident} onSignOut={signOut} bottomNav={nav} />;
     case 'r-home':
@@ -451,13 +422,6 @@ function residentNav(view: View, go: (v: View) => void): NavItem[] {
       icon: 'building',
       active: active === 'condominio',
       onClick: () => go('r-finance'),
-    },
-    {
-      key: 'help',
-      label: 'Ajuda',
-      icon: 'message',
-      active: active === 'help',
-      onClick: () => go('r-help'),
     },
     {
       key: 'profile',

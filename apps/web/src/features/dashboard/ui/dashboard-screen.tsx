@@ -15,10 +15,8 @@ import { useDashboard } from './use-dashboard';
 type Props = {
   repository: DashboardRepository;
   onSendNotice: () => void;
-  onOpenMessages: () => void;
   onSeeAccounts: () => void;
   onOpenSettings?: () => void;
-  unreadCount: number;
   bottomNav: ReactNode;
   ensureMonthlyReceipts?: () => Promise<void>;
 };
@@ -26,10 +24,8 @@ type Props = {
 export function DashboardScreen({
   repository,
   onSendNotice,
-  onOpenMessages,
   onSeeAccounts,
   onOpenSettings,
-  unreadCount,
   bottomNav,
   ensureMonthlyReceipts,
 }: Props) {
@@ -100,9 +96,7 @@ export function DashboardScreen({
           <DashboardContent
             summary={dashboard.data}
             onSendNotice={onSendNotice}
-            onOpenMessages={onOpenMessages}
             onSeeAccounts={onSeeAccounts}
-            unreadCount={unreadCount}
           />
         )}
       </ScreenBody>
@@ -114,33 +108,22 @@ export function DashboardScreen({
 function DashboardContent({
   summary,
   onSendNotice,
-  onOpenMessages,
   onSeeAccounts,
-  unreadCount,
 }: {
   summary: DashboardSummary;
   onSendNotice: () => void;
-  onOpenMessages: () => void;
   onSeeAccounts: () => void;
-  unreadCount: number;
 }) {
   return (
     <>
       <BalanceHero balance={summary.balance} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 }}>
+      <div style={{ marginTop: 12 }}>
         <QuickAction
           icon="bell"
           iconBg="var(--info-bg)"
           title="Enviar aviso"
           subtitle="Comunicar moradores"
           onClick={onSendNotice}
-        />
-        <QuickAction
-          icon="message"
-          title="Mensagens"
-          subtitle="Recebidas dos moradores"
-          onClick={onOpenMessages}
-          badge={unreadCount}
         />
       </div>
 
@@ -236,40 +219,16 @@ function QuickAction({
   title,
   subtitle,
   onClick,
-  badge,
 }: {
-  icon: 'bell' | 'message';
+  icon: 'bell';
   iconBg?: string;
   title: string;
   subtitle: string;
   onClick: () => void;
-  badge?: number;
 }) {
-  const showBadge = badge !== undefined && badge > 0;
   return (
     <SurfaceCard onClick={onClick} style={{ position: 'relative', padding: '14px 14px 15px' }}>
       <IconBadge icon={icon} bg={iconBg} />
-      {showBadge && (
-        <span
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            minWidth: 20,
-            height: 20,
-            padding: '0 6px',
-            borderRadius: 999,
-            background: 'var(--atraso-bg)',
-            color: 'var(--atraso-700)',
-            fontSize: '.72rem',
-            fontWeight: 700,
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          {badge}
-        </span>
-      )}
       <div style={{ fontWeight: 600, fontSize: '.98rem', marginTop: 11 }}>{title}</div>
       <div style={{ fontSize: '.78rem', color: 'var(--ink-500)', marginTop: 1 }}>{subtitle}</div>
     </SurfaceCard>

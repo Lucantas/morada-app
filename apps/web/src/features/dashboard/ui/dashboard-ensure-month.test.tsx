@@ -25,9 +25,7 @@ function renderScreen() {
       <DashboardScreen
         repository={{} as never}
         onSendNotice={() => {}}
-        onOpenMessages={() => {}}
         onSeeAccounts={() => {}}
-        unreadCount={0}
         bottomNav={null}
         ensureMonthlyReceipts={() => ensureMock()}
       />
