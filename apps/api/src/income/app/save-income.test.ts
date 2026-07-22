@@ -16,7 +16,7 @@ function fakeRepo(): IncomeRepository & { saved: Income[] } {
       else saved[index] = income;
       return income;
     },
-    delete: async (id) => {
+    archive: async (id) => {
       const index = saved.findIndex((i) => i.id === id);
       if (index !== -1) saved.splice(index, 1);
     },

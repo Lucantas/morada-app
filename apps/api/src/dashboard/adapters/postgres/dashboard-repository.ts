@@ -57,7 +57,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
     }));
 
     const incomesResult = await this.pool.query<IncomeRow>(
-      'SELECT value_cents, date::text AS date FROM incomes',
+      'SELECT value_cents, date::text AS date FROM incomes WHERE visible = true',
     );
     const incomes: LedgerIncome[] = incomesResult.rows.map((row) => ({
       valueCents: row.value_cents,

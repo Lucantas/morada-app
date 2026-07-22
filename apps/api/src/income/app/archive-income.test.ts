@@ -2,7 +2,7 @@ import { IncomeNotFoundError } from '../domain/errors';
 import type { Income } from '../domain/income';
 import type { IncomeRepository } from '../domain/income-repository';
 
-import { deleteIncome } from './delete-income';
+import { archiveIncome } from './archive-income';
 
 function fakeRepo(): IncomeRepository & { saved: Income[] } {
   const saved: Income[] = [];
@@ -14,15 +14,15 @@ function fakeRepo(): IncomeRepository & { saved: Income[] } {
       saved.push(income);
       return income;
     },
-    delete: async (id) => {
+    archive: async (id) => {
       const index = saved.findIndex((i) => i.id === id);
       if (index !== -1) saved.splice(index, 1);
     },
   };
 }
 
-describe('deleteIncome', () => {
-  test('deletes an existing income', async () => {
+describe('archiveIncome', () => {
+  test('archives an existing income', async () => {
     const repo = fakeRepo();
     await repo.save({
       id: 'i-1',
@@ -32,12 +32,12 @@ describe('deleteIncome', () => {
       valueCents: 20000,
     });
 
-    await deleteIncome(repo, 'i-1');
+    await archiveIncome(repo, 'i-1');
 
     expect(await repo.getById('i-1')).toBeNull();
   });
 
   test('throws IncomeNotFoundError for an unknown id', async () => {
-    await expect(deleteIncome(fakeRepo(), 'nope')).rejects.toThrow(IncomeNotFoundError);
+    await expect(archiveIncome(fakeRepo(), 'nope')).rejects.toThrow(IncomeNotFoundError);
   });
 });

@@ -63,7 +63,7 @@ export function runIncomeRepositoryContract(
       expect((await repo.getById('i-1'))?.valueCents).toBe(18000);
     });
 
-    test('delete removes the income', async () => {
+    test('archive hides the income from list and getById', async () => {
       const repo = await makeRepo();
       await repo.save({
         id: 'i-1',
@@ -74,7 +74,7 @@ export function runIncomeRepositoryContract(
         proofDataUrl: undefined,
       });
 
-      await repo.delete('i-1');
+      await repo.archive('i-1');
 
       expect(await repo.getById('i-1')).toBeNull();
       expect(await repo.list()).toEqual([]);

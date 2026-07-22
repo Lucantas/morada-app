@@ -179,4 +179,10 @@ CREATE TABLE notice_dismissals (
 ALTER TABLE notices DROP COLUMN dismissed;
 `,
   },
+  {
+    id: '011_income_visible',
+    sql: `
+ALTER TABLE incomes ADD COLUMN visible boolean NOT NULL DEFAULT true;
+`,
+  },
 ];

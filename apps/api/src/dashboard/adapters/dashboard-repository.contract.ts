@@ -124,5 +124,24 @@ export function runDashboardRepositoryContract(
       expect(summary.recentPaid).toEqual([]);
       expect(summary.maintenances).toEqual([]);
     });
+
+    test('an archived income is not counted in the summary', async () => {
+      const { dashboard, incomes } = await setup();
+      const today = new Date().toISOString().slice(0, 10);
+      const thisMonth = today.slice(0, 7);
+      await incomes.save({
+        id: 'i-1',
+        description: 'Aluguel salão de festas',
+        source: 'Salão de festas',
+        date: `${thisMonth}-08`,
+        valueCents: 10000,
+      });
+
+      await incomes.archive('i-1');
+      const summary = await dashboard.getSummary();
+
+      expect(summary.balance.incomeCents).toBe(0);
+      expect(summary.balance.balanceCents).toBe(0);
+    });
   });
 }

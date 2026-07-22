@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
-import { deleteIncome } from '../../app/delete-income';
+import { archiveIncome } from '../../app/archive-income';
 import { listIncomes } from '../../app/list-incomes';
 import { saveIncome } from '../../app/save-income';
 import { updateIncome } from '../../app/update-income';
@@ -15,7 +15,7 @@ export function incomeRoutes(repo: IncomeRepository): Hono<ApiEnv> {
     c.json(await updateIncome(repo, c.req.param('id'), await c.req.json())),
   );
   app.delete('/:id', async (c) => {
-    await deleteIncome(repo, c.req.param('id'));
+    await archiveIncome(repo, c.req.param('id'));
     return c.body(null, 204);
   });
   return app;

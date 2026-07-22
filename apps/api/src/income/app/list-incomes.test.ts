@@ -8,7 +8,7 @@ function fakeRepo(seed: Income[]): IncomeRepository {
     list: async () => seed,
     getById: async (id) => seed.find((i) => i.id === id) ?? null,
     save: async (income) => income,
-    delete: async () => undefined,
+    archive: async () => undefined,
   };
 }
 

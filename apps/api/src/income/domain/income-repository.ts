@@ -4,5 +4,5 @@ export interface IncomeRepository {
   list(): Promise<Income[]>;
   getById(id: string): Promise<Income | null>;
   save(income: Income): Promise<Income>;
-  delete(id: string): Promise<void>;
+  archive(id: string): Promise<void>;
 }

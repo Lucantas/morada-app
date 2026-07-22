@@ -32,14 +32,14 @@ export class PostgresIncomeRepository implements IncomeRepository {
 
   async list(): Promise<Income[]> {
     const { rows } = await this.pool.query<IncomeRow>(
-      `SELECT ${SELECT_COLUMNS} FROM incomes ORDER BY date DESC NULLS LAST`,
+      `SELECT ${SELECT_COLUMNS} FROM incomes WHERE visible = true ORDER BY date DESC NULLS LAST`,
     );
     return rows.map(toIncome);
   }
 
   async getById(id: string): Promise<Income | null> {
     const { rows } = await this.pool.query<IncomeRow>(
-      `SELECT ${SELECT_COLUMNS} FROM incomes WHERE id = $1`,
+      `SELECT ${SELECT_COLUMNS} FROM incomes WHERE id = $1 AND visible = true`,
       [id],
     );
     return rows[0] ? toIncome(rows[0]) : null;
@@ -65,7 +65,7 @@ export class PostgresIncomeRepository implements IncomeRepository {
     return income;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.pool.query('DELETE FROM incomes WHERE id = $1', [id]);
+  async archive(id: string): Promise<void> {
+    await this.pool.query('UPDATE incomes SET visible = false WHERE id = $1', [id]);
   }
 }
