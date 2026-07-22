@@ -2,11 +2,34 @@ import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import { insertRows, resetPg } from '../../../test-support/pg';
 import { MonthlyReceiptExistsError } from '../../domain/errors';
+import type { ProofBytes, ProofStorage } from '../../domain/proof-storage';
 import { runReceiptRepositoryContract } from '../receipt-repository.contract';
 
 import { PostgresReceiptRepository } from './receipt-repository';
 
 const pool = createPool(process.env.DATABASE_URL ?? '');
+
+class FakeProofStorage implements ProofStorage {
+  private readonly store = new Map<string, string>();
+
+  async put(key: string, dataUrl: string): Promise<void> {
+    this.store.set(key, dataUrl);
+  }
+
+  async get(key: string): Promise<ProofBytes | null> {
+    const dataUrl = this.store.get(key);
+    if (!dataUrl) return null;
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    const contentType = match?.[1];
+    const base64 = match?.[2];
+    if (!contentType || !base64) return null;
+    return { contentType, body: new Uint8Array(Buffer.from(base64, 'base64')) };
+  }
+
+  has(key: string): boolean {
+    return this.store.has(key);
+  }
+}
 
 beforeAll(async () => {
   await migrate(pool);
@@ -18,7 +41,7 @@ afterAll(async () => {
 
 runReceiptRepositoryContract('PostgresReceiptRepository', async () => {
   await resetPg(pool);
-  return new PostgresReceiptRepository(pool);
+  return new PostgresReceiptRepository(pool, null);
 });
 
 describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
@@ -84,7 +107,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         ON receipts (resident_id, ref) WHERE visible AND title = 'Taxa condominial'
     `);
 
-    const repo = new PostgresReceiptRepository(pool);
+    const repo = new PostgresReceiptRepository(pool, null);
     expect(await repo.getById('dup-pago')).not.toBeNull();
     expect(await repo.getById('dup-pendente')).toBeNull();
   });
@@ -111,7 +134,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
   });
 
   test('save throws MonthlyReceiptExistsError when it collides with the unique index', async () => {
-    const repo = new PostgresReceiptRepository(pool);
+    const repo = new PostgresReceiptRepository(pool, null);
     await repo.save({
       id: 'first',
       ref: '07/2026',
@@ -133,5 +156,114 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         residentId: 'r-1',
       }),
     ).rejects.toThrow(MonthlyReceiptExistsError);
+  });
+});
+
+describe('PostgresReceiptRepository — proof offload/serve', () => {
+  const BASE_RECEIPT = {
+    id: 'rc-1',
+    ref: '07/2026',
+    title: 'Taxa condominial',
+    dueDate: '2026-07-15',
+    valueCents: 15000,
+    status: 'em_analise' as const,
+    method: 'pix' as const,
+    submittedAt: '2026-07-14',
+    residentId: 'r-1',
+    apartmentId: 'apt-1',
+  };
+  const DATA_URL = 'data:image/png;base64,iVBORw0KGgo=';
+
+  beforeEach(async () => {
+    await resetPg(pool);
+  });
+
+  test('save offloads a fresh data URL to storage, persisting proof_key (not the base64) and hasProof: true', async () => {
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, storage);
+
+    const saved = await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    expect(saved.hasProof).toBe(true);
+    expect(saved.proofDataUrl).toBeUndefined();
+    expect(storage.has('receipts/rc-1')).toBe(true);
+
+    const { rows } = await pool.query(
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
+      ['rc-1'],
+    );
+    expect(rows[0].proof_key).toBe('receipts/rc-1');
+    expect(rows[0].proof_data_url).toBeNull();
+
+    const fetched = await repo.getById('rc-1');
+    expect(fetched?.hasProof).toBe(true);
+    expect(fetched?.proofDataUrl).toBeUndefined();
+  });
+
+  test('save falls back to storing the base64 inline when storage is null, still reporting hasProof: true', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const { rows } = await pool.query(
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
+      ['rc-1'],
+    );
+    expect(rows[0].proof_key).toBeNull();
+    expect(rows[0].proof_data_url).toBe(DATA_URL);
+
+    const fetched = await repo.getById('rc-1');
+    expect(fetched?.hasProof).toBe(true);
+    expect(fetched?.proofDataUrl).toBeUndefined();
+  });
+
+  test('getProof returns bytes from storage when proof_key is set', async () => {
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, storage);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const proof = await repo.getProof('rc-1');
+
+    expect(proof).not.toBeNull();
+    expect(proof?.contentType).toBe('image/png');
+  });
+
+  test('getProof decodes legacy base64 when only proof_data_url is set', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const proof = await repo.getProof('rc-1');
+
+    expect(proof).not.toBeNull();
+    expect(proof?.contentType).toBe('image/png');
+  });
+
+  test('getProof returns null when the receipt has no proof', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+    await repo.save({ ...BASE_RECEIPT, status: 'pendente', proofDataUrl: undefined });
+
+    expect(await repo.getProof('rc-1')).toBeNull();
+  });
+
+  test('getProof returns null for an unknown id', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+    expect(await repo.getProof('nope')).toBeNull();
+  });
+
+  test('list/listByApartment/listByResident carry hasProof, never proofDataUrl', async () => {
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, storage);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    for (const items of [
+      await repo.list(),
+      await repo.listByApartment('apt-1'),
+      await repo.listByResident('r-1'),
+    ]) {
+      expect(items).toHaveLength(1);
+      const [item] = items;
+      expect(item?.hasProof).toBe(true);
+      expect(item).not.toHaveProperty('proofDataUrl');
+    }
   });
 });

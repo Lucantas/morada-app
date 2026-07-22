@@ -43,7 +43,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
   return {
     residents: new PostgresResidentRepository(pool),
     accounts: new PostgresAccountRepository(pool),
-    receipts: new PostgresReceiptRepository(pool),
+    receipts: new PostgresReceiptRepository(pool, null),
     notices: new PostgresNoticeRepository(pool),
     threads: new PostgresThreadRepository(pool),
     dashboard: new PostgresDashboardRepository(pool),

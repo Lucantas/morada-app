@@ -42,6 +42,7 @@ function fakeReceipts(
     getById: async () => null,
     save: async (r) => r,
     archive: async () => {},
+    getProof: async () => null,
   };
 }
 

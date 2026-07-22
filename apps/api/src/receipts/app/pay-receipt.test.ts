@@ -18,6 +18,7 @@ function fakeRepo(list: Receipt[]): ReceiptRepository {
     archive: async (id) => {
       map.delete(id);
     },
+    getProof: async () => null,
   };
 }
 

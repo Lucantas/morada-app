@@ -21,7 +21,7 @@ export function runReceiptRepositoryContract(
 
       await repo.save(receipt);
 
-      expect(await repo.getById('r-1')).toEqual(receipt);
+      expect(await repo.getById('r-1')).toEqual({ ...receipt, hasProof: false });
     });
 
     test('save then getById round-trips a receipt without a method (null coerced to undefined)', async () => {
@@ -38,7 +38,7 @@ export function runReceiptRepositoryContract(
       await repo.save(receipt);
 
       const stored = await repo.getById('r-2');
-      expect(stored).toEqual(receipt);
+      expect(stored).toEqual({ ...receipt, hasProof: false });
       expect(stored?.method).toBeUndefined();
     });
 
@@ -72,7 +72,7 @@ export function runReceiptRepositoryContract(
       expect(await repo.getById('nope')).toBeNull();
     });
 
-    test('round-trips an em_analise receipt with proof and submittedAt', async () => {
+    test('round-trips an em_analise receipt with proof and submittedAt, exposing hasProof (not the raw proof)', async () => {
       const repo = await makeRepo();
       const receipt = {
         id: 'rc-analise',
@@ -88,7 +88,9 @@ export function runReceiptRepositoryContract(
         apartmentId: 'apt-1',
       };
       await repo.save(receipt);
-      expect(await repo.getById('rc-analise')).toEqual(receipt);
+      const { proofDataUrl, ...withoutProof } = receipt;
+      void proofDataUrl;
+      expect(await repo.getById('rc-analise')).toEqual({ ...withoutProof, hasProof: true });
     });
 
     test('listByResident returns only that resident receipts and round-trips residentId', async () => {

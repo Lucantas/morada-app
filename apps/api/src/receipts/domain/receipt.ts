@@ -21,6 +21,9 @@ export const receiptSchema = z.object({
   paidAt: isoDateSchema.optional(),
   submittedAt: isoDateSchema.optional(),
   proofDataUrl: z.string().max(7_000_000).optional(),
+  // Persistence-derived (whether a proof exists in storage or as legacy base64),
+  // never a write input — not enforced as an invariant, just carried through reads.
+  hasProof: z.boolean().optional(),
   valueCents: z.number().int(),
   status: receiptStatusSchema,
   method: receiptMethodSchema.optional(),

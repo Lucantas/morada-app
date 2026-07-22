@@ -17,6 +17,7 @@ function fakeReceipts(seed: Receipt[] = []): ReceiptRepository & { all: () => Re
     archive: async (id) => {
       rows = rows.filter((x) => x.id !== id);
     },
+    getProof: async () => null,
     all: () => rows,
   };
 }
@@ -43,6 +44,7 @@ function fakeReceiptsCollidingFor(
     archive: async (id) => {
       rows = rows.filter((x) => x.id !== id);
     },
+    getProof: async () => null,
     all: () => rows,
   };
 }

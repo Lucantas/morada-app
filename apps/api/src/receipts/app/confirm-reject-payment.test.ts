@@ -18,6 +18,7 @@ function fakeRepo(seed: Receipt[]): ReceiptRepository {
     archive: async (id) => {
       rows = rows.filter((x) => x.id !== id);
     },
+    getProof: async () => null,
   };
 }
 

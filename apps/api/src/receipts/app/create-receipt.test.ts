@@ -20,6 +20,7 @@ function fakeRepo(): ReceiptRepository & { saved: Receipt[] } {
       const index = saved.findIndex((r) => r.id === id);
       if (index !== -1) saved.splice(index, 1);
     },
+    getProof: async () => null,
   };
 }
 

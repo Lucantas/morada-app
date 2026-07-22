@@ -21,6 +21,7 @@ function fakeRepo(list: Receipt[]): ReceiptRepository & { archived: string[] } {
       archived.push(id);
       map.delete(id);
     },
+    getProof: async () => null,
   };
 }
 

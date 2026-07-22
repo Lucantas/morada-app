@@ -212,4 +212,14 @@ CREATE UNIQUE INDEX idx_receipts_condo_fee_month
   ON receipts (resident_id, ref) WHERE visible AND title = 'Taxa condominial';
 `,
   },
+  {
+    // proof_key points at an object in R2 (offloaded proof); proof_data_url keeps
+    // legacy base64 rows working. Added to both tables so income's own storage
+    // offload (a later task) needs no further migration.
+    id: '013_proof_key',
+    sql: `
+ALTER TABLE receipts ADD COLUMN proof_key TEXT;
+ALTER TABLE incomes ADD COLUMN proof_key TEXT;
+`,
+  },
 ];
