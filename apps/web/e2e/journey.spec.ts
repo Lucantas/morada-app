@@ -6,12 +6,12 @@ import { expect, test, type Page } from '@playwright/test';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROOF_PATH = path.join(__dirname, 'fixtures/proof.png');
 
-const APT_NUMBER = String(900 + new Date().getUTCMinutes());
+const APT_NUMBER = String(900 + (Math.floor(Date.now() / 1000) % 100));
 const RESIDENT_NAME = 'Maria Ribeiro';
 // A future competência avoids colliding with the current month's auto-issued
 // charge (the admin dashboard calls ensureMonthlyReceipts() on every mount,
 // which issues a receipt for the current month to every active resident).
-const RECEIPT_REF = '12/2027';
+const RECEIPT_REF = `12/${new Date().getUTCFullYear() + 2}`;
 const RECEIPT_VALUE_DIGITS = '35000';
 
 async function login(page: Page, username: string, password: string): Promise<void> {
