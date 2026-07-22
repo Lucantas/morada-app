@@ -79,7 +79,14 @@ export class PostgresNoticeRepository implements NoticeRepository {
         [noticeId, residentId],
       );
     } catch (error) {
-      if (error instanceof Error && error.message.includes('violates foreign key constraint')) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === '23503' &&
+        'constraint' in error &&
+        typeof error.constraint === 'string' &&
+        error.constraint.includes('notice_id')
+      ) {
         throw new NoticeNotFoundError(noticeId);
       }
       throw error;
