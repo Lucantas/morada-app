@@ -57,3 +57,32 @@ jobs:
       - run: pnpm --filter @morada/api test:coverage
         env:
           DATABASE_URL: postgres://morada:morada@localhost:5433/morada
+
+  spec-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check spec trailers on every commit in range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            RANGE="$PR_BASE_SHA..HEAD"
+          else
+            case "$PUSH_BEFORE_SHA" in
+              ''|0000000000000000000000000000000000000000)
+                echo "No previous SHA for this push; skipping spec-gate."
+                exit 0
+                ;;
+            esac
+            RANGE="$PUSH_BEFORE_SHA..HEAD"
+          fi
+          echo "spec-gate range: $RANGE"
+          node scripts/check-spec-trailer.mjs --range "$RANGE"
