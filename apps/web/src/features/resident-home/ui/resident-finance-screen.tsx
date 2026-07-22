@@ -11,6 +11,7 @@ import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 import { TopBar } from '@/shared/ui/top-bar';
 
+import { ResidentFinanceSkeleton } from './resident-finance-skeleton';
 import { useResidentFinance } from './use-resident-finance';
 
 type Props = {
@@ -25,7 +26,7 @@ export function ResidentFinanceScreen({ dashboardRepository, bottomNav }: Props)
     <Screen>
       <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Condomínio" />
       <ScreenBody>
-        {finance.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando…</p>}
+        {finance.isLoading && <ResidentFinanceSkeleton />}
         {finance.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar o resumo.</p>
         )}
