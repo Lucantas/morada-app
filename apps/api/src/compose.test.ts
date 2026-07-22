@@ -194,6 +194,19 @@ describe('Morada API', () => {
 });
 
 describe('Morada API — real credentials', () => {
+  test('login sets httpOnly session cookie and a readable csrf cookie', async () => {
+    const app = await makeApp();
+    const res = await login(app, adminCredentials.username, adminCredentials.password);
+    expect(res.status).toBe(200);
+    const setCookies = res.headers.getSetCookie();
+    const session = setCookies.find((c) => c.startsWith('session='));
+    const csrf = setCookies.find((c) => c.startsWith('csrf='));
+    expect(session).toMatch(/HttpOnly/i);
+    expect(session).toMatch(/SameSite=Strict/i);
+    expect(csrf).toBeDefined();
+    expect(csrf).not.toMatch(/HttpOnly/i);
+  });
+
   test('valid demo credentials return a token and role', async () => {
     const res = await login(await makeApp(), adminCredentials.username, adminCredentials.password);
     expect(res.status).toBe(200);

@@ -1,7 +1,16 @@
 import { Hono } from 'hono';
+import { setCookie } from 'hono/cookie';
 import { z } from 'zod';
 
 import { signSession, type ApiEnv } from '../../../platform/auth';
+import { config } from '../../../platform/config';
+import {
+  CSRF_COOKIE,
+  SESSION_COOKIE,
+  csrfCookieOptions,
+  newCsrfToken,
+  sessionCookieOptions,
+} from '../../../platform/cookies';
 import type { RateLimiter } from '../../../platform/rate-limit';
 import { verifyCredentials } from '../../app/verify-credentials';
 import { InvalidCredentialsError } from '../../domain/errors';
@@ -53,7 +62,10 @@ export function authRoutes(deps: {
 
     deps.limiter.succeed(key);
     const subject = user.role === 'resident' ? (user.residentId ?? user.id) : user.id;
-    return c.json({ token: await signSession(user.role, subject), role: user.role });
+    const token = await signSession(user.role, subject);
+    setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
+    setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
+    return c.json({ token, role: user.role, subject });
   });
 
   return app;
