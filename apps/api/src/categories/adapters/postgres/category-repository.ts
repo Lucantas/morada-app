@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 
 import { categorySchema, type Category } from '../../domain/category';
-import type { CategoryRepository } from '../../domain/category-repository';
+import type { CategoryAccountUpdate, CategoryRepository } from '../../domain/category-repository';
 
 interface CategoryRow {
   id: string;
@@ -20,13 +20,22 @@ export class PostgresCategoryRepository implements CategoryRepository {
     return rows.map((row) => categorySchema.parse(row));
   }
 
-  async replaceAll(categories: Category[]): Promise<Category[]> {
+  async replaceAll(
+    categories: Category[],
+    accountUpdates: CategoryAccountUpdate[],
+  ): Promise<Category[]> {
     const parsed = categories.map((category, index) =>
       categorySchema.parse({ ...category, position: index }),
     );
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      for (const update of accountUpdates) {
+        await client.query('UPDATE accounts SET category = $2 WHERE id = $1', [
+          update.id,
+          update.category,
+        ]);
+      }
       await client.query('DELETE FROM categories');
       for (const category of parsed) {
         await client.query(

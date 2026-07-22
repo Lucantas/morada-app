@@ -19,10 +19,13 @@ export function runCategoryRepositoryContract(
 
     test('replaceAll replaces the whole set and returns it with re-indexed positions', async () => {
       const repo = await makeRepo();
-      const replaced = await repo.replaceAll([
-        { id: 'cat-a', name: 'A', keywords: 'a', position: 5 },
-        { id: 'cat-b', name: 'B', keywords: 'b', position: 9 },
-      ]);
+      const replaced = await repo.replaceAll(
+        [
+          { id: 'cat-a', name: 'A', keywords: 'a', position: 5 },
+          { id: 'cat-b', name: 'B', keywords: 'b', position: 9 },
+        ],
+        [],
+      );
       expect(replaced).toEqual([
         { id: 'cat-a', name: 'A', keywords: 'a', position: 0 },
         { id: 'cat-b', name: 'B', keywords: 'b', position: 1 },
@@ -31,7 +34,7 @@ export function runCategoryRepositoryContract(
 
     test('list after replaceAll reflects the new set', async () => {
       const repo = await makeRepo();
-      await repo.replaceAll([{ id: 'cat-only', name: 'Only', keywords: 'only', position: 0 }]);
+      await repo.replaceAll([{ id: 'cat-only', name: 'Only', keywords: 'only', position: 0 }], []);
       expect(await repo.list()).toEqual([
         { id: 'cat-only', name: 'Only', keywords: 'only', position: 0 },
       ]);

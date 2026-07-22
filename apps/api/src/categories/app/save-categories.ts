@@ -9,7 +9,6 @@ import { reclassifyAccounts } from '../domain/reclassify';
 
 export type AccountsForReclassify = {
   list(): Promise<{ id: string; category: string; description: string }[]>;
-  save(account: { id: string; category: string; description: string }): Promise<void>;
 };
 
 export async function saveCategories(
@@ -22,11 +21,11 @@ export async function saveCategories(
   const categories = parsed.data.map((category, index) =>
     categorySchema.parse({ ...category, id: category.id ?? randomUUID(), position: index }),
   );
-  const saved = await repo.replaceAll(categories);
   const current = await accounts.list();
-  const { changed, reclassified } = reclassifyAccounts(saved, current);
-  for (const account of changed) {
-    await accounts.save(account);
-  }
+  const { changed, reclassified } = reclassifyAccounts(categories, current);
+  const saved = await repo.replaceAll(
+    categories,
+    changed.map((account) => ({ id: account.id, category: account.category })),
+  );
   return { categories: saved, reclassified };
 }

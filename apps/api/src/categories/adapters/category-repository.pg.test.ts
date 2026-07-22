@@ -40,3 +40,36 @@ runCategoryRepositoryContract('PostgresCategoryRepository', async () => {
   );
   return new PostgresCategoryRepository(pool);
 });
+
+describe('PostgresCategoryRepository.replaceAll atomicity', () => {
+  test('rolls back account updates when a category insert fails', async () => {
+    await resetPg(pool);
+    await insertRows(
+      pool,
+      'accounts',
+      ['id', 'description', 'category', 'date', 'value_cents', 'status'],
+      [
+        {
+          id: 'acc-1',
+          description: 'Conta de luz',
+          category: 'Energia',
+          date: '2026-07-01',
+          value_cents: 1000,
+          status: 'pendente',
+        },
+      ],
+    );
+    const repo = new PostgresCategoryRepository(pool);
+    const validCategory = { id: 'cat-a', name: 'A', keywords: 'a', position: 0 };
+
+    await expect(
+      repo.replaceAll(
+        [validCategory, { ...validCategory }],
+        [{ id: 'acc-1', category: 'NovaCat' }],
+      ),
+    ).rejects.toThrow();
+
+    const { rows } = await pool.query('SELECT category FROM accounts WHERE id = $1', ['acc-1']);
+    expect(rows[0].category).not.toBe('NovaCat');
+  });
+});

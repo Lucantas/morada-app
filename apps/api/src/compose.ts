@@ -113,16 +113,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route('/incomes', guarded('admin', incomeRoutes(incomes)));
   api.route(
     '/categories',
-    guarded(
-      'admin',
-      categoryRoutes(categories, {
-        list: () => accounts.list(),
-        save: async (account) => {
-          const existing = await accounts.getById(account.id);
-          if (existing) await accounts.save({ ...existing, category: account.category });
-        },
-      }),
-    ),
+    guarded('admin', categoryRoutes(categories, { list: () => accounts.list() })),
   );
   api.route('/settings', guarded('admin', settingsRoutes(settings)));
 
