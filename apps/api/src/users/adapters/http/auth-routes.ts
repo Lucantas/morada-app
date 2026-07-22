@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { setCookie } from 'hono/cookie';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 
 import { signSession, type ApiEnv } from '../../../platform/auth';
@@ -7,10 +7,12 @@ import { config } from '../../../platform/config';
 import {
   CSRF_COOKIE,
   SESSION_COOKIE,
+  clearCookieOptions,
   csrfCookieOptions,
   newCsrfToken,
   sessionCookieOptions,
 } from '../../../platform/cookies';
+import { csrfMiddleware } from '../../../platform/csrf';
 import type { RateLimiter } from '../../../platform/rate-limit';
 import { verifyCredentials } from '../../app/verify-credentials';
 import { InvalidCredentialsError } from '../../domain/errors';
@@ -66,6 +68,12 @@ export function authRoutes(deps: {
     setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
     setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
     return c.json({ token, role: user.role, subject });
+  });
+
+  app.post('/logout', csrfMiddleware, (c) => {
+    deleteCookie(c, SESSION_COOKIE, clearCookieOptions(config.isProduction));
+    deleteCookie(c, CSRF_COOKIE, clearCookieOptions(config.isProduction));
+    return c.body(null, 204);
   });
 
   return app;

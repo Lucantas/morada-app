@@ -338,6 +338,28 @@ describe('Morada API — real credentials', () => {
     const foreign = await auth('/api/threads/t-2');
     expect(foreign.status).toBe(403);
   });
+
+  test('logout clears the session cookie so the next request is unauthenticated', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const out = await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+    });
+    expect(out.status).toBe(204);
+    const cleared = out.headers.getSetCookie().find((c) => c.startsWith('session='));
+    expect(cleared).toMatch(/Max-Age=0/i);
+  });
+
+  test('logout without a CSRF token is rejected', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const out = await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie },
+    });
+    expect(out.status).toBe(403);
+  });
 });
 
 async function adminAuthFor(app: App) {
