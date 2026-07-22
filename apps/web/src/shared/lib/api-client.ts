@@ -1,3 +1,5 @@
+import { readCookie } from './cookies';
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -15,18 +17,17 @@ export type ApiClient = {
   del(path: string): Promise<void>;
 };
 
-export function createApiClient(opts: {
-  baseUrl: string;
-  getToken: () => string | null;
-  onUnauthorized?: () => void;
-}): ApiClient {
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+export function createApiClient(opts: { baseUrl: string; onUnauthorized?: () => void }): ApiClient {
   const request = async (method: string, path: string, body?: unknown): Promise<unknown> => {
-    const token = opts.getToken();
+    const csrf = UNSAFE_METHODS.has(method) ? readCookie('csrf') : null;
     const res = await fetch(`${opts.baseUrl}${path}`, {
       method,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

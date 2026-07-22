@@ -9,9 +9,27 @@ function mockFetch(response: { ok: boolean; status: number; json?: unknown }) {
 }
 
 describe('createApiClient', () => {
-  const client = () => createApiClient({ baseUrl: 'http://api.test', getToken: () => 'tok-123' });
+  const client = () => createApiClient({ baseUrl: 'http://api.test' });
 
-  test('sends the bearer token and returns parsed JSON', async () => {
+  beforeEach(() => {
+    Object.defineProperty(document, 'cookie', { value: '', configurable: true });
+  });
+
+  test('sends credentials always and X-CSRF-Token on mutations', async () => {
+    Object.defineProperty(document, 'cookie', { value: 'csrf=tok', configurable: true });
+    const fetchMock = mockFetch({ ok: true, status: 204 });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const apiClient = createApiClient({ baseUrl: 'http://x' });
+    await apiClient.post('/api/thing', { a: 1 });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.credentials).toBe('include');
+    expect((init.headers as Record<string, string>)['X-CSRF-Token']).toBe('tok');
+  });
+
+  test('sends credentials on GET but omits X-CSRF-Token', async () => {
+    Object.defineProperty(document, 'cookie', { value: 'csrf=tok', configurable: true });
     const fetchMock = mockFetch({ ok: true, status: 200, json: [{ id: 'r-1' }] });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -20,7 +38,8 @@ describe('createApiClient', () => {
     expect(result).toEqual([{ id: 'r-1' }]);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('http://api.test/api/residents');
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-123');
+    expect(init.credentials).toBe('include');
+    expect((init.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined();
   });
 
   test('serializes the body on POST', async () => {
@@ -32,6 +51,27 @@ describe('createApiClient', () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init.method).toBe('POST');
     expect(init.body).toBe(JSON.stringify({ name: 'Ana' }));
+  });
+
+  test('omits X-CSRF-Token on mutations when the csrf cookie is absent', async () => {
+    const fetchMock = mockFetch({ ok: true, status: 200, json: {} });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await client().post('/api/residents', { name: 'Ana' });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined();
+  });
+
+  test('never sends an Authorization header', async () => {
+    Object.defineProperty(document, 'cookie', { value: 'csrf=tok', configurable: true });
+    const fetchMock = mockFetch({ ok: true, status: 200, json: {} });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await client().post('/api/residents', { name: 'Ana' });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
   test('throws ApiError carrying status and server message on failure', async () => {
@@ -53,14 +93,19 @@ describe('createApiClient', () => {
     await expect(client().del('/api/notices/n-1')).resolves.toBeUndefined();
   });
 
-  test('omits Authorization when there is no token', async () => {
-    const fetchMock = mockFetch({ ok: true, status: 200, json: {} });
-    global.fetch = fetchMock as unknown as typeof fetch;
+  test('calls onUnauthorized on a 401 response', async () => {
+    global.fetch = mockFetch({
+      ok: false,
+      status: 401,
+      json: { error: 'Sessão expirada' },
+    }) as unknown as typeof fetch;
+    const onUnauthorized = jest.fn();
 
-    await createApiClient({ baseUrl: 'http://api.test', getToken: () => null }).get('/x');
+    await expect(
+      createApiClient({ baseUrl: 'http://api.test', onUnauthorized }).get('/api/accounts'),
+    ).rejects.toMatchObject({ status: 401 });
 
-    const [, init] = fetchMock.mock.calls[0];
-    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
   test('ApiError is an Error subclass', () => {
