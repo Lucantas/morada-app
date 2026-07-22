@@ -1245,7 +1245,7 @@ In `apps/api/eslint.config.cjs`, add:
     'no-restricted-syntax': [
       'error',
       {
-        selector: "CallExpression[callee.property.name=/^(get|post|put|patch|delete|on)$/]",
+        selector: "CallExpression[callee.object.name!='c'][callee.property.name=/^(get|post|put|patch|delete|all|on)$/]",
         message:
           'Define routes in a feature adapters/http router; compose.ts only wires (.route/.use).',
       },
