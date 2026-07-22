@@ -71,10 +71,11 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            RANGE="$PR_BASE_SHA..HEAD"
+            RANGE="$PR_BASE_SHA..$PR_HEAD_SHA"
           else
             case "$PUSH_BEFORE_SHA" in
               ''|0000000000000000000000000000000000000000)
