@@ -11,6 +11,7 @@ import type { CondoBalance, DashboardSummary, Maintenance, PaidItem } from '../d
 import type { DashboardRepository } from '../domain/dashboard-repository';
 
 import { useDashboard } from './use-dashboard';
+import { DashboardSkeleton } from './dashboard-skeleton';
 
 type Props = {
   repository: DashboardRepository;
@@ -88,7 +89,7 @@ export function DashboardScreen({
             Não foi possível gerar as cobranças do mês. Tente recarregar.
           </p>
         )}
-        {dashboard.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando painel…</p>}
+        {dashboard.isLoading && <DashboardSkeleton />}
         {dashboard.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar o painel.</p>
         )}
