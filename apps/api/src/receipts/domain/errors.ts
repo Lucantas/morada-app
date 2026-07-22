@@ -29,3 +29,11 @@ export class ChargeResidentNotFoundError extends Error {
     this.name = 'ChargeResidentNotFoundError';
   }
 }
+
+export class MonthlyReceiptExistsError extends Error {
+  readonly status = 409;
+  constructor() {
+    super('Recibo da taxa condominial já existe para esta competência');
+    this.name = 'MonthlyReceiptExistsError';
+  }
+}

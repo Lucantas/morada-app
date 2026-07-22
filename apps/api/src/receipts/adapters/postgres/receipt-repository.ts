@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 
+import { MonthlyReceiptExistsError } from '../../domain/errors';
 import { receiptSchema, type Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
 
@@ -76,30 +77,43 @@ export class PostgresReceiptRepository implements ReceiptRepository {
   }
 
   async save(receipt: Receipt): Promise<Receipt> {
-    await this.pool.query(
-      `INSERT INTO receipts (${INSERT_COLUMNS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       ON CONFLICT (id) DO UPDATE SET
-         ref = EXCLUDED.ref, title = EXCLUDED.title, due_date = EXCLUDED.due_date,
-         paid_at = EXCLUDED.paid_at, value_cents = EXCLUDED.value_cents, status = EXCLUDED.status,
-         method = EXCLUDED.method, resident_id = EXCLUDED.resident_id,
-         apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at,
-         proof_data_url = EXCLUDED.proof_data_url`,
-      [
-        receipt.id,
-        receipt.ref,
-        receipt.title,
-        receipt.dueDate,
-        receipt.paidAt ?? null,
-        receipt.valueCents,
-        receipt.status,
-        receipt.method ?? null,
-        receipt.residentId ?? null,
-        receipt.apartmentId ?? null,
-        receipt.submittedAt ?? null,
-        receipt.proofDataUrl ?? null,
-      ],
-    );
+    try {
+      await this.pool.query(
+        `INSERT INTO receipts (${INSERT_COLUMNS})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id) DO UPDATE SET
+           ref = EXCLUDED.ref, title = EXCLUDED.title, due_date = EXCLUDED.due_date,
+           paid_at = EXCLUDED.paid_at, value_cents = EXCLUDED.value_cents, status = EXCLUDED.status,
+           method = EXCLUDED.method, resident_id = EXCLUDED.resident_id,
+           apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at,
+           proof_data_url = EXCLUDED.proof_data_url`,
+        [
+          receipt.id,
+          receipt.ref,
+          receipt.title,
+          receipt.dueDate,
+          receipt.paidAt ?? null,
+          receipt.valueCents,
+          receipt.status,
+          receipt.method ?? null,
+          receipt.residentId ?? null,
+          receipt.apartmentId ?? null,
+          receipt.submittedAt ?? null,
+          receipt.proofDataUrl ?? null,
+        ],
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === '23505' &&
+        'constraint' in error &&
+        error.constraint === 'idx_receipts_condo_fee_month'
+      ) {
+        throw new MonthlyReceiptExistsError();
+      }
+      throw error;
+    }
     return receipt;
   }
 

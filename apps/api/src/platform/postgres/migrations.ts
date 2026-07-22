@@ -185,4 +185,31 @@ ALTER TABLE notices DROP COLUMN dismissed;
 ALTER TABLE incomes ADD COLUMN visible boolean NOT NULL DEFAULT true;
 `,
   },
+  {
+    // Fixes the ensure-month race (check-then-insert with no DB guard could
+    // duplicate 'Taxa condominial' receipts). Step 1 archives (visible = false —
+    // nothing is deleted) existing visible duplicates per (resident_id, ref),
+    // keeping the one with the strongest evidence: pago > em_analise > rest, tie
+    // broken by lowest id. Step 2 adds the partial unique index that makes a
+    // second visible condo-fee receipt for the same resident/month impossible.
+    id: '012_receipt_monthly_unique',
+    sql: `
+WITH ranked AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY resident_id, ref
+           ORDER BY
+             CASE status WHEN 'pago' THEN 0 WHEN 'em_analise' THEN 1 ELSE 2 END,
+             id
+         ) AS rn
+  FROM receipts
+  WHERE visible AND title = 'Taxa condominial'
+)
+UPDATE receipts SET visible = false
+WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+CREATE UNIQUE INDEX idx_receipts_condo_fee_month
+  ON receipts (resident_id, ref) WHERE visible AND title = 'Taxa condominial';
+`,
+  },
 ];
