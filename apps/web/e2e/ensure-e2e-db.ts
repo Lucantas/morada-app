@@ -19,6 +19,14 @@ export async function ensureE2eDatabaseExists(): Promise<void> {
   }
 }
 
+// Tables excluded from the reset TRUNCATE: `_migrations` tracks which
+// migrations have already run, and `categories`/`condo_settings` hold only
+// migration-seeded config (migrations 007 and 004) that the e2e journey never
+// mutates. Migrations are marked applied after their first run, so truncating
+// these would wipe their seed rows forever — no fresh environment starts in
+// that state.
+const TABLES_EXCLUDED_FROM_RESET = ['_migrations', 'categories', 'condo_settings'];
+
 // Resets the e2e database to a clean slate before every `make e2e` run.
 // `apartments.label` (and similar) are UNIQUE, so leftover rows from a
 // previous run would make the journey spec fail on re-run. Truncating here —
@@ -30,10 +38,13 @@ export async function resetE2eDatabase(): Promise<void> {
   await client.connect();
   try {
     const result = await client.query<{ tablename: string }>(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != '_migrations'`,
+      `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename != ALL($1)`,
+      [TABLES_EXCLUDED_FROM_RESET],
     );
     if (result.rows.length === 0) return;
-    const tableNames = result.rows.map((row) => `"${row.tablename}"`).join(', ');
+    const tableNames = result.rows
+      .map((row) => `"${row.tablename.replace(/"/g, '""')}"`)
+      .join(', ');
     await client.query(`TRUNCATE TABLE ${tableNames} CASCADE`);
   } finally {
     await client.end();

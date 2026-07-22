@@ -59,15 +59,9 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
 
     await expect(page.getByText('Senha temporária')).toBeVisible();
 
-    const usernameRow = page
-      .locator('div', { has: page.getByText('Usuário', { exact: true }) })
-      .last();
-    await expect(usernameRow.getByText(residentUsername, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('login-username')).toHaveText(residentUsername);
 
-    const passwordRow = page
-      .locator('div', { has: page.getByText('Senha temporária', { exact: true }) })
-      .last();
-    tempPassword = (await passwordRow.locator('span').last().textContent())?.trim() ?? '';
+    tempPassword = (await page.getByTestId('temp-password').textContent())?.trim() ?? '';
     expect(tempPassword.length).toBeGreaterThan(0);
   });
 

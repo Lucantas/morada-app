@@ -133,8 +133,12 @@ export function CreateLoginScreen({
             <p style={{ fontWeight: 600, color: 'var(--ink-900)', marginBottom: 12 }}>
               Anote e repasse ao morador — a senha não será mostrada novamente.
             </p>
-            <CredentialRow label="Usuário" value={credentials.username} />
-            <CredentialRow label="Senha temporária" value={credentials.tempPassword} />
+            <CredentialRow label="Usuário" value={credentials.username} testId="login-username" />
+            <CredentialRow
+              label="Senha temporária"
+              value={credentials.tempPassword}
+              testId="temp-password"
+            />
           </SurfaceCard>
         )}
 
@@ -144,7 +148,7 @@ export function CreateLoginScreen({
               Este morador já tem acesso. Redefina a senha para gerar uma nova senha temporária.
             </p>
             <SurfaceCard>
-              <CredentialRow label="Usuário" value={existingUsername} />
+              <CredentialRow label="Usuário" value={existingUsername} testId="login-username" />
             </SurfaceCard>
             {error && (
               <p role="alert" style={{ color: 'var(--atraso-700)', margin: '14px 0' }}>
@@ -184,7 +188,7 @@ export function CreateLoginScreen({
   );
 }
 
-function CredentialRow({ label, value }: { label: string; value: string }) {
+function CredentialRow({ label, value, testId }: { label: string; value: string; testId: string }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
 
@@ -215,6 +219,7 @@ function CredentialRow({ label, value }: { label: string; value: string }) {
       <span style={{ color: 'var(--ink-500)', fontSize: '.86rem' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span
+          data-testid={testId}
           style={{
             fontWeight: 600,
             color: 'var(--ink-900)',
