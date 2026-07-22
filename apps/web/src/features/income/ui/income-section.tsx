@@ -8,6 +8,7 @@ import type { Income } from '../domain/income';
 import type { IncomeRepository } from '../domain/income-repository';
 import { sortIncomesByDateDesc } from '../domain/sort-incomes';
 
+import { IncomeSectionSkeleton } from './income-section-skeleton';
 import { useIncomes } from './use-income';
 
 type Props = {
@@ -23,7 +24,7 @@ export function IncomeSection({ repository, onOpenIncome }: Props) {
       <SectionLabel right={<AddIncomeButton onClick={() => onOpenIncome()} />}>
         Outras entradas
       </SectionLabel>
-      {incomes.isLoading && <StatusView variant="loading" message="Carregando entradas…" />}
+      {incomes.isLoading && <IncomeSectionSkeleton />}
       {incomes.isError && (
         <StatusView variant="error" message="Não foi possível carregar as entradas." />
       )}
