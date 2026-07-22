@@ -4,6 +4,7 @@ import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
 import { copyText } from '@/shared/lib/clipboard';
+import { CreateLoginSkeleton } from './create-login-skeleton';
 
 type ProvisionResult = { username: string; tempPassword: string };
 
@@ -124,9 +125,7 @@ export function CreateLoginScreen({
         </div>
       </div>
       <ScreenBody>
-        {phase === 'loading' && (
-          <p style={{ color: 'var(--ink-500)', fontSize: '.92rem', paddingTop: 2 }}>Carregando…</p>
-        )}
+        {phase === 'loading' && <CreateLoginSkeleton />}
 
         {phase === 'done' && credentials && (
           <SurfaceCard>
