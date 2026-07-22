@@ -59,6 +59,46 @@ describe('IncomeEditScreen', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
+  test('renders a proof link pointing at the serving endpoint when the income has a proof', async () => {
+    const repository = new InMemoryIncomeRepository([
+      {
+        id: 'income-1',
+        description: 'Aluguel salão',
+        source: 'Salão de festas',
+        date: '2026-04-10',
+        valueCents: 20000,
+        hasProof: true,
+      },
+    ]);
+    renderWithClient(
+      <IncomeEditScreen incomeId="income-1" repository={repository} onBack={jest.fn()} />,
+    );
+
+    expect(await screen.findByDisplayValue('Aluguel salão')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
+      'href',
+      '/api/incomes/income-1/proof',
+    );
+  });
+
+  test('does not render a proof link when the income has no proof', async () => {
+    const repository = new InMemoryIncomeRepository([
+      {
+        id: 'income-1',
+        description: 'Aluguel salão',
+        source: 'Salão de festas',
+        date: '2026-04-10',
+        valueCents: 20000,
+      },
+    ]);
+    renderWithClient(
+      <IncomeEditScreen incomeId="income-1" repository={repository} onBack={jest.fn()} />,
+    );
+
+    expect(await screen.findByDisplayValue('Aluguel salão')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /ver comprovante/i })).not.toBeInTheDocument();
+  });
+
   test('deletes an existing income after confirming', async () => {
     const repository = new InMemoryIncomeRepository([
       {

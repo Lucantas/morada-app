@@ -279,7 +279,7 @@ describe('ResidentEditScreen', () => {
         title: 'Taxa condominial',
         apartmentId: 'apt-1',
         status: 'em_analise',
-        proofDataUrl: 'data:image/png;base64,abc123',
+        hasProof: true,
       }),
     ]);
     const onConfirmPayment = jest.fn().mockResolvedValue(undefined);
@@ -300,7 +300,7 @@ describe('ResidentEditScreen', () => {
     expect(screen.queryByRole('button', { name: /dar baixa/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
       'href',
-      'data:image/png;base64,abc123',
+      '/api/receipts/rc-1/proof',
     );
 
     const confirmButton = screen.getByRole('button', { name: /^confirmar$/i });
@@ -313,6 +313,34 @@ describe('ResidentEditScreen', () => {
 
     await waitFor(() => expect(onConfirmPayment).toHaveBeenCalledWith('rc-1', '2026-06-20'));
     expect(onRejectPayment).not.toHaveBeenCalled();
+  });
+
+  test('does not render a proof link when the receipt under review has no proof', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        status: 'em_analise',
+      }),
+    ]);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onConfirmPayment={jest.fn()}
+        onRejectPayment={jest.fn()}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+
+    expect(screen.queryByRole('link', { name: /ver comprovante/i })).not.toBeInTheDocument();
   });
 
   test('lets the admin override or clear the resident status', async () => {

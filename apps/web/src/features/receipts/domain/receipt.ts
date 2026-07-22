@@ -21,5 +21,6 @@ export const receiptSchema = z.object({
   apartmentId: z.string().min(1).optional(),
   submittedAt: z.string().optional(),
   proofDataUrl: z.string().optional(),
+  hasProof: z.boolean().optional(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;

@@ -737,9 +737,9 @@ function ReceiptLedgerRow({
 
       {isUnderReview && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-          {receipt.proofDataUrl && (
+          {receipt.hasProof && (
             <a
-              href={receipt.proofDataUrl}
+              href={`/api/receipts/${receipt.id}/proof`}
               target="_blank"
               rel="noreferrer"
               style={{ ...archiveButtonStyle, textDecoration: 'none' }}

@@ -7,6 +7,7 @@ export const incomeSchema = z.object({
   date: z.string().nullable(),
   valueCents: z.number().int().nonnegative(),
   proofDataUrl: z.string().optional(),
+  hasProof: z.boolean().optional(),
 });
 export type Income = z.infer<typeof incomeSchema>;
 

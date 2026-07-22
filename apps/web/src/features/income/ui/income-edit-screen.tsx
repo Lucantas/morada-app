@@ -38,8 +38,8 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
 
   useEffect(() => {
     if (existing) {
-      const { description, source, date, valueCents, proofDataUrl } = existing;
-      setForm({ description, source, date: date ?? '', valueCents, proofDataUrl });
+      const { description, source, date, valueCents } = existing;
+      setForm((prev) => ({ ...prev, description, source, date: date ?? '', valueCents }));
     }
   }, [existing]);
 
@@ -157,6 +157,26 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
           >
             Anexar comprovante
           </label>
+          {existing?.hasProof && (
+            <a
+              href={`/api/incomes/${existing.id}/proof`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 12,
+                color: 'var(--petrol-700)',
+                fontWeight: 600,
+                fontSize: '.86rem',
+                textDecoration: 'none',
+              }}
+            >
+              <Icon name="receipt" size={15} />
+              Ver comprovante
+            </a>
+          )}
           <input
             id="income-proof"
             type="file"
