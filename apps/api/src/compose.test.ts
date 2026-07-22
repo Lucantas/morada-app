@@ -60,6 +60,17 @@ describe('Morada API', () => {
     expect(await res.json()).toEqual({ status: 'ok' });
   });
 
+  test('CORS allows credentials for the configured origin', async () => {
+    const origin = config.webOrigins[0] ?? '';
+    const res = await (
+      await makeApp()
+    ).request('/healthz', {
+      headers: { Origin: origin },
+    });
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+  });
+
   test('every response carries security headers', async () => {
     const res = await (await makeApp()).request('/healthz');
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');

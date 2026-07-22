@@ -60,8 +60,9 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     '*',
     cors({
       origin: config.webOrigins,
+      credentials: true,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization'],
+      allowHeaders: ['Content-Type', 'X-CSRF-Token'],
     }),
   );
   app.use(
