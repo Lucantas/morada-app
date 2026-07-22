@@ -6,3 +6,5 @@ coverage/
 .env
 .DS_Store
 backups/
+apps/web/playwright-report/
+apps/web/test-results/
