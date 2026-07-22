@@ -13,6 +13,7 @@ import { initials, type Resident } from '../domain/resident';
 import { residentStats } from '../domain/resident-stats';
 import type { ResidentRepository } from '../domain/resident-repository';
 
+import { ResidentsSkeleton } from './residents-skeleton';
 import { residentStatusView } from './resident-status-view';
 import { useResidents } from './use-residents';
 
@@ -56,7 +57,7 @@ export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props
         </div>
       </TopBar>
       <ScreenBody>
-        {residents.isLoading && <StatusView variant="loading" message="Carregando apartamentos…" />}
+        {residents.isLoading && <ResidentsSkeleton />}
         {residents.isError && (
           <StatusView
             variant="error"
