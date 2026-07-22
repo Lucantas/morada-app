@@ -12,6 +12,7 @@ import type { Notice } from '../domain/notice';
 import type { NoticeRepository } from '../domain/notice-repository';
 
 import { noticeKindView } from './notice-kind-view';
+import { NoticesSkeleton } from './notices-skeleton';
 import { useClearNotices, useDismissNotice, useNotices } from './use-notices';
 
 type Props = {
@@ -28,7 +29,7 @@ export function NoticesScreen({ repository, bottomNav }: Props) {
     <Screen>
       <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Avisos" />
       <ScreenBody>
-        {notices.isLoading && <StatusView variant="loading" message="Carregando avisos…" />}
+        {notices.isLoading && <NoticesSkeleton />}
         {notices.isError && (
           <StatusView
             variant="error"
