@@ -12,6 +12,7 @@ import { StatusView } from '@/shared/ui/status-view';
 import { TopBar } from '@/shared/ui/top-bar';
 
 import { firstName } from './current-resident';
+import { ResidentHomeSkeleton } from './resident-home-skeleton';
 import { useResidentHome } from './use-resident-home';
 
 type Props = {
@@ -41,7 +42,7 @@ export function ResidentHomeScreen({
         right={<NoticesButton onClick={onGoNotices} />}
       />
       <ScreenBody>
-        {home.isLoading && <StatusView variant="loading" message="Carregando…" />}
+        {home.isLoading && <ResidentHomeSkeleton />}
         {home.isError && (
           <StatusView
             variant="error"
