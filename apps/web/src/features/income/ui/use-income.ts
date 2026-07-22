@@ -20,10 +20,10 @@ export function useSaveIncome(repository: IncomeRepository) {
   });
 }
 
-export function useDeleteIncome(repository: IncomeRepository) {
+export function useArchiveIncome(repository: IncomeRepository) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => repository.remove(id),
+    mutationFn: (id: string) => repository.archive(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: incomeQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });

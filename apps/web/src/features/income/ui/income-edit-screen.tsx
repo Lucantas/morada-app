@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
 import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 
 import type { IncomeRepository } from '../domain/income-repository';
-import { useDeleteIncome, useIncomes, useSaveIncome } from './use-income';
+import { useArchiveIncome, useIncomes, useSaveIncome } from './use-income';
 
 const EMPTY = {
   description: '',
@@ -29,7 +29,7 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
   const incomes = useIncomes(repository);
   const existing = incomes.data?.find((income) => income.id === incomeId);
   const save = useSaveIncome(repository);
-  const deleteIncome = useDeleteIncome(repository);
+  const archiveIncome = useArchiveIncome(repository);
   const [form, setForm] = useState(EMPTY);
   const [proofName, setProofName] = useState<string | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
@@ -191,7 +191,7 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
               Não foi possível salvar a entrada. Tente novamente.
             </p>
           )}
-          {deleteIncome.isError && (
+          {archiveIncome.isError && (
             <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>
               Não foi possível excluir a entrada. Tente novamente.
             </p>
@@ -230,10 +230,10 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
         title="Excluir entrada?"
         confirmLabel="Excluir"
         tone="danger"
-        isPending={deleteIncome.isPending}
+        isPending={archiveIncome.isPending}
         onConfirm={() => {
           if (!incomeId) return;
-          deleteIncome.mutate(incomeId, { onSuccess: onBack });
+          archiveIncome.mutate(incomeId, { onSuccess: onBack });
         }}
         onCancel={() => setConfirmingDelete(false)}
       />

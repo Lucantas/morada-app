@@ -21,7 +21,7 @@ export class HttpIncomeRepository implements IncomeRepository {
     return incomeSchema.parse(await this.api.put(`/api/incomes/${draft.id}`, draft));
   }
 
-  async remove(id: string): Promise<void> {
+  async archive(id: string): Promise<void> {
     await this.api.del(`/api/incomes/${id}`);
   }
 }

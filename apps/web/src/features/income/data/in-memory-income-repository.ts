@@ -23,7 +23,7 @@ export class InMemoryIncomeRepository implements IncomeRepository {
     return income;
   }
 
-  async remove(id: string): Promise<void> {
+  async archive(id: string): Promise<void> {
     const next = new Map(this.incomes);
     next.delete(id);
     this.incomes = next;
