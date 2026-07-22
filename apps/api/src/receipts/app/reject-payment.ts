@@ -10,6 +10,6 @@ export async function rejectPayment(repo: ReceiptRepository, id: string): Promis
   void paidAt;
   void submittedAt;
   void proofDataUrl;
-  const updated = receiptSchema.parse({ ...rest, status: 'pendente' });
+  const updated = receiptSchema.parse({ ...rest, status: 'pendente', proofDataUrl: null });
   return repo.save(updated);
 }

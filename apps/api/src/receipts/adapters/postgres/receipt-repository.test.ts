@@ -267,3 +267,117 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
     }
   });
 });
+
+describe('PostgresReceiptRepository — proof preservation on proof-less re-save (regression)', () => {
+  const BASE_RECEIPT = {
+    id: 'rc-1',
+    ref: '07/2026',
+    title: 'Taxa condominial',
+    dueDate: '2026-07-15',
+    valueCents: 15000,
+    status: 'em_analise' as const,
+    method: 'pix' as const,
+    submittedAt: '2026-07-14',
+    residentId: 'r-1',
+    apartmentId: 'apt-1',
+  };
+  const DATA_URL = 'data:image/png;base64,iVBORw0KGgo=';
+
+  beforeEach(async () => {
+    await resetPg(pool);
+  });
+
+  test('confirm-payment style re-save (proofDataUrl: undefined, base64 fallback mode) preserves the existing proof', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const resaved = await repo.save({
+      ...BASE_RECEIPT,
+      status: 'pago',
+      paidAt: '2026-07-20',
+      proofDataUrl: undefined,
+    });
+
+    expect(resaved.hasProof).toBe(true);
+
+    const { rows } = await pool.query(
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
+      ['rc-1'],
+    );
+    expect(rows[0].proof_data_url).toBe(DATA_URL);
+    expect(rows[0].proof_key).toBeNull();
+
+    const proof = await repo.getProof('rc-1');
+    expect(proof).not.toBeNull();
+    expect(proof?.contentType).toBe('image/png');
+  });
+
+  test('confirm-payment style re-save (proofDataUrl: undefined, storage mode) preserves the existing proof_key', async () => {
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, storage);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const resaved = await repo.save({
+      ...BASE_RECEIPT,
+      status: 'pago',
+      paidAt: '2026-07-20',
+      proofDataUrl: undefined,
+    });
+
+    expect(resaved.hasProof).toBe(true);
+
+    const { rows } = await pool.query(
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
+      ['rc-1'],
+    );
+    expect(rows[0].proof_key).toBe('receipts/rc-1');
+    expect(rows[0].proof_data_url).toBeNull();
+
+    const proof = await repo.getProof('rc-1');
+    expect(proof).not.toBeNull();
+    expect(proof?.contentType).toBe('image/png');
+  });
+
+  test('reject-payment style re-save (proofDataUrl: null) explicitly clears the proof', async () => {
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, storage);
+    await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
+
+    const resaved = await repo.save({
+      ...BASE_RECEIPT,
+      status: 'pendente',
+      method: undefined,
+      submittedAt: undefined,
+      proofDataUrl: null,
+    });
+
+    expect(resaved.hasProof).toBe(false);
+
+    const { rows } = await pool.query(
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
+      ['rc-1'],
+    );
+    expect(rows[0].proof_key).toBeNull();
+    expect(rows[0].proof_data_url).toBeNull();
+
+    expect(await repo.getProof('rc-1')).toBeNull();
+  });
+
+  test('brand-new insert with proofDataUrl: undefined succeeds with hasProof: false', async () => {
+    const repo = new PostgresReceiptRepository(pool, null);
+
+    const saved = await repo.save({
+      id: 'rc-new',
+      ref: '07/2026',
+      title: 'Taxa condominial',
+      dueDate: '2026-07-15',
+      valueCents: 15000,
+      status: 'pendente',
+      residentId: 'r-2',
+      proofDataUrl: undefined,
+    });
+
+    expect(saved.hasProof).toBe(false);
+    expect(await repo.getProof('rc-new')).toBeNull();
+  });
+});

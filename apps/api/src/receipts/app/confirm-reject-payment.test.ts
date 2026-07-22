@@ -12,8 +12,14 @@ function fakeRepo(seed: Receipt[]): ReceiptRepository {
     listByApartment: async (aid) => rows.filter((r) => r.apartmentId === aid),
     getById: async (id) => rows.find((r) => r.id === id) ?? null,
     save: async (r) => {
-      rows = [...rows.filter((x) => x.id !== r.id), r];
-      return r;
+      const existing = rows.find((x) => x.id === r.id);
+      const proofDataUrl = r.proofDataUrl === undefined ? existing?.proofDataUrl : r.proofDataUrl;
+      const stored: Receipt = {
+        ...r,
+        proofDataUrl: proofDataUrl ?? undefined,
+      };
+      rows = [...rows.filter((x) => x.id !== r.id), stored];
+      return { ...stored, proofDataUrl: undefined, hasProof: stored.proofDataUrl != null };
     },
     archive: async (id) => {
       rows = rows.filter((x) => x.id !== id);

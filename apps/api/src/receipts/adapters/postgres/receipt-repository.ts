@@ -102,27 +102,38 @@ export class PostgresReceiptRepository implements ReceiptRepository {
   }
 
   async save(receipt: Receipt): Promise<Receipt> {
+    const touchesProof = receipt.proofDataUrl !== undefined;
     const isFreshUpload =
-      receipt.proofDataUrl !== undefined && DATA_URL_PATTERN.test(receipt.proofDataUrl);
+      typeof receipt.proofDataUrl === 'string' && DATA_URL_PATTERN.test(receipt.proofDataUrl);
     let proofKey: string | null = null;
     let proofDataUrl: string | null = null;
     if (isFreshUpload && this.storage) {
       proofKey = `receipts/${receipt.id}`;
       await this.storage.put(proofKey, receipt.proofDataUrl as string);
-    } else {
+    } else if (touchesProof) {
       proofDataUrl = receipt.proofDataUrl ?? null;
     }
 
+    // When the save carries no proof change (proofDataUrl === undefined, e.g.
+    // confirm/edit/pay re-saving an existing receipt), the SET clause must not
+    // mention the proof columns at all, so an existing row keeps its proof —
+    // the INSERT branch still supplies NULL/NULL, correct for a brand-new row.
+    const proofSetClause = touchesProof
+      ? 'proof_data_url = EXCLUDED.proof_data_url, proof_key = EXCLUDED.proof_key'
+      : '';
+
+    let result: { rows: { has_proof: boolean }[] };
     try {
-      await this.pool.query(
+      result = await this.pool.query<{ has_proof: boolean }>(
         `INSERT INTO receipts (${INSERT_COLUMNS})
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (id) DO UPDATE SET
            ref = EXCLUDED.ref, title = EXCLUDED.title, due_date = EXCLUDED.due_date,
            paid_at = EXCLUDED.paid_at, value_cents = EXCLUDED.value_cents, status = EXCLUDED.status,
            method = EXCLUDED.method, resident_id = EXCLUDED.resident_id,
-           apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at,
-           proof_data_url = EXCLUDED.proof_data_url, proof_key = EXCLUDED.proof_key`,
+           apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at
+           ${proofSetClause ? `, ${proofSetClause}` : ''}
+         RETURNING (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof`,
         [
           receipt.id,
           receipt.ref,
@@ -154,7 +165,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
     return receiptSchema.parse({
       ...receipt,
       proofDataUrl: undefined,
-      hasProof: proofKey !== null || proofDataUrl !== null,
+      hasProof: result.rows[0]?.has_proof ?? false,
     });
   }
 

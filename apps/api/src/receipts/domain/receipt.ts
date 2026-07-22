@@ -20,7 +20,9 @@ export const receiptSchema = z.object({
   // When the charge was actually paid; absent while pending. Set on payment.
   paidAt: isoDateSchema.optional(),
   submittedAt: isoDateSchema.optional(),
-  proofDataUrl: z.string().max(7_000_000).optional(),
+  // string = new upload; null = explicit clear (reject); undefined = leave
+  // the existing proof untouched (confirm/edit/pay re-saves without a fresh proof).
+  proofDataUrl: z.string().max(7_000_000).nullable().optional(),
   // Persistence-derived (whether a proof exists in storage or as legacy base64),
   // never a write input — not enforced as an invariant, just carried through reads.
   hasProof: z.boolean().optional(),
