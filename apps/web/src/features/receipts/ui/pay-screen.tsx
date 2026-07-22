@@ -16,6 +16,7 @@ import type { ReceiptRepository } from '../domain/receipt-repository';
 
 import { methodLabel } from './receipt-status-view';
 import { receiptsQueryKey, useSubmitPayment } from './use-receipts';
+import { PaySkeleton } from './pay-skeleton';
 
 const METHODS: ReceiptMethod[] = ['dinheiro', 'pix'];
 
@@ -104,7 +105,7 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
         </div>
       </div>
       <ScreenBody>
-        {receipt.isLoading && <p style={{ color: 'var(--ink-500)' }}>Carregando recibo…</p>}
+        {receipt.isLoading && <PaySkeleton />}
         {receipt.isError && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar o recibo.</p>
         )}
