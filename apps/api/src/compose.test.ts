@@ -36,10 +36,21 @@ async function login(app: App, username: string, password: string): Promise<Resp
   });
 }
 
-async function tokenFor(app: App, creds: { username: string; password: string }): Promise<string> {
+type Auth = { cookie: string; csrf: string };
+
+function parseCookie(setCookies: string[], name: string): string {
+  const raw = setCookies.find((c) => c.startsWith(`${name}=`));
+  if (!raw) throw new Error(`missing ${name} cookie`);
+  const pair = raw.split(';')[0] ?? '';
+  return pair.split('=').slice(1).join('=');
+}
+
+async function authFor(app: App, creds: { username: string; password: string }): Promise<Auth> {
   const res = await login(app, creds.username, creds.password);
-  const body = (await res.json()) as { token: string };
-  return body.token;
+  const setCookies = res.headers.getSetCookie();
+  const session = parseCookie(setCookies, 'session');
+  const csrf = parseCookie(setCookies, 'csrf');
+  return { cookie: `session=${session}; csrf=${csrf}`, csrf };
 }
 
 describe('Morada API', () => {
@@ -64,18 +75,18 @@ describe('Morada API', () => {
 
   test('forbids a resident from admin-only resources', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/residents', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
   });
 
   test('lets an admin list seeded residents', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, adminCredentials);
+    const auth = await authFor(app, adminCredentials);
     const res = await app.request('/api/residents', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
     const residents = (await res.json()) as unknown[];
@@ -84,10 +95,14 @@ describe('Morada API', () => {
 
   test('an admin can create a resident (201) and read it back', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, adminCredentials);
+    const auth = await authFor(app, adminCredentials);
     const create = await app.request('/api/residents', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         name: 'Novo Morador',
         apt: 'Apto 500',
@@ -101,15 +116,19 @@ describe('Morada API', () => {
     expect(created.name).toBe('Novo Morador');
 
     const read = await app.request(`/api/residents/${created.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(read.status).toBe(200);
   });
 
   test('an admin overrides and then clears a resident status', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, adminCredentials);
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const auth = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
 
     const override = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
       method: 'PUT',
@@ -128,10 +147,14 @@ describe('Morada API', () => {
 
   test('overriding a resident status is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ status: 'atrasado' }),
     });
     expect(res.status).toBe(403);
@@ -156,10 +179,10 @@ describe('Morada API', () => {
 
   test('an inactive (moved-out) resident cannot log in', async () => {
     const app = await makeApp();
-    const admin = await tokenFor(app, adminCredentials);
+    const admin = await authFor(app, adminCredentials);
     const deactivate = await app.request('/api/residents/r-1/deactivate', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${admin}` },
+      headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
     });
     expect(deactivate.ok).toBe(true);
 
@@ -169,25 +192,25 @@ describe('Morada API', () => {
 
   test('an active resident can read their own record', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/residents/me', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
   });
 
   test("an inactive resident's existing session is rejected on the next request", async () => {
     const app = await makeApp();
-    const residentToken = await tokenFor(app, residentCredentials); // issued while active
-    const admin = await tokenFor(app, adminCredentials);
+    const residentAuth = await authFor(app, residentCredentials); // issued while active
+    const admin = await authFor(app, adminCredentials);
     const deactivate = await app.request('/api/residents/r-1/deactivate', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${admin}` },
+      headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
     });
     expect(deactivate.ok).toBe(true);
 
     const res = await app.request('/api/residents/me', {
-      headers: { Authorization: `Bearer ${residentToken}` },
+      headers: { Cookie: residentAuth.cookie },
     });
     expect(res.status).toBe(401);
   });
@@ -251,9 +274,9 @@ describe('Morada API — real credentials', () => {
 
   test('a resident reads their own record via GET /api/residents/me', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/residents/me', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
     const me = (await res.json()) as { id: string; name: string };
@@ -268,9 +291,8 @@ describe('Morada API — real credentials', () => {
 
   test("a resident token is scoped to that resident's own id", async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
-    const auth = (path: string) =>
-      app.request(path, { headers: { Authorization: `Bearer ${token}` } });
+    const resAuth = await authFor(app, residentCredentials);
+    const auth = (path: string) => app.request(path, { headers: { Cookie: resAuth.cookie } });
 
     const own = await auth(`/api/threads/${residentCredentials.residentId}`);
     expect(own.status).toBe(200);
@@ -281,13 +303,14 @@ describe('Morada API — real credentials', () => {
 });
 
 async function adminAuthFor(app: App) {
-  const token = await tokenFor(app, adminCredentials);
+  const auth = await authFor(app, adminCredentials);
   return (path: string, init: RequestInit = {}) =>
     app.request(path, {
       ...init,
       headers: {
         ...(init.headers ?? {}),
-        Authorization: `Bearer ${token}`,
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
         'Content-Type': 'application/json',
       },
     });
@@ -344,9 +367,9 @@ describe('Morada API — apartments & occupancy', () => {
 
   test('the apartment occupant history is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/apartments/apt-r-1/residents', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
   });
@@ -364,9 +387,9 @@ describe('Morada API — apartments & occupancy', () => {
 
   test('the apartment ledger is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/apartments/apt-r-1/receipts', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
   });
@@ -395,10 +418,14 @@ describe('Morada API — admin provisions resident logins', () => {
 
   test('provisioning a resident login is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/users', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ username: 'hacker', residentId: 'r-4' }),
     });
     expect(res.status).toBe(403);
@@ -457,9 +484,9 @@ describe('Morada API — admin reads and resets resident logins', () => {
 
   test('reading a resident login is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request(`/api/residents/${residentCredentials.residentId}/login`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
   });
@@ -492,11 +519,15 @@ describe('Morada API — admin reads and resets resident logins', () => {
 describe('Morada API — authorization wiring', () => {
   async function withCreds(creds: { username: string; password: string }) {
     const app = await makeApp();
-    const token = await tokenFor(app, creds);
+    const userAuth = await authFor(app, creds);
     const auth = (path: string, init: RequestInit = {}) =>
       app.request(path, {
         ...init,
-        headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+        headers: {
+          ...(init.headers ?? {}),
+          Cookie: userAuth.cookie,
+          'X-CSRF-Token': userAuth.csrf,
+        },
       });
     return { app, auth };
   }
@@ -664,10 +695,14 @@ describe('Morada API — authorization wiring', () => {
 
   test('an admin issues a charge and the resident then sees it (pending)', async () => {
     const app = await makeApp();
-    const adminToken = await tokenFor(app, adminCredentials);
+    const admin = await authFor(app, adminCredentials);
     const issue = await app.request('/api/receipts', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: admin.cookie,
+        'X-CSRF-Token': admin.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         residentId: 'r-1',
         ref: '05/2026',
@@ -680,9 +715,9 @@ describe('Morada API — authorization wiring', () => {
     const created = (await issue.json()) as { id: string; status: string };
     expect(created.status).toBe('pendente');
 
-    const residentToken = await tokenFor(app, residentCredentials);
+    const resident = await authFor(app, residentCredentials);
     const mine = await app.request('/api/receipts', {
-      headers: { Authorization: `Bearer ${residentToken}` },
+      headers: { Cookie: resident.cookie },
     });
     const ids = ((await mine.json()) as { id: string }[]).map((r) => r.id);
     expect(ids).toContain(created.id);
@@ -690,10 +725,14 @@ describe('Morada API — authorization wiring', () => {
 
   test('issuing a charge is admin-only', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, residentCredentials);
+    const auth = await authFor(app, residentCredentials);
     const res = await app.request('/api/receipts', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         residentId: 'r-1',
         ref: '05/2026',
@@ -707,10 +746,14 @@ describe('Morada API — authorization wiring', () => {
 
   test('issuing a charge for a nonexistent resident is rejected with 404', async () => {
     const app = await makeApp();
-    const token = await tokenFor(app, adminCredentials);
+    const auth = await authFor(app, adminCredentials);
     const res = await app.request('/api/receipts', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         residentId: 'r-nope',
         ref: '05/2026',

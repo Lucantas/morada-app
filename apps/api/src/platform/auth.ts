@@ -1,7 +1,9 @@
 import type { MiddlewareHandler } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { sign, verify } from 'hono/jwt';
 
 import { config } from './config';
+import { SESSION_COOKIE } from './cookies';
 
 export type Role = 'admin' | 'resident';
 
@@ -16,8 +18,7 @@ export async function signSession(role: Role, subject: string): Promise<string> 
 }
 
 export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
-  const header = c.req.header('Authorization');
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+  const token = getCookie(c, SESSION_COOKIE);
   if (!token) return c.json({ error: 'Não autenticado' }, 401);
   try {
     const payload = await verify(token, config.jwtSecret, 'HS256');
