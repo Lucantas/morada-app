@@ -51,6 +51,8 @@ export async function login(username: string, password: string): Promise<Role> {
 export async function logout(): Promise<void> {
   try {
     await apiClient.post('/auth/logout');
+  } catch {
+    // server-side session cleanup is best-effort; the cookie expires on its own
   } finally {
     useSessionStore.getState().signOut();
   }
