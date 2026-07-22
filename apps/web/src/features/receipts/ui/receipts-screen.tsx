@@ -16,6 +16,7 @@ import type { ReceiptRepository } from '../domain/receipt-repository';
 import { buildReceiptProof, proofFileName } from '../domain/receipt-proof';
 import { sortByDueDateDesc } from '../domain/sort-by-due-date';
 
+import { ReceiptsSkeleton } from './receipts-skeleton';
 import { methodLabel, receiptStatusView } from './receipt-status-view';
 import { useReceipts } from './use-receipts';
 
@@ -60,7 +61,7 @@ export function ReceiptsScreen({ repository, resident, onPay, bottomNav }: Props
         }
       />
       <ScreenBody>
-        {receipts.isLoading && <StatusView variant="loading" message="Carregando recibos…" />}
+        {receipts.isLoading && <ReceiptsSkeleton />}
         {receipts.isError && (
           <StatusView
             variant="error"
