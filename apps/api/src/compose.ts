@@ -9,6 +9,7 @@ import { incomeRoutes } from './income/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
+import { csrfMiddleware } from './platform/csrf';
 import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
@@ -89,6 +90,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
+  api.use('*', csrfMiddleware);
 
   api.use('*', async (c, next) => {
     if (c.get('role') === 'resident' && !(await isResidentActive(c.get('sub')))) {

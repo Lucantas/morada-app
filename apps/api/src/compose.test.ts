@@ -68,6 +68,44 @@ describe('Morada API', () => {
     expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'none'");
   });
 
+  test('rejects a mutating request without a matching CSRF token', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const res = await app.request('/api/accounts', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Água',
+        category: 'Utilidades',
+        valueCents: 1000,
+        date: '2026-04-05',
+        status: 'pendente',
+      }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('accepts a mutating request with the matching CSRF token', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const res = await app.request('/api/accounts', {
+      method: 'POST',
+      headers: {
+        Cookie: auth.cookie,
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': auth.csrf,
+      },
+      body: JSON.stringify({
+        description: 'Água',
+        category: 'Utilidades',
+        valueCents: 1000,
+        date: '2026-04-05',
+        status: 'pendente',
+      }),
+    });
+    expect(res.status).toBe(201);
+  });
+
   test('rejects unauthenticated access to protected resources', async () => {
     const res = await (await makeApp()).request('/api/residents');
     expect(res.status).toBe(401);
