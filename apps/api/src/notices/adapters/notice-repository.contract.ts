@@ -1,3 +1,4 @@
+import { NoticeNotFoundError } from '../domain/errors';
 import type { NoticeRepository } from '../domain/notice-repository';
 
 // Behavioural contract every NoticeRepository must satisfy.
@@ -126,6 +127,24 @@ export function runNoticeRepositoryContract(
       await repo.remove('n-1');
 
       expect(await repo.getById('n-1')).toBeNull();
+    });
+
+    test('dismiss throws NoticeNotFoundError when the notice vanishes mid-dismiss', async () => {
+      const repo = await makeRepo();
+      // Insert and then delete the notice to simulate the race condition
+      // where the notice is deleted between the insert and getById
+      await repo.save({
+        id: 'race-notice',
+        title: 'Aviso',
+        body: 'Corpo',
+        kind: 'aviso',
+        audience: 'todos',
+        dateLabel: 'Agora',
+        dismissed: false,
+      });
+      await repo.remove('race-notice');
+
+      await expect(repo.dismiss('race-notice', 'r-1')).rejects.toBeInstanceOf(NoticeNotFoundError);
     });
   });
 }

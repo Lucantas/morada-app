@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 
+import { NoticeNotFoundError } from '../../domain/errors';
 import { noticeSchema, type Notice } from '../../domain/notice';
 import type { NoticeRepository } from '../../domain/notice-repository';
 
@@ -70,14 +71,21 @@ export class PostgresNoticeRepository implements NoticeRepository {
   }
 
   async dismiss(noticeId: string, residentId: string): Promise<Notice> {
-    await this.pool.query(
-      `INSERT INTO notice_dismissals (notice_id, resident_id)
-       VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [noticeId, residentId],
-    );
+    try {
+      await this.pool.query(
+        `INSERT INTO notice_dismissals (notice_id, resident_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [noticeId, residentId],
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('violates foreign key constraint')) {
+        throw new NoticeNotFoundError(noticeId);
+      }
+      throw error;
+    }
     const notice = await this.getById(noticeId);
-    if (!notice) throw new Error(`Notice ${noticeId} not found after dismiss`);
+    if (!notice) throw new NoticeNotFoundError(noticeId);
     return { ...notice, dismissed: true };
   }
 
