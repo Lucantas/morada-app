@@ -23,6 +23,7 @@ import type { ResidentStatus } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
 import { NewReceiptCard } from './new-receipt-card';
+import { ResidentEditSkeleton } from './resident-edit-skeleton';
 import { residentStatusView } from './resident-status-view';
 import {
   residentsQueryKey,
@@ -257,184 +258,189 @@ export function ResidentEditScreen({
         )}
       </div>
       <ScreenBody>
-        <label style={{ display: 'block', marginBottom: 18 }}>
-          <span
-            style={{
-              display: 'block',
-              fontWeight: 600,
-              fontSize: '.9rem',
-              marginBottom: 7,
-              color: 'var(--ink-900)',
-            }}
-          >
-            Número do apartamento
-          </span>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <span
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                left: 16,
-                fontFamily: "'Fraunces', serif",
-                fontWeight: 600,
-                fontSize: '1.35rem',
-                color: 'var(--ink-300)',
-              }}
-            >
-              Apto
-            </span>
-            <input
-              value={form.apt}
-              inputMode="numeric"
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                set('apt')(e.target.value.replace(/\D/g, ''))
-              }
-              placeholder="302"
-              aria-label="Número do apartamento"
-              style={{
-                width: '100%',
-                minHeight: 54,
-                border: '1.5px solid var(--petrol-100)',
-                borderRadius: 'var(--r-md)',
-                padding: '0 16px 0 74px',
-                fontFamily: "'Fraunces', serif",
-                fontWeight: 600,
-                fontSize: '1.35rem',
-                color: 'var(--petrol-900)',
-                background: 'var(--surface)',
-              }}
-            />
-          </div>
-        </label>
-
-        <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 4px' }} />
-
-        <SectionLabel
-          right={
-            residentId && isActive ? (
-              <button
-                type="button"
-                onClick={() => setConfirmingMoveOut(true)}
-                style={archiveButtonStyle}
-              >
-                <Icon name="logout" size={15} />
-                {deactivate.isPending ? 'Arquivando…' : 'Arquivar morador'}
-              </button>
-            ) : undefined
-          }
-        >
-          {moradorSubtitle}
-        </SectionLabel>
-
-        <Field
-          label="Nome completo"
-          value={form.name}
-          onChange={set('name')}
-          placeholder="Ex.: Maria Ribeiro"
-        />
-        <Field
-          label="Telefone"
-          value={form.phone}
-          onChange={(v) => set('phone')(maskPhone(v))}
-          placeholder="(11) 90000-0000"
-        />
-        <Field
-          label="E-mail"
-          value={form.email}
-          onChange={set('email')}
-          placeholder="morador@email.com"
-          type="email"
-        />
-
-        {residentId && onOverrideStatus && (
-          <StatusOverrideControl
-            currentOverride={existing.data?.statusOverride ?? null}
-            onOverride={(status) => overridingStatus.mutate({ residentId, status })}
-            isPending={overridingStatus.isPending}
-          />
-        )}
-
-        {apartmentId && (
+        {residentId && existing.isLoading && <ResidentEditSkeleton />}
+        {(!residentId || !existing.isLoading) && (
           <>
-            <button
-              type="button"
-              onClick={() => setShowArchived((v) => !v)}
-              style={archiveButtonStyle}
-            >
-              <Icon name="clock" size={15} />
-              Ver moradores antigos
-            </button>
-            {showArchived && (
-              <div style={{ marginTop: 12 }}>
-                {archived.length === 0 ? (
-                  <EmptyState title="Nenhum morador antigo registrado" />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {archived.map((r) => (
-                      <SurfaceCard
-                        key={r.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '12px 14px',
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{r.name}</div>
-                          <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>
-                            {r.phone}
-                          </div>
-                        </div>
-                      </SurfaceCard>
-                    ))}
-                  </div>
-                )}
+            <label style={{ display: 'block', marginBottom: 18 }}>
+              <span
+                style={{
+                  display: 'block',
+                  fontWeight: 600,
+                  fontSize: '.9rem',
+                  marginBottom: 7,
+                  color: 'var(--ink-900)',
+                }}
+              >
+                Número do apartamento
+              </span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    fontFamily: "'Fraunces', serif",
+                    fontWeight: 600,
+                    fontSize: '1.35rem',
+                    color: 'var(--ink-300)',
+                  }}
+                >
+                  Apto
+                </span>
+                <input
+                  value={form.apt}
+                  inputMode="numeric"
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    set('apt')(e.target.value.replace(/\D/g, ''))
+                  }
+                  placeholder="302"
+                  aria-label="Número do apartamento"
+                  style={{
+                    width: '100%',
+                    minHeight: 54,
+                    border: '1.5px solid var(--petrol-100)',
+                    borderRadius: 'var(--r-md)',
+                    padding: '0 16px 0 74px',
+                    fontFamily: "'Fraunces', serif",
+                    fontWeight: 600,
+                    fontSize: '1.35rem',
+                    color: 'var(--petrol-900)',
+                    background: 'var(--surface)',
+                  }}
+                />
               </div>
+            </label>
+
+            <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 4px' }} />
+
+            <SectionLabel
+              right={
+                residentId && isActive ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingMoveOut(true)}
+                    style={archiveButtonStyle}
+                  >
+                    <Icon name="logout" size={15} />
+                    {deactivate.isPending ? 'Arquivando…' : 'Arquivar morador'}
+                  </button>
+                ) : undefined
+              }
+            >
+              {moradorSubtitle}
+            </SectionLabel>
+
+            <Field
+              label="Nome completo"
+              value={form.name}
+              onChange={set('name')}
+              placeholder="Ex.: Maria Ribeiro"
+            />
+            <Field
+              label="Telefone"
+              value={form.phone}
+              onChange={(v) => set('phone')(maskPhone(v))}
+              placeholder="(11) 90000-0000"
+            />
+            <Field
+              label="E-mail"
+              value={form.email}
+              onChange={set('email')}
+              placeholder="morador@email.com"
+              type="email"
+            />
+
+            {residentId && onOverrideStatus && (
+              <StatusOverrideControl
+                currentOverride={existing.data?.statusOverride ?? null}
+                onOverride={(status) => overridingStatus.mutate({ residentId, status })}
+                isPending={overridingStatus.isPending}
+              />
             )}
 
-            <ReceiptsSection
-              receipts={receipts.data ?? []}
-              dueDay={dueDay}
-              issue={submitNewReceipt}
-              onRegisterPayment={
-                registerPayment ? (input) => registration.mutate(input) : undefined
-              }
-              isRegistering={registration.isPending}
-              onEditReceipt={onEditReceipt ? (input) => editing.mutate(input) : undefined}
-              isEditing={editing.isPending}
-              onConfirmPayment={
-                onConfirmPayment
-                  ? (receiptId, paidAt) => confirming.mutate({ receiptId, paidAt })
-                  : undefined
-              }
-              isConfirming={confirming.isPending}
-              onRejectPayment={
-                onRejectPayment ? (receiptId) => rejecting.mutate(receiptId) : undefined
-              }
-              isRejecting={rejecting.isPending}
-              onArchiveReceipt={(receiptId) => archivingReceipt.mutate(receiptId)}
-              isArchiving={archivingReceipt.isPending}
-            />
+            {apartmentId && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowArchived((v) => !v)}
+                  style={archiveButtonStyle}
+                >
+                  <Icon name="clock" size={15} />
+                  Ver moradores antigos
+                </button>
+                {showArchived && (
+                  <div style={{ marginTop: 12 }}>
+                    {archived.length === 0 ? (
+                      <EmptyState title="Nenhum morador antigo registrado" />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {archived.map((r) => (
+                          <SurfaceCard
+                            key={r.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: '12px 14px',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: '.95rem' }}>{r.name}</div>
+                              <div style={{ fontSize: '.8rem', color: 'var(--ink-500)' }}>
+                                {r.phone}
+                              </div>
+                            </div>
+                          </SurfaceCard>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <ReceiptsSection
+                  receipts={receipts.data ?? []}
+                  dueDay={dueDay}
+                  issue={submitNewReceipt}
+                  onRegisterPayment={
+                    registerPayment ? (input) => registration.mutate(input) : undefined
+                  }
+                  isRegistering={registration.isPending}
+                  onEditReceipt={onEditReceipt ? (input) => editing.mutate(input) : undefined}
+                  isEditing={editing.isPending}
+                  onConfirmPayment={
+                    onConfirmPayment
+                      ? (receiptId, paidAt) => confirming.mutate({ receiptId, paidAt })
+                      : undefined
+                  }
+                  isConfirming={confirming.isPending}
+                  onRejectPayment={
+                    onRejectPayment ? (receiptId) => rejecting.mutate(receiptId) : undefined
+                  }
+                  isRejecting={rejecting.isPending}
+                  onArchiveReceipt={(receiptId) => archivingReceipt.mutate(receiptId)}
+                  isArchiving={archivingReceipt.isPending}
+                />
+              </>
+            )}
+
+            {saveError && (
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '16px 0 12px' }}>
+                {saveError}
+              </p>
+            )}
+
+            <div style={{ marginTop: 20 }}>
+              <PrimaryButton icon="check" onClick={submit}>
+                {residentId ? 'Salvar alterações' : 'Cadastrar apartamento'}
+              </PrimaryButton>
+            </div>
+
+            {onCreateLogin && (
+              <button type="button" onClick={onCreateLogin} style={secondaryButtonStyle}>
+                Criar acesso do morador
+              </button>
+            )}
           </>
-        )}
-
-        {saveError && (
-          <p role="alert" style={{ color: 'var(--atraso-700)', margin: '16px 0 12px' }}>
-            {saveError}
-          </p>
-        )}
-
-        <div style={{ marginTop: 20 }}>
-          <PrimaryButton icon="check" onClick={submit}>
-            {residentId ? 'Salvar alterações' : 'Cadastrar apartamento'}
-          </PrimaryButton>
-        </div>
-
-        {onCreateLogin && (
-          <button type="button" onClick={onCreateLogin} style={secondaryButtonStyle}>
-            Criar acesso do morador
-          </button>
         )}
       </ScreenBody>
       <ConfirmDialog
