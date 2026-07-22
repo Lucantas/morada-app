@@ -1,3 +1,19 @@
+export type R2Config = {
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+};
+
+export function parseR2Config(env: NodeJS.ProcessEnv): R2Config | null {
+  const endpoint = env.R2_ENDPOINT;
+  const accessKeyId = env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = env.R2_SECRET_ACCESS_KEY;
+  const bucket = env.R2_BUCKET;
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) return null;
+  return { endpoint, accessKeyId, secretAccessKey, bucket };
+}
+
 export function parseWebOrigins(raw: string | undefined, isProd: boolean): string[] {
   const origins = (raw ?? '')
     .split(',')
@@ -32,4 +48,5 @@ export const config = {
   webOrigins: parseWebOrigins(process.env.WEB_ORIGIN, isProduction),
   bcryptCost: Number(process.env.BCRYPT_COST ?? 12),
   isProduction,
+  r2: parseR2Config(process.env),
 };
