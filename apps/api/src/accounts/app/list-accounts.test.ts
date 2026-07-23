@@ -15,6 +15,7 @@ function fakeRepo(list: Account[]): AccountRepository {
     archive: async (id) => {
       map.delete(id);
     },
+    getProof: async () => null,
   };
 }
 

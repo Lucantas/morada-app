@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { proofSchema } from '../../receipts/domain/proof';
 import { isoDateSchema } from '../../shared/domain/iso-date';
 
 export const accountStatusSchema = z.enum(['pago', 'pendente', 'atrasado']);
@@ -13,6 +14,10 @@ export const accountSchema = z.object({
   date: isoDateSchema.nullable(),
   valueCents: z.number().int().min(0).max(1_000_000_000),
   status: accountStatusSchema,
+  // string = new upload; null = clear; undefined = leave existing proof untouched.
+  proofDataUrl: proofSchema.nullable().optional(),
+  // Persistence-derived (whether a proof exists), never a write input.
+  hasProof: z.boolean().optional(),
 });
 export type Account = z.infer<typeof accountSchema>;
 

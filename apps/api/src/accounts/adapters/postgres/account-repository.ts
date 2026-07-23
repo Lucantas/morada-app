@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 
 import { accountSchema, type Account } from '../../domain/account';
 import type { AccountRepository } from '../../domain/account-repository';
+import type { ProofBytes } from '../../../receipts/domain/proof-storage';
 
 const INSERT_COLUMNS = 'id, description, category, date, value_cents, status';
 // DATE comes back as a YYYY-MM-DD string (::text) rather than a JS Date object.
@@ -67,5 +68,9 @@ export class PostgresAccountRepository implements AccountRepository {
 
   async archive(id: string): Promise<void> {
     await this.pool.query('UPDATE accounts SET visible = false WHERE id = $1', [id]);
+  }
+
+  async getProof(): Promise<ProofBytes | null> {
+    throw new Error('Not implemented');
   }
 }

@@ -19,6 +19,7 @@ function fakeRepo(list: Account[]): AccountRepository & { archived: string[] } {
       archived.push(id);
       map.delete(id);
     },
+    getProof: async () => null,
   };
 }
 
