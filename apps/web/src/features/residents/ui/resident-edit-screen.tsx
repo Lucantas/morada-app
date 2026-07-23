@@ -47,6 +47,7 @@ type EditReceipt = (input: {
   title: string;
   valueCents: number;
   dueDate: string;
+  paidAt?: string;
 }) => Promise<void>;
 
 type ConfirmPayment = (receiptId: string, paidAt: string) => Promise<void>;
@@ -113,6 +114,7 @@ export function ResidentEditScreen({
       title: string;
       valueCents: number;
       dueDate: string;
+      paidAt?: string;
     }) => (onEditReceipt ?? (async () => {}))(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receipts'] });
@@ -548,6 +550,7 @@ type EditReceiptHandler = (input: {
   title: string;
   valueCents: number;
   dueDate: string;
+  paidAt?: string;
 }) => void;
 
 type ConfirmPaymentHandler = (receiptId: string, paidAt: string) => void;
@@ -689,6 +692,7 @@ function ReceiptLedgerRow({
   const [editValueCents, setEditValueCents] = useState(receipt.valueCents);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [editDueDate, setEditDueDate] = useState(receipt.dueDate ?? '');
+  const [editPaidAt, setEditPaidAt] = useState(receipt.paidAt ?? '');
   const canRegister = receipt.status === 'pendente' && onRegisterPayment !== undefined;
   const canEdit = onEditReceipt !== undefined;
   const isUnderReview = receipt.status === 'em_analise';
@@ -699,6 +703,7 @@ function ReceiptLedgerRow({
     setEditRef(receipt.ref);
     setEditValueCents(receipt.valueCents);
     setEditDueDate(receipt.dueDate ?? '');
+    setEditPaidAt(receipt.paidAt ?? '');
     setEditOpen(true);
   };
 
@@ -805,6 +810,9 @@ function ReceiptLedgerRow({
           <Field label="Referência" value={editRef} onChange={setEditRef} />
           <MoneyInput label="Valor" value={editValueCents} onChange={setEditValueCents} />
           <DateInput label="Vencimento" value={editDueDate} onChange={setEditDueDate} />
+          {receipt.status === 'pago' && (
+            <DateInput label="Data do pagamento" value={editPaidAt} onChange={setEditPaidAt} />
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
@@ -816,6 +824,7 @@ function ReceiptLedgerRow({
                   title: receipt.title,
                   valueCents: editValueCents,
                   dueDate: editDueDate,
+                  ...(receipt.status === 'pago' && editPaidAt ? { paidAt: editPaidAt } : {}),
                 })
               }
               style={{

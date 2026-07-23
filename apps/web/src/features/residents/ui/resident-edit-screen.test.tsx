@@ -269,6 +269,86 @@ describe('ResidentEditScreen', () => {
     );
   });
 
+  test('lets the admin edit the payment date of an already-paid receipt', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        ref: '05/2026',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        valueCents: 45000,
+        dueDate: '2026-05-15',
+        paidAt: '2026-05-10',
+        status: 'pago',
+      }),
+    ]);
+    const onEditReceipt = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onEditReceipt={onEditReceipt}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+    await userEvent.click(screen.getByRole('button', { name: /editar/i }));
+
+    expect(screen.getByLabelText('Data do pagamento')).toHaveValue('10/05/2026');
+    fireEvent.change(screen.getByLabelText('Data do pagamento'), {
+      target: { value: '12/05/2026' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: /salvar edição/i }));
+
+    await waitFor(() =>
+      expect(onEditReceipt).toHaveBeenCalledWith({
+        receiptId: 'rc-1',
+        ref: '05/2026',
+        title: 'Taxa condominial',
+        valueCents: 45000,
+        dueDate: '2026-05-15',
+        paidAt: '2026-05-12',
+      }),
+    );
+  });
+
+  test('does not show a payment-date field when editing a pendente receipt', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),
+    ]);
+    const receiptRepository = new InMemoryReceiptRepository([
+      buildReceipt({
+        id: 'rc-1',
+        ref: '05/2026',
+        title: 'Taxa condominial',
+        apartmentId: 'apt-1',
+        valueCents: 45000,
+        dueDate: '2026-05-15',
+        status: 'pendente',
+      }),
+    ]);
+    const onEditReceipt = jest.fn().mockResolvedValue(undefined);
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={receiptRepository}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onEditReceipt={onEditReceipt}
+      />,
+    );
+
+    await screen.findByText('Taxa condominial');
+    await userEvent.click(screen.getByRole('button', { name: /editar/i }));
+
+    expect(screen.queryByLabelText('Data do pagamento')).not.toBeInTheDocument();
+  });
+
   test('lets the admin confirm or reject a payment submitted for review', async () => {
     const repository = new InMemoryResidentRepository([
       buildResident({ id: 'r-7', name: 'Diego Reis', apartmentId: 'apt-1', active: true }),

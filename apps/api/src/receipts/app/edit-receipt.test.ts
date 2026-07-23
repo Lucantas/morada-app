@@ -80,4 +80,27 @@ describe('editReceipt', () => {
     });
     expect(paid.valueCents).toBe(15000);
   });
+
+  it('updates paidAt on a paid receipt when supplied', async () => {
+    const repo = fakeRepo([paid]);
+    const updated = await editReceipt(repo, 'rc-1', {
+      ref: '07/2026',
+      title: 'Taxa condominial',
+      valueCents: 15000,
+      dueDate: '2026-07-15',
+      paidAt: '2026-07-12',
+    });
+    expect(updated.paidAt).toBe('2026-07-12');
+  });
+
+  it('preserves the existing paidAt when omitted from the patch', async () => {
+    const repo = fakeRepo([paid]);
+    const updated = await editReceipt(repo, 'rc-1', {
+      ref: '07/2026',
+      title: 'Taxa condominial',
+      valueCents: 15000,
+      dueDate: '2026-07-15',
+    });
+    expect(updated.paidAt).toBe('2026-07-10');
+  });
 });

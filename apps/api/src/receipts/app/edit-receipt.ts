@@ -9,6 +9,7 @@ const patchSchema = z.object({
   title: z.string().min(1).max(120),
   valueCents: z.number().int().min(0).max(1_000_000_000),
   dueDate: isoDateSchema,
+  paidAt: isoDateSchema.optional(),
 });
 
 export async function editReceipt(

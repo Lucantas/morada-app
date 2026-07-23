@@ -80,6 +80,7 @@ export async function editReceipt(input: {
   title: string;
   valueCents: number;
   dueDate: string;
+  paidAt?: string;
 }): Promise<void> {
   const { receiptId, ...patch } = input;
   await apiClient.put(`/api/receipts/${receiptId}`, patch);
