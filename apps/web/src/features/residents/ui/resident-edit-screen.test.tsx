@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { InMemoryReceiptRepository } from '@/features/receipts/data/in-memory-receipt-repository';
@@ -594,6 +595,53 @@ describe('ResidentEditScreen', () => {
         }),
       ),
     );
+  });
+
+  test('re-initializes the open new-receipt value when the condo fee arrives after mount', async () => {
+    const user = userEvent.setup();
+    const repository = new InMemoryResidentRepository([
+      buildResident({
+        id: 'r-1',
+        name: 'Maria Ribeiro',
+        apt: 'Apto 302',
+        apartmentId: 'apt-1',
+        active: true,
+      }),
+    ]);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <ResidentEditScreen
+          repository={repository}
+          receiptRepository={new InMemoryReceiptRepository([])}
+          residentId="r-1"
+          dueDay={15}
+          issueCharge={jest.fn().mockResolvedValue(undefined)}
+          defaultReceiptValueCents={0}
+          onBack={jest.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /adicionar/i }));
+
+    expect(screen.getByLabelText('Valor')).toHaveValue('');
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ResidentEditScreen
+          repository={repository}
+          receiptRepository={new InMemoryReceiptRepository([])}
+          residentId="r-1"
+          dueDay={15}
+          issueCharge={jest.fn().mockResolvedValue(undefined)}
+          defaultReceiptValueCents={15000}
+          onBack={jest.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByLabelText('Valor')).toHaveValue('150,00');
   });
 
   test('archives a receipt from the ledger after confirmation, for any status', async () => {

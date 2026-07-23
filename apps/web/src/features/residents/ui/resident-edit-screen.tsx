@@ -624,6 +624,7 @@ function ReceiptsSection({
       )}
       {showNewReceipt && issue && (
         <NewReceiptCard
+          key={defaultReceiptValueCents}
           dueDay={dueDay}
           issue={issue}
           onClose={() => setShowNewReceipt(false)}
