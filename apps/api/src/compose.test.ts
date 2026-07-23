@@ -476,7 +476,7 @@ describe('Morada API — admin provisions resident logins', () => {
 
     const created = await auth('/api/users', {
       method: 'POST',
-      body: JSON.stringify({ username: 'ana202', residentId: 'r-3' }),
+      body: JSON.stringify({ residentId: 'r-3' }),
     });
     expect(created.status).toBe(201);
     const body = (await created.json()) as { username: string; tempPassword: string };
@@ -498,19 +498,9 @@ describe('Morada API — admin provisions resident logins', () => {
         'X-CSRF-Token': auth.csrf,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ username: 'hacker', residentId: 'r-4' }),
+      body: JSON.stringify({ residentId: 'r-4' }),
     });
     expect(res.status).toBe(403);
-  });
-
-  test('provisioning a duplicate username is rejected with 409', async () => {
-    const app = await makeApp();
-    const auth = await adminAuth(app);
-    const res = await auth('/api/users', {
-      method: 'POST',
-      body: JSON.stringify({ username: residentCredentials.username, residentId: 'r-5' }),
-    });
-    expect(res.status).toBe(409);
   });
 
   test('provisioning for a nonexistent resident is rejected with 404', async () => {
@@ -518,20 +508,17 @@ describe('Morada API — admin provisions resident logins', () => {
     const auth = await adminAuth(app);
     const res = await auth('/api/users', {
       method: 'POST',
-      body: JSON.stringify({ username: 'fantasma', residentId: 'r-does-not-exist' }),
+      body: JSON.stringify({ residentId: 'r-does-not-exist' }),
     });
     expect(res.status).toBe(404);
   });
 
-  test('provisioning a second login for the same resident is rejected with 409', async () => {
+  test('provisioning a login for a resident that already has one is rejected with 409', async () => {
     const app = await makeApp();
     const auth = await adminAuth(app);
     const res = await auth('/api/users', {
       method: 'POST',
-      body: JSON.stringify({
-        username: 'maria-alt',
-        residentId: residentCredentials.residentId,
-      }),
+      body: JSON.stringify({ residentId: residentCredentials.residentId }),
     });
     expect(res.status).toBe(409);
   });

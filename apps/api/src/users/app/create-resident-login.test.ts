@@ -1,3 +1,4 @@
+import type { Resident } from '../../residents/domain/resident';
 import {
   ResidentLoginExistsError,
   UnknownResidentError,
@@ -8,7 +9,7 @@ import type { PasswordHasher } from '../domain/password-hasher';
 import type { User } from '../domain/user';
 import type { UserRepository } from '../domain/user-repository';
 
-import { createResidentLogin } from './create-resident-login';
+import { createResidentLogin, type ResidentLookup } from './create-resident-login';
 
 function fakeRepo(users: User[] = []): UserRepository {
   const list = [...users];
@@ -25,7 +26,25 @@ function fakeRepo(users: User[] = []): UserRepository {
   };
 }
 
-const anyResident = async () => true;
+function fakeResident(overrides: Partial<Resident> = {}): Resident {
+  return {
+    id: 'r-1',
+    name: 'Maria Ribeiro',
+    apt: 'Apto 302',
+    apartmentId: 'apt-r-1',
+    phone: '',
+    email: '',
+    status: 'em_dia',
+    active: true,
+    ...overrides,
+  };
+}
+
+const lookupReturning =
+  (resident: Resident): ResidentLookup =>
+  async () =>
+    resident;
+const noResident: ResidentLookup = async () => null;
 
 const hasher: PasswordHasher = {
   hash: (plain) => Promise.resolve(`hash:${plain}`),
@@ -33,10 +52,9 @@ const hasher: PasswordHasher = {
 };
 
 describe('createResidentLogin', () => {
-  test('creates a resident user with a hashed password and a generated id', async () => {
+  test('derives the username from the resident name and apartment', async () => {
     const repo = fakeRepo();
-    const user = await createResidentLogin(repo, hasher, anyResident, {
-      username: 'maria302',
+    const user = await createResidentLogin(repo, hasher, lookupReturning(fakeResident()), {
       password: 's3nha-temp',
       residentId: 'r-1',
     });
@@ -54,22 +72,23 @@ describe('createResidentLogin', () => {
       hash: () => Promise.resolve('opaque-hash'),
       verify: () => Promise.resolve(false),
     };
-    const user = await createResidentLogin(fakeRepo(), opaqueHasher, anyResident, {
-      username: 'joao101',
-      password: 'plaintext-secret',
-      residentId: 'r-2',
-    });
+    const user = await createResidentLogin(
+      fakeRepo(),
+      opaqueHasher,
+      lookupReturning(fakeResident({ id: 'r-2', name: 'João Pereira', apt: 'Apto 101' })),
+      { password: 'plaintext-secret', residentId: 'r-2' },
+    );
+    expect(user.username).toBe('joao101');
     expect(user.passwordHash).toBe('opaque-hash');
     expect(user.passwordHash).not.toContain('plaintext-secret');
   });
 
-  test('throws UsernameTakenError when the username already exists', async () => {
+  test('throws UsernameTakenError when the derived username already exists', async () => {
     const repo = fakeRepo([
       { id: 'u-9', username: 'maria302', passwordHash: 'x', role: 'resident', residentId: 'r-9' },
     ]);
     await expect(
-      createResidentLogin(repo, hasher, anyResident, {
-        username: 'maria302',
+      createResidentLogin(repo, hasher, lookupReturning(fakeResident()), {
         password: 's3nha-temp',
         residentId: 'r-1',
       }),
@@ -78,8 +97,7 @@ describe('createResidentLogin', () => {
 
   test('throws UnknownResidentError when the resident does not exist', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, async () => false, {
-        username: 'ghost404',
+      createResidentLogin(fakeRepo(), hasher, noResident, {
         password: 's3nha-temp',
         residentId: 'r-nope',
       }),
@@ -91,28 +109,29 @@ describe('createResidentLogin', () => {
       { id: 'u-1', username: 'maria302', passwordHash: 'x', role: 'resident', residentId: 'r-1' },
     ]);
     await expect(
-      createResidentLogin(repo, hasher, anyResident, {
-        username: 'maria302-2',
-        password: 's3nha-temp',
-        residentId: 'r-1',
-      }),
+      createResidentLogin(
+        repo,
+        hasher,
+        lookupReturning(fakeResident({ id: 'r-1', name: 'Carlos Souza', apt: 'Apto 402' })),
+        { password: 's3nha-temp', residentId: 'r-1' },
+      ),
     ).rejects.toBeInstanceOf(ResidentLoginExistsError);
   });
 
-  test('rejects an invalid username', async () => {
+  test('rejects when the derived login is too short to be valid', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, anyResident, {
-        username: 'no',
-        password: 's3nha-temp',
-        residentId: 'r-1',
-      }),
+      createResidentLogin(
+        fakeRepo(),
+        hasher,
+        lookupReturning(fakeResident({ name: 'Al', apt: '' })),
+        { password: 's3nha-temp', residentId: 'r-1' },
+      ),
     ).rejects.toBeInstanceOf(UserValidationError);
   });
 
   test('rejects a too-short password', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, anyResident, {
-        username: 'maria302',
+      createResidentLogin(fakeRepo(), hasher, lookupReturning(fakeResident()), {
         password: 'short',
         residentId: 'r-1',
       }),
