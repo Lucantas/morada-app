@@ -20,7 +20,7 @@ export function runAccountRepositoryContract(
 
       await repo.save(account);
 
-      expect(await repo.getById('a-1')).toEqual(account);
+      expect(await repo.getById('a-1')).toEqual({ ...account, hasProof: false });
     });
 
     test('save upserts on conflicting id', async () => {

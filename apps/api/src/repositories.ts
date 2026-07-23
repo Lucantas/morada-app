@@ -45,7 +45,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
   const proofStorage = config.r2 ? new R2ProofStorage(config.r2) : null;
   return {
     residents: new PostgresResidentRepository(pool),
-    accounts: new PostgresAccountRepository(pool),
+    accounts: new PostgresAccountRepository(pool, proofStorage),
     receipts: new PostgresReceiptRepository(pool, proofStorage),
     notices: new PostgresNoticeRepository(pool),
     threads: new PostgresThreadRepository(pool),

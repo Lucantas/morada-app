@@ -222,4 +222,11 @@ ALTER TABLE receipts ADD COLUMN proof_key TEXT;
 ALTER TABLE incomes ADD COLUMN proof_key TEXT;
 `,
   },
+  {
+    id: '014_account_proof',
+    sql: `
+ALTER TABLE accounts ADD COLUMN proof_data_url TEXT;
+ALTER TABLE accounts ADD COLUMN proof_key TEXT;
+`,
+  },
 ];

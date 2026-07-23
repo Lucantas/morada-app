@@ -22,7 +22,7 @@ runDashboardRepositoryContract('PostgresDashboardRepository', async () => {
   await resetPg(pool);
   return {
     dashboard: new PostgresDashboardRepository(pool),
-    accounts: new PostgresAccountRepository(pool),
+    accounts: new PostgresAccountRepository(pool, null),
     receipts: new PostgresReceiptRepository(pool, null),
     incomes: new PostgresIncomeRepository(pool, null),
   };
