@@ -530,13 +530,24 @@ describe('Morada API — admin reads and resets resident logins', () => {
     const auth = await adminAuthFor(app);
     const res = await auth(`/api/residents/${residentCredentials.residentId}/login`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ username: residentCredentials.username });
+    expect(await res.json()).toEqual({
+      username: residentCredentials.username,
+      suggested: residentCredentials.username,
+    });
   });
 
-  test('reading the login of a resident without one returns null', async () => {
+  test('reading the login of a resident without one returns the derived suggestion', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     const res = await auth('/api/residents/r-3/login');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ username: null, suggested: 'ana202' });
+  });
+
+  test('reading the login of a nonexistent resident returns null', async () => {
+    const app = await makeApp();
+    const auth = await adminAuthFor(app);
+    const res = await auth('/api/residents/r-does-not-exist/login');
     expect(res.status).toBe(200);
     expect(await res.json()).toBeNull();
   });

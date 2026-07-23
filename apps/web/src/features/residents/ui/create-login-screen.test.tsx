@@ -3,13 +3,14 @@ import userEvent from '@testing-library/user-event';
 
 import { CreateLoginScreen } from './create-login-screen';
 
-const noLogin = () => jest.fn().mockResolvedValue(null);
+const suggestsLogin = (suggestedUsername: string) =>
+  jest.fn().mockResolvedValue({ existingUsername: null, suggestedUsername });
 const noReset = () =>
   jest.fn().mockRejectedValue(new Error('reset should not be called in the create flow'));
 
 describe('CreateLoginScreen', () => {
   describe('when the resident has no login yet', () => {
-    test('provisions a login and reveals the generated temp password', async () => {
+    test('shows the derived login read-only and provisions it on confirm', async () => {
       const user = userEvent.setup();
       const provision = jest
         .fn()
@@ -20,16 +21,18 @@ describe('CreateLoginScreen', () => {
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={provision}
-          fetchLogin={noLogin()}
+          fetchLogin={suggestsLogin('maria302')}
           reset={noReset()}
           onBack={jest.fn()}
         />,
       );
 
-      await user.type(await screen.findByLabelText('Usuário'), 'maria302');
+      expect(await screen.findByTestId('suggested-username')).toHaveTextContent('maria302');
+      expect(screen.queryByLabelText('Usuário')).not.toBeInTheDocument();
+
       await user.click(screen.getByRole('button', { name: 'Criar acesso' }));
 
-      expect(provision).toHaveBeenCalledWith({ username: 'maria302', residentId: 'r-1' });
+      expect(provision).toHaveBeenCalledWith({ residentId: 'r-1' });
       expect(await screen.findByText('7Kq2Ab9m')).toBeInTheDocument();
     });
 
@@ -42,14 +45,13 @@ describe('CreateLoginScreen', () => {
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={provision}
-          fetchLogin={noLogin()}
+          fetchLogin={suggestsLogin('maria302')}
           reset={noReset()}
           onBack={jest.fn()}
         />,
       );
 
-      await user.type(await screen.findByLabelText('Usuário'), 'maria302');
-      await user.click(screen.getByRole('button', { name: 'Criar acesso' }));
+      await user.click(await screen.findByRole('button', { name: 'Criar acesso' }));
 
       expect(await screen.findByText('Usuário já existe: maria302')).toBeInTheDocument();
     });
@@ -70,14 +72,13 @@ describe('CreateLoginScreen', () => {
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={provision}
-          fetchLogin={noLogin()}
+          fetchLogin={suggestsLogin('maria302')}
           reset={noReset()}
           onBack={jest.fn()}
         />,
       );
 
-      await user.type(await screen.findByLabelText('Usuário'), 'maria302');
-      await user.click(screen.getByRole('button', { name: 'Criar acesso' }));
+      await user.click(await screen.findByRole('button', { name: 'Criar acesso' }));
       await screen.findByText('7Kq2Ab9m');
 
       await user.click(screen.getByRole('button', { name: 'Copiar Senha temporária' }));
@@ -105,21 +106,23 @@ describe('CreateLoginScreen', () => {
       );
 
       expect(await screen.findByText('Falha ao consultar o acesso.')).toBeInTheDocument();
-      await user.type(await screen.findByLabelText('Usuário'), 'maria302');
-      await user.click(screen.getByRole('button', { name: 'Criar acesso' }));
+      await user.click(await screen.findByRole('button', { name: 'Criar acesso' }));
 
       expect(await screen.findByText('7Kq2Ab9m')).toBeInTheDocument();
     });
   });
 
   describe('when the resident already has a login', () => {
+    const hasLogin = () =>
+      jest.fn().mockResolvedValue({ existingUsername: 'maria302', suggestedUsername: 'maria302' });
+
     test('shows the existing username instead of the create form', async () => {
       render(
         <CreateLoginScreen
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={jest.fn()}
-          fetchLogin={jest.fn().mockResolvedValue({ username: 'maria302' })}
+          fetchLogin={hasLogin()}
           reset={jest.fn()}
           onBack={jest.fn()}
         />,
@@ -127,7 +130,6 @@ describe('CreateLoginScreen', () => {
 
       expect(await screen.findByText('maria302')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Redefinir senha' })).toBeInTheDocument();
-      expect(screen.queryByLabelText('Usuário')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Criar acesso' })).not.toBeInTheDocument();
     });
 
@@ -140,7 +142,7 @@ describe('CreateLoginScreen', () => {
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={jest.fn()}
-          fetchLogin={jest.fn().mockResolvedValue({ username: 'maria302' })}
+          fetchLogin={hasLogin()}
           reset={reset}
           onBack={jest.fn()}
         />,
@@ -161,7 +163,7 @@ describe('CreateLoginScreen', () => {
           residentId="r-1"
           residentName="Maria Ribeiro"
           provision={jest.fn()}
-          fetchLogin={jest.fn().mockResolvedValue({ username: 'maria302' })}
+          fetchLogin={hasLogin()}
           reset={reset}
           onBack={jest.fn()}
         />,

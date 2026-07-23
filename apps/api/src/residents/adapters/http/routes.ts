@@ -11,6 +11,7 @@ import { getResident } from '../../app/get-resident';
 import { listResidents } from '../../app/list-residents';
 import { overrideStatus } from '../../app/override-status';
 import { saveResident } from '../../app/save-resident';
+import { deriveResidentLogin } from '../../domain/login';
 import { residentDraftSchema } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
 
@@ -28,12 +29,18 @@ export function residentRoutes({ residents, receipts, users, hasher }: ResidentR
   // admin-only routes below, which would otherwise 403 this).
   app.get('/me', async (c) => c.json(await getResident(residents, receipts, c.get('sub'))));
 
-  // Admin-only: read a resident's login username (never the hash), or reset
-  // their password to a fresh temp one. Registered before '/:id' below or
-  // they would be shadowed by its generic param match.
+  // Admin-only: read a resident's login state — the existing username (never the
+  // hash) and the login derived from name + apartment. Null when the resident is
+  // gone. Registered before '/:id' below or they would be shadowed by its param.
   app.get('/:id/login', requireRole('admin'), async (c) => {
-    const user = await users.findByResidentId(c.req.param('id'));
-    return c.json(user ? { username: user.username } : null);
+    const id = c.req.param('id');
+    const resident = await residents.getById(id);
+    if (!resident) return c.json(null);
+    const user = await users.findByResidentId(id);
+    return c.json({
+      username: user ? user.username : null,
+      suggested: deriveResidentLogin(resident.name, resident.apt),
+    });
   });
   app.post('/:id/login/reset', requireRole('admin'), async (c) => {
     const tempPassword = generateTempPassword();

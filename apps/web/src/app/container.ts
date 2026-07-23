@@ -125,10 +125,9 @@ export async function overrideResidentStatus(input: {
   await residentRepository.setStatusOverride(input.residentId, input.status);
 }
 
-/** Admin-only: provision a resident login. The API generates and returns the
- *  one-time temp password. */
+/** Admin-only: provision a resident login. The API derives the username from the
+ *  resident's name + apartment and returns the one-time temp password. */
 export async function provisionResidentLogin(input: {
-  username: string;
   residentId: string;
 }): Promise<{ username: string; tempPassword: string }> {
   const data = (await apiClient.post('/api/users', input)) as {
@@ -138,12 +137,16 @@ export async function provisionResidentLogin(input: {
   return { username: data.username, tempPassword: data.tempPassword };
 }
 
-/** Admin-only: fetch a resident's existing login, or null when none exists. */
-export async function getResidentLogin(residentId: string): Promise<{ username: string } | null> {
+/** Admin-only: fetch a resident's login state — the existing username (null when
+ *  none yet) and the login the API would derive. Null when the resident is gone. */
+export async function getResidentLogin(
+  residentId: string,
+): Promise<{ existingUsername: string | null; suggestedUsername: string } | null> {
   const data = (await apiClient.get(`/api/residents/${residentId}/login`)) as {
-    username: string;
+    username: string | null;
+    suggested: string;
   } | null;
-  return data ? { username: data.username } : null;
+  return data ? { existingUsername: data.username, suggestedUsername: data.suggested } : null;
 }
 
 /** Admin-only: reset a resident's login password. The API returns a fresh

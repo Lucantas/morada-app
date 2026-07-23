@@ -2,19 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
-import { Field, PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
+import { PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
 import { copyText } from '@/shared/lib/clipboard';
 import { CreateLoginSkeleton } from './create-login-skeleton';
 
 type ProvisionResult = { username: string; tempPassword: string };
+
+type ResidentLogin = { existingUsername: string | null; suggestedUsername: string };
 
 type Phase = 'loading' | 'form' | 'existing' | 'done';
 
 type Props = {
   residentId: string;
   residentName?: string;
-  provision: (input: { username: string; residentId: string }) => Promise<ProvisionResult>;
-  fetchLogin: (residentId: string) => Promise<{ username: string } | null>;
+  provision: (input: { residentId: string }) => Promise<ProvisionResult>;
+  fetchLogin: (residentId: string) => Promise<ResidentLogin | null>;
   reset: (residentId: string) => Promise<ProvisionResult>;
   onBack: () => void;
 };
@@ -29,7 +31,7 @@ export function CreateLoginScreen({
 }: Props) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [existingUsername, setExistingUsername] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
+  const [suggestedUsername, setSuggestedUsername] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<ProvisionResult | null>(null);
@@ -39,10 +41,11 @@ export function CreateLoginScreen({
     fetchLogin(residentId)
       .then((login) => {
         if (!active) return;
-        if (login) {
-          setExistingUsername(login.username);
+        if (login?.existingUsername) {
+          setExistingUsername(login.existingUsername);
           setPhase('existing');
         } else {
+          if (login) setSuggestedUsername(login.suggestedUsername);
           setPhase('form');
         }
       })
@@ -57,12 +60,11 @@ export function CreateLoginScreen({
   }, [fetchLogin, residentId]);
 
   const submit = async () => {
-    const u = username.trim();
-    if (!u || pending) return;
+    if (pending) return;
     setPending(true);
     setError(null);
     try {
-      setCredentials(await provision({ username: u, residentId }));
+      setCredentials(await provision({ residentId }));
       setPhase('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar o acesso.');
@@ -163,23 +165,37 @@ export function CreateLoginScreen({
         {phase === 'form' && (
           <div style={{ paddingTop: 2 }}>
             <p style={{ color: 'var(--ink-500)', fontSize: '.92rem', marginBottom: 16 }}>
-              Escolha um nome de usuário. O sistema gera uma senha temporária que você entrega ao
-              morador.
+              O login é gerado a partir do nome e do apartamento. Ao criar o acesso, o sistema gera
+              uma senha temporária que você entrega ao morador.
             </p>
-            <Field
-              label="Usuário"
-              value={username}
-              onChange={setUsername}
-              placeholder="Ex.: maria302"
-            />
+            <SurfaceCard>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <span style={{ color: 'var(--ink-500)', fontSize: '.86rem' }}>Usuário</span>
+                <span
+                  data-testid="suggested-username"
+                  style={{ fontWeight: 600, color: 'var(--ink-900)', fontVariantLigatures: 'none' }}
+                >
+                  {suggestedUsername}
+                </span>
+              </div>
+            </SurfaceCard>
             {error && (
-              <p role="alert" style={{ color: 'var(--atraso-700)', marginBottom: 14 }}>
+              <p role="alert" style={{ color: 'var(--atraso-700)', margin: '14px 0' }}>
                 {error}
               </p>
             )}
-            <PrimaryButton icon="check" onClick={() => void submit()}>
-              {pending ? 'Criando…' : 'Criar acesso'}
-            </PrimaryButton>
+            <div style={{ marginTop: 16 }}>
+              <PrimaryButton icon="check" onClick={() => void submit()}>
+                {pending ? 'Criando…' : 'Criar acesso'}
+              </PrimaryButton>
+            </div>
           </div>
         )}
       </ScreenBody>
