@@ -19,8 +19,14 @@ export class InMemoryAccountRepository implements AccountRepository {
   }
 
   async save(account: Account): Promise<Account> {
-    this.accounts = new Map(this.accounts).set(account.id, account);
-    return account;
+    const existing = this.accounts.get(account.id);
+    const hasProof =
+      account.proofDataUrl === undefined
+        ? (existing?.hasProof ?? false)
+        : account.proofDataUrl !== null;
+    const stored: Account = { ...account, proofDataUrl: undefined, hasProof };
+    this.accounts = new Map(this.accounts).set(stored.id, stored);
+    return stored;
   }
 
   async archive(id: string): Promise<void> {

@@ -11,6 +11,8 @@ export const accountSchema = z.object({
   date: z.string().nullable(),
   valueCents: z.number().int().nonnegative(),
   status: accountStatusSchema,
+  proofDataUrl: z.string().nullable().optional(),
+  hasProof: z.boolean().optional(),
 });
 export type Account = z.infer<typeof accountSchema>;
 
