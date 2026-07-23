@@ -136,7 +136,7 @@ function ReceiptsContent({
 
 function downloadProof(receipt: Receipt, resident: { name: string; apt: string }): void {
   const blob = new Blob([buildReceiptProof(receipt, resident)], {
-    type: 'text/plain;charset=utf-8',
+    type: 'text/html;charset=utf-8',
   });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
