@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Icon } from '@/shared/ui/icon';
@@ -7,6 +7,7 @@ import { DateInput } from '@/shared/ui/date-input';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { ConfirmDialog } from '@/shared/ui/confirm-dialog';
+import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 
 import type { AccountStatus } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
@@ -23,6 +24,7 @@ const EMPTY = {
   date: '',
   valueCents: 0,
   status: 'pendente' as AccountStatus,
+  proofDataUrl: undefined as string | undefined,
 };
 
 type Props = {
@@ -40,18 +42,33 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
   const save = useSaveAccount(repository);
   const archive = useArchiveAccount(repository);
   const [form, setForm] = useState(EMPTY);
+  const [proofName, setProofName] = useState<string | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (existing.data) {
       const { description, category, date, valueCents, status } = existing.data;
-      setForm({ description, category, date: date ?? '', valueCents, status });
+      setForm((prev) => ({ ...prev, description, category, date: date ?? '', valueCents, status }));
     }
   }, [existing.data]);
 
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleProofChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    if (!isAllowedProof(dataUrl)) {
+      setProofError('Envie uma imagem ou PDF do comprovante.');
+      return;
+    }
+    setForm((prev) => ({ ...prev, proofDataUrl: dataUrl }));
+    setProofName(file.name);
+    setProofError(null);
+  };
 
   const submit = () => {
     if (
@@ -64,7 +81,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
       return;
     }
     setValidationError(null);
-    save.mutate({ ...form, id: accountId }, { onSuccess: onBack });
+    save.mutate({ ...form, id: accountId, proofDataUrl: form.proofDataUrl }, { onSuccess: onBack });
   };
 
   const title = accountId ? (existing.data?.description ?? 'Editar conta') : 'Nova conta';
@@ -168,6 +185,62 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
                 );
               })}
             </div>
+
+            <label
+              htmlFor="account-proof"
+              style={{
+                display: 'block',
+                fontWeight: 600,
+                fontSize: '.9rem',
+                marginBottom: 9,
+                color: 'var(--ink-900)',
+              }}
+            >
+              Anexar comprovante
+            </label>
+            {existing.data?.hasProof && (
+              <a
+                href={`/api/accounts/${accountId}/proof`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginBottom: 12,
+                  color: 'var(--petrol-700)',
+                  fontWeight: 600,
+                  fontSize: '.86rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <Icon name="receipt" size={15} />
+                Ver comprovante
+              </a>
+            )}
+            <input
+              id="account-proof"
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(event) => void handleProofChange(event)}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginBottom: 8,
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '.86rem',
+              }}
+            />
+            {proofName && (
+              <p style={{ color: 'var(--ink-500)', marginBottom: 12, fontSize: '.86rem' }}>
+                {proofName}
+              </p>
+            )}
+            {proofError && (
+              <p style={{ color: 'var(--atraso-700)', marginBottom: 12, fontSize: '.88rem' }}>
+                {proofError}
+              </p>
+            )}
 
             {validationError && (
               <p role="alert" style={{ color: 'var(--atraso-700)', margin: '4px 0 16px' }}>

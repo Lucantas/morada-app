@@ -153,4 +153,53 @@ describe('AccountEditScreen', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(archiveSpy).not.toHaveBeenCalled();
   });
+
+  test('renders a proof link to the serving endpoint when the account has a proof', async () => {
+    const repository = new InMemoryAccountRepository([
+      buildAccount({ id: 'a-9', description: 'Energia', hasProof: true }),
+    ]);
+    renderWithClient(
+      <AccountEditScreen repository={repository} accountId="a-9" onBack={jest.fn()} />,
+    );
+
+    expect(await screen.findByDisplayValue('Energia')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
+      'href',
+      '/api/accounts/a-9/proof',
+    );
+  });
+
+  test('does not render a proof link when the account has no proof', async () => {
+    const repository = new InMemoryAccountRepository([
+      buildAccount({ id: 'a-9', description: 'Energia' }),
+    ]);
+    renderWithClient(
+      <AccountEditScreen repository={repository} accountId="a-9" onBack={jest.fn()} />,
+    );
+
+    expect(await screen.findByDisplayValue('Energia')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /ver comprovante/i })).not.toBeInTheDocument();
+  });
+
+  test('attaching a proof includes proofDataUrl in the saved account', async () => {
+    const { repo, saved } = makeSpyRepo();
+    renderWithClient(<AccountEditScreen repository={repo} onBack={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Energia' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '10/05/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '8900' } });
+
+    const file = new File(['x'], 'boleto.png', { type: 'image/png' });
+    const input = screen.getByLabelText('Anexar comprovante') as HTMLInputElement;
+    await userEvent.upload(input, file);
+    await screen.findByText('boleto.png');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect((saved[0] as { proofDataUrl?: string }).proofDataUrl).toMatch(
+      /^data:image\/png;base64,/,
+    );
+  });
 });
