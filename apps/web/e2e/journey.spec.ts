@@ -7,7 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROOF_PATH = path.join(__dirname, 'fixtures/proof.png');
 
 const APT_NUMBER = String(900 + (Math.floor(Date.now() / 1000) % 100));
-const RESIDENT_NAME = 'Maria Ribeiro';
+// A Playwright retry re-imports this module with a fresh APT_NUMBER, and the e2e
+// DB is only reset once at boot (not between retries), so a fixed name would let
+// two apartments share it and break the strict-mode getByText lookups below.
+// Deriving the name from APT_NUMBER keeps every attempt's resident distinct.
+const RESIDENT_NAME = `Maria Ribeiro ${APT_NUMBER}`;
 // A future competência avoids colliding with the current month's auto-issued
 // charge (the admin dashboard calls ensureMonthlyReceipts() on every mount,
 // which issues a receipt for the current month to every active resident).
@@ -51,10 +55,12 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
     await page.getByText(`Apto ${APT_NUMBER}`).click();
     await page.getByRole('button', { name: 'Criar acesso do morador' }).click();
 
-    const usernameInput = page.getByLabel('Usuário');
-    await expect(usernameInput).toBeVisible();
-    residentUsername = `morador${APT_NUMBER}`;
-    await usernameInput.fill(residentUsername);
+    // The resident login is derived (first name + apartment) and shown read-only —
+    // capture the suggested value instead of typing one.
+    const suggestedUsername = page.getByTestId('suggested-username');
+    await expect(suggestedUsername).toBeVisible();
+    residentUsername = (await suggestedUsername.textContent())?.trim() ?? '';
+    expect(residentUsername.length).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Criar acesso' }).click();
 
     await expect(page.getByText('Senha temporária')).toBeVisible();
