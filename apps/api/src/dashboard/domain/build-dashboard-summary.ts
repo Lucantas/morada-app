@@ -7,6 +7,7 @@ export interface LedgerAccount {
   date: string | null;
   valueCents: number;
   status: string;
+  hasProof?: boolean;
 }
 
 // ISO (YYYY-MM-DD) -> BR (DD/MM/YYYY) for display. Callers guard against null.
@@ -77,6 +78,7 @@ export function buildDashboardSummary(
       dateLabel: a.date ? `Paga em ${formatBrDate(a.date)}` : 'Paga',
       valueCents: a.valueCents,
       icon: iconForAccount(a),
+      hasProof: a.hasProof ?? false,
     }));
 
   const maintenances = accounts

@@ -16,6 +16,7 @@ interface AccountRow {
   date: string | null;
   value_cents: number;
   status: string;
+  has_proof: boolean;
 }
 
 interface ReceiptRow {
@@ -36,7 +37,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
 
   async getSummary(): Promise<DashboardSummary> {
     const accountsResult = await this.pool.query<AccountRow>(
-      'SELECT id, description, category, date::text AS date, value_cents, status FROM accounts WHERE visible = true',
+      'SELECT id, description, category, date::text AS date, value_cents, status, (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof FROM accounts WHERE visible = true',
     );
     const accounts: LedgerAccount[] = accountsResult.rows.map((row) => ({
       id: row.id,
@@ -45,6 +46,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
       date: row.date,
       valueCents: row.value_cents,
       status: row.status,
+      hasProof: row.has_proof,
     }));
 
     const receiptsResult = await this.pool.query<ReceiptRow>(

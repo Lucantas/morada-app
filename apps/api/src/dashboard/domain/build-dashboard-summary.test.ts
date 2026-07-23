@@ -212,3 +212,36 @@ describe('buildDashboardSummary — month-aware balance', () => {
     expect(summary.balance.paidCents).toBe(8000);
   });
 });
+
+describe('buildDashboardSummary — recentPaid carries hasProof', () => {
+  test('reflects the LedgerAccount hasProof flag on paid items', () => {
+    const summary = buildDashboardSummary(
+      [
+        {
+          id: 'a-1',
+          description: 'Água',
+          category: 'Utilidades',
+          date: '2026-04-05',
+          valueCents: 5000,
+          status: 'pago',
+          hasProof: true,
+        },
+        {
+          id: 'a-2',
+          description: 'Energia',
+          category: 'Utilidades',
+          date: '2026-04-04',
+          valueCents: 6000,
+          status: 'pago',
+        },
+      ],
+      [],
+      [],
+      '2026-04-20',
+    );
+
+    const byId = new Map(summary.recentPaid.map((p) => [p.id, p]));
+    expect(byId.get('a-1')?.hasProof).toBe(true);
+    expect(byId.get('a-2')?.hasProof).toBe(false);
+  });
+});
