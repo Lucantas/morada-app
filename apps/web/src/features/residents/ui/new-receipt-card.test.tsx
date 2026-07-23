@@ -58,6 +58,15 @@ describe('NewReceiptCard', () => {
     expect(typeof arg.paidAt).toBe('string');
   });
 
+  test('masks raw digits typed into Competência as MM/AAAA', async () => {
+    const user = userEvent.setup();
+    render(<NewReceiptCard dueDay={15} issue={jest.fn()} onClose={jest.fn()} />);
+
+    await user.type(screen.getByLabelText('Competência'), '062026');
+
+    expect(screen.getByLabelText('Competência')).toHaveValue('06/2026');
+  });
+
   test('Concluir closes the card', async () => {
     const user = userEvent.setup();
     const onClose = jest.fn();

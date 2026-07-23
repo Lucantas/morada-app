@@ -3,6 +3,7 @@ import { useState, type ChangeEvent } from 'react';
 import { dueDateFromRef } from '@/features/receipts/domain/due-date';
 import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 import type { ReceiptMethod } from '@/features/receipts/domain/receipt';
+import { maskCompetence } from '@/shared/lib/competence';
 import { Icon } from '@/shared/ui/icon';
 import { MoneyInput } from '@/shared/ui/money-input';
 
@@ -159,9 +160,10 @@ export function NewReceiptCard({ dueDay, issue, onClose }: Props) {
         Competência
         <input
           value={ref}
-          onChange={(e) => setRef(e.target.value)}
+          onChange={(e) => setRef(maskCompetence(e.target.value))}
           placeholder="04/2026"
           aria-label="Competência"
+          inputMode="numeric"
           style={{
             width: '100%',
             minHeight: 44,
