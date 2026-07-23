@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
-import { accountRoutes } from './accounts/adapters/http/routes';
+import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
@@ -107,6 +107,11 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.
   api.route('/residents', residentRoutes({ residents, receipts, users, hasher }));
+
+  // Account proof download: any authenticated user (admin or resident) — condo
+  // expense proofs are shared building information. Mounted before the
+  // admin-only CRUD below so it isn't caught by the admin guard.
+  api.route('/accounts', accountProofRoutes(accounts));
 
   // Admin-only resources.
   api.route('/accounts', guarded('admin', accountRoutes(accounts)));

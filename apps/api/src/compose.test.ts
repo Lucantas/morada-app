@@ -1065,4 +1065,64 @@ describe('Morada API — authorization wiring', () => {
     const incomeNoProof = (await withoutProof.json()) as { id: string };
     expect((await admin.auth(`/api/incomes/${incomeNoProof.id}/proof`)).status).toBe(404);
   });
+
+  test('an account proof is downloadable by admin and by a resident; 404 without one', async () => {
+    const app = await makeApp();
+    const adminAuth = await authFor(app, adminCredentials);
+    const put = await app.request('/api/accounts/a-proof', {
+      method: 'PUT',
+      headers: {
+        Cookie: adminAuth.cookie,
+        'X-CSRF-Token': adminAuth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        description: 'Energia — áreas comuns',
+        category: 'Utilidades',
+        date: '2026-05-10',
+        valueCents: 8900,
+        status: 'pago',
+        proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+    });
+    expect(put.status).toBe(200);
+
+    const adminProof = await app.request('/api/accounts/a-proof/proof', {
+      headers: { Cookie: adminAuth.cookie },
+    });
+    expect(adminProof.status).toBe(200);
+    expect(adminProof.headers.get('Content-Type')).toBe('image/png');
+
+    const residentAuth = await authFor(app, residentCredentials);
+    const residentProof = await app.request('/api/accounts/a-proof/proof', {
+      headers: { Cookie: residentAuth.cookie },
+    });
+    expect(residentProof.status).toBe(200);
+    expect(residentProof.headers.get('Content-Type')).toBe('image/png');
+
+    const noProof = await app.request('/api/accounts/a-plain', {
+      method: 'PUT',
+      headers: {
+        Cookie: adminAuth.cookie,
+        'X-CSRF-Token': adminAuth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        description: 'Sem comprovante',
+        category: 'Utilidades',
+        date: '2026-05-11',
+        valueCents: 5000,
+        status: 'pago',
+      }),
+    });
+    expect(noProof.status).toBe(200);
+    expect(
+      (await app.request('/api/accounts/a-plain/proof', { headers: { Cookie: adminAuth.cookie } }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await app.request('/api/accounts/ghost/proof', { headers: { Cookie: adminAuth.cookie } }))
+        .status,
+    ).toBe(404);
+  });
 });

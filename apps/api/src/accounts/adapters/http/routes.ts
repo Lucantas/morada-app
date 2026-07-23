@@ -8,6 +8,25 @@ import { saveAccount } from '../../app/save-account';
 import { accountDraftSchema } from '../../domain/account';
 import type { AccountRepository } from '../../domain/account-repository';
 
+function toArrayBufferView(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(bytes);
+}
+
+// Proof download is available to any authenticated user (admin or resident) —
+// condo expense proofs are shared building information. Mounted OUTSIDE the admin
+// guard; the CRUD below stays admin-only.
+export function accountProofRoutes(repo: AccountRepository): Hono<ApiEnv> {
+  const app = new Hono<ApiEnv>();
+  app.get('/:id/proof', async (c) => {
+    const account = await repo.getById(c.req.param('id'));
+    if (!account) return c.json({ error: 'Conta não encontrada' }, 404);
+    const proof = await repo.getProof(account.id);
+    if (!proof) return c.json({ error: 'Comprovante não encontrado' }, 404);
+    return c.body(toArrayBufferView(proof.body), 200, { 'Content-Type': proof.contentType });
+  });
+  return app;
+}
+
 export function accountRoutes(repo: AccountRepository) {
   const app = new Hono<ApiEnv>();
 
