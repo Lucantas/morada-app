@@ -104,6 +104,23 @@ function PaidRow({ item }: { item: PaidItem }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '.96rem' }}>{item.label}</div>
         <div style={{ fontSize: '.82rem', color: 'var(--ink-500)' }}>{item.dateLabel}</div>
+        {item.hasProof && (
+          <a
+            href={`/api/accounts/${item.id}/proof`}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'inline-block',
+              marginTop: 4,
+              color: 'var(--petrol-700)',
+              fontWeight: 600,
+              fontSize: '.8rem',
+              textDecoration: 'none',
+            }}
+          >
+            Baixar comprovante
+          </a>
+        )}
       </div>
       <div className="fraunces" style={{ fontWeight: 600, color: 'var(--petrol-900)' }}>
         {'R$ ' + formatBRLShort(item.valueCents)}

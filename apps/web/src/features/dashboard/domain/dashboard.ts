@@ -24,6 +24,7 @@ export const paidItemSchema = z.object({
   dateLabel: z.string().min(1),
   valueCents: z.number(),
   icon: dashIconSchema,
+  hasProof: z.boolean().optional(),
 });
 export type PaidItem = z.infer<typeof paidItemSchema>;
 
