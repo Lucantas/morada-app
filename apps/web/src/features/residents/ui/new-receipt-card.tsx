@@ -20,6 +20,7 @@ type Props = {
   dueDay: number;
   issue: (input: IssueInput) => Promise<void>;
   onClose: () => void;
+  defaultValueCents?: number;
 };
 
 const METHODS: { value: ReceiptMethod; label: string }[] = [
@@ -32,9 +33,9 @@ const STATUSES: { paid: boolean; label: string }[] = [
   { paid: true, label: 'Pago' },
 ];
 
-export function NewReceiptCard({ dueDay, issue, onClose }: Props) {
+export function NewReceiptCard({ dueDay, issue, onClose, defaultValueCents }: Props) {
   const [ref, setRef] = useState('');
-  const [valueCents, setValueCents] = useState(0);
+  const [valueCents, setValueCents] = useState(defaultValueCents ?? 0);
   const [paid, setPaid] = useState(false);
   const [method, setMethod] = useState<ReceiptMethod>('dinheiro');
   const [proofDataUrl, setProofDataUrl] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function NewReceiptCard({ dueDay, issue, onClose }: Props) {
 
   const reset = () => {
     setRef('');
-    setValueCents(0);
+    setValueCents(defaultValueCents ?? 0);
     setPaid(false);
     setMethod('dinheiro');
     setProofDataUrl(null);

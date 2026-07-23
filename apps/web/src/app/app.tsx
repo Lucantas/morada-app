@@ -162,6 +162,7 @@ type RouteProps = {
 function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
+  const defaultReceiptValueCents = settings.data?.monthlyFeeCents ?? 0;
   const incomes = useIncomes(incomeRepository);
   const receipts = useReceipts(receiptRepository);
   const monthlyIncomeCents = mergeMonthlyTotals(
@@ -192,6 +193,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           onBack={() => go('a-residents')}
           onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           dueDay={dueDay}
+          defaultReceiptValueCents={defaultReceiptValueCents}
           issueCharge={issueCharge}
           registerPayment={registerPayment}
           onEditReceipt={editReceipt}

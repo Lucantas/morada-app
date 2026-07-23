@@ -64,6 +64,7 @@ type Props = {
   onBack: () => void;
   onCreateLogin?: () => void;
   dueDay?: number;
+  defaultReceiptValueCents?: number;
   issueCharge?: (input: {
     residentId: string;
     ref: string;
@@ -88,6 +89,7 @@ export function ResidentEditScreen({
   onBack,
   onCreateLogin,
   dueDay = 15,
+  defaultReceiptValueCents = 0,
   issueCharge,
   registerPayment,
   onEditReceipt,
@@ -400,6 +402,7 @@ export function ResidentEditScreen({
                 <ReceiptsSection
                   receipts={receipts.data ?? []}
                   dueDay={dueDay}
+                  defaultReceiptValueCents={defaultReceiptValueCents}
                   issue={submitNewReceipt}
                   onRegisterPayment={
                     registerPayment ? (input) => registration.mutate(input) : undefined
@@ -554,6 +557,7 @@ type ArchiveReceiptHandler = (receiptId: string) => void;
 function ReceiptsSection({
   receipts,
   dueDay,
+  defaultReceiptValueCents,
   issue,
   onRegisterPayment,
   isRegistering,
@@ -568,6 +572,7 @@ function ReceiptsSection({
 }: {
   receipts: Receipt[];
   dueDay: number;
+  defaultReceiptValueCents?: number;
   issue?: (input: {
     ref: string;
     valueCents: number;
@@ -615,7 +620,12 @@ function ReceiptsSection({
         </div>
       )}
       {showNewReceipt && issue && (
-        <NewReceiptCard dueDay={dueDay} issue={issue} onClose={() => setShowNewReceipt(false)} />
+        <NewReceiptCard
+          dueDay={dueDay}
+          issue={issue}
+          onClose={() => setShowNewReceipt(false)}
+          defaultValueCents={defaultReceiptValueCents}
+        />
       )}
       {receipts.length === 0 ? (
         <p style={{ color: 'var(--ink-500)', padding: '4px 2px', fontSize: '.9rem' }}>

@@ -74,4 +74,17 @@ describe('NewReceiptCard', () => {
     await user.click(screen.getByRole('button', { name: /concluir/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  test('pre-fills Valor with the condo monthly fee when provided', () => {
+    render(
+      <NewReceiptCard
+        dueDay={15}
+        issue={jest.fn()}
+        onClose={jest.fn()}
+        defaultValueCents={15000}
+      />,
+    );
+
+    expect(screen.getByLabelText('Valor')).toHaveValue('150,00');
+  });
 });
