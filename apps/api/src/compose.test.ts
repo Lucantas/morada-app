@@ -207,6 +207,63 @@ describe('Morada API', () => {
     expect((await other.residents.getById('r-foreign'))?.statusOverride).toBeNull();
   });
 
+  async function seedForeignReceipt(): Promise<
+    ReturnType<ReturnType<typeof makePostgresRepositories>['forCondo']>
+  > {
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.receipts.save({
+      id: 'rc-foreign',
+      ref: '07/2026',
+      title: 'Taxa condominial',
+      dueDate: '2026-07-15',
+      valueCents: 15000,
+      status: 'em_analise',
+      method: 'pix',
+      submittedAt: '2026-07-14',
+      residentId: 'r-foreign',
+      apartmentId: 'apt-foreign',
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+    return other;
+  }
+
+  test('cross-condo receipts access answers 404', async () => {
+    const app = await makeApp();
+    const other = await seedForeignReceipt();
+    const auth = await authFor(app, adminCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/receipts/rc-foreign`, { headers });
+    const list = await app.request(`${P}/receipts`, { headers });
+    const ledger = await app.request(`${P}/apartments/apt-foreign/receipts`, { headers });
+    const confirm = await app.request(`${P}/receipts/rc-foreign/confirm`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const archive = await app.request(`${P}/receipts/rc-foreign`, { method: 'DELETE', headers });
+
+    expect(read.status).toBe(404);
+    expect(((await list.json()) as { id: string }[]).map((r) => r.id)).not.toContain('rc-foreign');
+    expect(await ledger.json()).toEqual([]);
+    expect(confirm.status).toBe(404);
+    expect(archive.status).toBe(404);
+    expect((await other.receipts.getById('rc-foreign'))?.status).toBe('em_analise');
+  });
+
+  test('receipt proof of another condo answers 404', async () => {
+    const app = await makeApp();
+    await seedForeignReceipt();
+    const auth = await authFor(app, adminCredentials);
+
+    const res = await app.request(`${P}/receipts/rc-foreign/proof`, {
+      headers: { Cookie: auth.cookie },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
   test('an admin overrides and then clears a resident status', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);

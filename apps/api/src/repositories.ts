@@ -52,7 +52,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     forCondo: (condominiumId) => ({
       residents: new PostgresResidentRepository(pool, condominiumId),
       accounts: new PostgresAccountRepository(pool, proofStorage),
-      receipts: new PostgresReceiptRepository(pool, proofStorage),
+      receipts: new PostgresReceiptRepository(pool, condominiumId, proofStorage),
       notices: new PostgresNoticeRepository(pool),
       threads: new PostgresThreadRepository(pool),
       dashboard: new PostgresDashboardRepository(pool),

@@ -23,7 +23,7 @@ runDashboardRepositoryContract('PostgresDashboardRepository', async () => {
   return {
     dashboard: new PostgresDashboardRepository(pool),
     accounts: new PostgresAccountRepository(pool, null),
-    receipts: new PostgresReceiptRepository(pool, null),
+    receipts: new PostgresReceiptRepository(pool, 'condo-legacy', null),
     incomes: new PostgresIncomeRepository(pool, null),
   };
 });
