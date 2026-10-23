@@ -1,4 +1,4 @@
-import type { CondoAccess } from './condo-access';
+import type { CondoAccess, OrgRoleName } from './condo-access';
 import type { Condominium, CondoRoleName } from './condominium';
 
 export interface CreateCondominiumInput {
@@ -13,6 +13,12 @@ export interface CondoGrant {
   userId: string;
   role: CondoRoleName;
   residentId: string | null;
+}
+
+export interface CondoSindico {
+  userId: string;
+  name: string | null;
+  email: string | null;
 }
 
 export interface CondoRepository {
@@ -30,4 +36,9 @@ export interface CondoRepository {
     residentId: string,
     exceptUserId: string,
   ): Promise<void>;
+  deactivateOtherSindicos(condominiumId: string, keepUserId: string): Promise<void>;
+  currentSindico(condominiumId: string): Promise<CondoSindico | null>;
+  removeSindico(condominiumId: string): Promise<void>;
+  addOrgMember(organizationId: string, userId: string, role: OrgRoleName): Promise<void>;
+  getOrganization(organizationId: string): Promise<{ id: string; name: string } | null>;
 }

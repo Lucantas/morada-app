@@ -1,6 +1,13 @@
 import type { CondoGrant, CondoRepository } from '../condos/domain/condo-repository';
 import type { Condominium } from '../condos/domain/condominium';
-import { effectiveStatus, type Invitation } from '../invitations/domain/invitation';
+import type { OrgRoleName } from '../condos/domain/condo-access';
+import {
+  effectiveStatus,
+  type Invitation,
+  type MembroInvitation,
+  type MoradorInvitation,
+  type SindicoInvitation,
+} from '../invitations/domain/invitation';
 import type { InvitationTokenRepository } from '../invitations/domain/invitation-repository';
 import type { Resident } from '../residents/domain/resident';
 
@@ -58,20 +65,37 @@ export function inMemoryInvitationTokens(
   };
 }
 
+type Deactivation = { condominiumId: string; residentId: string; exceptUserId: string };
+type SindicoRetirement = { condominiumId: string; keepUserId: string };
+type OrgMembership = { organizationId: string; userId: string; role: OrgRoleName };
+type Organization = { id: string; name: string };
+
 export type FakeCondos = Pick<
   CondoRepository,
-  'getById' | 'isOperational' | 'grant' | 'deactivateResidentGrants'
+  | 'getById'
+  | 'isOperational'
+  | 'grant'
+  | 'deactivateResidentGrants'
+  | 'deactivateOtherSindicos'
+  | 'addOrgMember'
+  | 'getOrganization'
 > & {
   grants: () => CondoGrant[];
-  deactivations: () => { condominiumId: string; residentId: string; exceptUserId: string }[];
+  deactivations: () => Deactivation[];
+  sindicoRetirements: () => SindicoRetirement[];
+  orgMembers: () => OrgMembership[];
 };
 
-export function fakeCondos(condos: Condominium[]): FakeCondos {
+export function fakeCondos(condos: Condominium[], organizations: Organization[] = []): FakeCondos {
   let grants: CondoGrant[] = [];
-  let deactivations: { condominiumId: string; residentId: string; exceptUserId: string }[] = [];
+  let deactivations: Deactivation[] = [];
+  let sindicoRetirements: SindicoRetirement[] = [];
+  let orgMembers: OrgMembership[] = [];
   return {
     grants: () => grants,
     deactivations: () => deactivations,
+    sindicoRetirements: () => sindicoRetirements,
+    orgMembers: () => orgMembers,
     getById: async (id) => condos.find((c) => c.id === id) ?? null,
     isOperational: async (id) => condos.find((c) => c.id === id)?.active === true,
     grant: async (grant) => {
@@ -80,6 +104,13 @@ export function fakeCondos(condos: Condominium[]): FakeCondos {
     deactivateResidentGrants: async (condominiumId, residentId, exceptUserId) => {
       deactivations = [...deactivations, { condominiumId, residentId, exceptUserId }];
     },
+    deactivateOtherSindicos: async (condominiumId, keepUserId) => {
+      sindicoRetirements = [...sindicoRetirements, { condominiumId, keepUserId }];
+    },
+    addOrgMember: async (organizationId, userId, role) => {
+      orgMembers = [...orgMembers, { organizationId, userId, role }];
+    },
+    getOrganization: async (id) => organizations.find((o) => o.id === id) ?? null,
   };
 }
 
@@ -93,7 +124,7 @@ export function fakeResidentsFor(
 
 export const INVITE_NOW = new Date('2026-10-23T12:00:00.000Z');
 
-export function invitationFixture(overrides: Partial<Invitation> = {}): Invitation {
+export function invitationFixture(overrides: Partial<MoradorInvitation> = {}): MoradorInvitation {
   return {
     id: 'inv-1',
     condominiumId: 'condo-a',
@@ -109,6 +140,43 @@ export function invitationFixture(overrides: Partial<Invitation> = {}): Invitati
     ...overrides,
   };
 }
+
+const staffBase = {
+  email: 'maria@x.com',
+  status: 'pendente' as const,
+  expiresAt: new Date(INVITE_NOW.getTime() + 60_000),
+  createdBy: 'u-admin',
+  claimedBy: null,
+  acceptedAt: null,
+  createdAt: INVITE_NOW,
+};
+
+export function sindicoInvitationFixture(
+  overrides: Partial<SindicoInvitation> = {},
+): SindicoInvitation {
+  return {
+    ...staffBase,
+    id: 'inv-sindico',
+    role: 'sindico',
+    condominiumId: 'condo-a',
+    ...overrides,
+  };
+}
+
+export function membroInvitationFixture(
+  overrides: Partial<MembroInvitation> = {},
+): MembroInvitation {
+  return {
+    ...staffBase,
+    id: 'inv-membro',
+    role: 'membro',
+    organizationId: 'org-a',
+    orgRole: 'member',
+    ...overrides,
+  };
+}
+
+export const ORG_A = { id: 'org-a', name: 'Contábil Aurora' };
 
 export function residentFixture(overrides: Partial<Resident> = {}): Resident {
   return {

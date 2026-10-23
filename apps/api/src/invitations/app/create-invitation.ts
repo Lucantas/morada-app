@@ -37,7 +37,7 @@ export interface CreatedInvitation {
   emailSent: boolean;
 }
 
-async function trySend(email: EmailSender, message: EmailMessage): Promise<boolean> {
+export async function trySend(email: EmailSender, message: EmailMessage): Promise<boolean> {
   try {
     await email.send(message);
     return true;

@@ -16,6 +16,11 @@ async function insertUser(pool: Pool, id: string): Promise<void> {
   );
 }
 
+async function count(pool: Pool, from: string): Promise<number> {
+  const { rows } = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${from}`);
+  return rows[0]?.n ?? -1;
+}
+
 async function insertMembership(
   pool: Pool,
   organizationId: string,
@@ -570,6 +575,123 @@ export function runCondoRepositoryContract(
     test('getById returns null when missing', async () => {
       const { repo } = await makeRepo();
       expect(await repo.getById('condo-missing')).toBeNull();
+    });
+
+    test('deactivateOtherSindicos keeps only the given user', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a');
+      await createTestCondo(pool, 'condo-b');
+      for (const id of ['u-old', 'u-new', 'u-other']) await insertUser(pool, id);
+      const sindico = (condominiumId: string, userId: string) =>
+        repo.grant({ condominiumId, userId, role: 'sindico', residentId: null });
+      await sindico('condo-a', 'u-old');
+      await sindico('condo-a', 'u-new');
+      await sindico('condo-b', 'u-other');
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-old',
+        role: 'administrador',
+        residentId: null,
+      });
+
+      await repo.deactivateOtherSindicos('condo-a', 'u-new');
+
+      const { rows } = await pool.query(
+        'SELECT condominium_id, user_id, role, active FROM condo_roles ORDER BY condominium_id, user_id, role',
+      );
+      expect(rows).toEqual([
+        { condominium_id: 'condo-a', user_id: 'u-new', role: 'sindico', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-old', role: 'administrador', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-old', role: 'sindico', active: false },
+        { condominium_id: 'condo-b', user_id: 'u-other', role: 'sindico', active: true },
+      ]);
+    });
+
+    test('currentSindico returns the active sindico of that condo only', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a');
+      await createTestCondo(pool, 'condo-b');
+      await insertUser(pool, 'u-sindico');
+      await pool.query(
+        "UPDATE users SET name = 'Síndica', email = 'sindica@x.com' WHERE id = 'u-sindico'",
+      );
+      expect(await repo.currentSindico('condo-a')).toBeNull();
+
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-sindico',
+        role: 'sindico',
+        residentId: null,
+      });
+
+      expect(await repo.currentSindico('condo-a')).toEqual({
+        userId: 'u-sindico',
+        name: 'Síndica',
+        email: 'sindica@x.com',
+      });
+      expect(await repo.currentSindico('condo-b')).toBeNull();
+    });
+
+    test('removeSindico deactivates the sindico grant of that condo only, keeping the row', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a');
+      await createTestCondo(pool, 'condo-b');
+      await insertUser(pool, 'u-sindico');
+      await insertOccupiedResident(pool, 'condo-a', 'r-home');
+      for (const condominiumId of ['condo-a', 'condo-b']) {
+        await repo.grant({ condominiumId, userId: 'u-sindico', role: 'sindico', residentId: null });
+      }
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-sindico',
+        role: 'morador',
+        residentId: 'r-home',
+      });
+
+      await repo.removeSindico('condo-a');
+
+      expect(await repo.currentSindico('condo-a')).toBeNull();
+      expect((await repo.currentSindico('condo-b'))?.userId).toBe('u-sindico');
+      expect((await repo.accessFor('u-sindico', 'condo-a'))?.role).toBe('morador');
+      expect(await count(pool, "condo_roles WHERE role = 'sindico'")).toBe(2);
+    });
+
+    test('addOrgMember adds a membership and reactivates an inactive one with the invited role', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      await insertUser(pool, 'u-member');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+
+      await repo.addOrgMember(org.id, 'u-member', 'member');
+      await repo.addOrgMember(org.id, 'u-member', 'member');
+      await pool.query("UPDATE organization_members SET active = FALSE WHERE user_id = 'u-member'");
+      await repo.addOrgMember(org.id, 'u-member', 'owner');
+
+      const { rows } = await pool.query(
+        "SELECT role, active FROM organization_members WHERE user_id = 'u-member'",
+      );
+      expect(rows).toEqual([{ role: 'owner', active: true }]);
+    });
+
+    test('addOrgMember never demotes an active owner', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+
+      await repo.addOrgMember(org.id, 'u-owner', 'member');
+
+      expect(await repo.ownedOrganization('u-owner')).toEqual({ id: org.id });
+    });
+
+    test('getOrganization returns an active organization only', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+
+      expect(await repo.getOrganization(org.id)).toEqual({ id: org.id, name: 'Contábil' });
+      await pool.query('UPDATE organizations SET active = FALSE WHERE id = $1', [org.id]);
+      expect(await repo.getOrganization(org.id)).toBeNull();
+      expect(await repo.getOrganization('org-missing')).toBeNull();
     });
   });
 }

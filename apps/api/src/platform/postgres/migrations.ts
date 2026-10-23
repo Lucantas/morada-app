@@ -450,4 +450,22 @@ CREATE TABLE activity_log (
 CREATE INDEX idx_activity_log_condo_created ON activity_log (condominium_id, created_at DESC);
 `,
   },
+  {
+    id: '025_staff_invitations',
+    sql: `
+ALTER TABLE invitations ALTER COLUMN resident_id DROP NOT NULL;
+ALTER TABLE invitations ALTER COLUMN condominium_id DROP NOT NULL;
+ALTER TABLE invitations ADD COLUMN organization_id TEXT REFERENCES organizations(id);
+ALTER TABLE invitations ADD COLUMN org_role TEXT CHECK (org_role IN ('owner', 'member'));
+ALTER TABLE invitations DROP CONSTRAINT invitations_role_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_role_check CHECK (role IN ('morador', 'sindico', 'membro'));
+ALTER TABLE invitations ADD CONSTRAINT invitations_shape_check CHECK (
+  (role = 'morador' AND condominium_id IS NOT NULL AND resident_id IS NOT NULL AND organization_id IS NULL) OR
+  (role = 'sindico' AND condominium_id IS NOT NULL AND resident_id IS NULL AND organization_id IS NULL AND email IS NOT NULL) OR
+  (role = 'membro' AND organization_id IS NOT NULL AND condominium_id IS NULL AND resident_id IS NULL AND email IS NOT NULL AND org_role IS NOT NULL)
+);
+CREATE UNIQUE INDEX idx_invitations_one_pending_sindico ON invitations (condominium_id) WHERE role = 'sindico' AND status = 'pendente';
+CREATE UNIQUE INDEX idx_invitations_one_pending_member ON invitations (organization_id, email) WHERE role = 'membro' AND status = 'pendente';
+`,
+  },
 ];

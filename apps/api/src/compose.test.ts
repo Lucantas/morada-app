@@ -2670,6 +2670,8 @@ describe('Accepting an invitation', () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(JSON.parse(text)).toEqual({
+      role: 'morador',
+      targetName: CONDO.name,
       condoName: CONDO.name,
       residentName: 'Maria Ribeiro',
       apt: 'Apto 302',
@@ -3100,6 +3102,191 @@ describe('Síndico access', () => {
     });
 
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('X-Morada-View');
+  });
+
+  describe('síndico management', () => {
+    const S = `${P}/sindico`;
+    const SINDICA = 'nova.sindica@x.com';
+
+    async function adminRequest(app: App) {
+      const admin = await authFor(app, adminCredentials);
+      return (path: string, init: RequestInit = {}) =>
+        app.request(path, {
+          ...init,
+          headers: {
+            ...(init.headers ?? {}),
+            Cookie: admin.cookie,
+            'X-CSRF-Token': admin.csrf,
+          },
+        });
+    }
+
+    function tokenOf(link: string): string {
+      return link.slice(`${config.appUrl}/#/convite/`.length);
+    }
+
+    function publicRequest(app: App, path: string, body?: unknown) {
+      return app.request(`/auth/invitations/${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '7.7.7.7' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    }
+
+    async function inviteSindico(app: App): Promise<string> {
+      const admin = await adminRequest(app);
+      const res = await admin(`${S}/invitation`, json('POST', { email: SINDICA }));
+      expect(res.status).toBe(201);
+      return tokenOf(((await res.json()) as { link: string }).link);
+    }
+
+    const newSindica = { password: 'senha-sindica-1', name: 'Nova Síndica' };
+
+    test('sindico routes are administrador-only', async () => {
+      const { request } = await sindicoApp();
+
+      const invite = await request(`${S}/invitation`, json('POST', { email: SINDICA }));
+      const view = await request(S);
+      const revoke = await request(`${S}/invitation/revoke`, { method: 'POST' });
+      const remove = await request(`${S}/remove`, { method: 'POST' });
+
+      expect(invite.status).toBe(403);
+      expect(await invite.json()).toEqual({ error: 'Acesso negado' });
+      expect([view.status, revoke.status, remove.status]).toEqual([403, 403, 403]);
+      expect(await count('invitations')).toBe(0);
+      expect(await count("condo_roles WHERE role = 'sindico' AND active")).toBe(1);
+    });
+
+    test('an administrador invites a sindico who accepts and becomes the current sindico', async () => {
+      const sender = new InMemoryEmailSender();
+      const app = await makeApp({ email: sender });
+      const admin = await adminRequest(app);
+
+      const created = await admin(
+        `${S}/invitation`,
+        json('POST', { email: ` ${SINDICA.toUpperCase()} `, phone: '(11) 98888-7777' }),
+      );
+
+      expect(created.status).toBe(201);
+      const body = (await created.json()) as Record<string, unknown> & { link: string };
+      expect(body).toMatchObject({ status: 'pendente', email: SINDICA, emailSent: true });
+      expect(body.whatsappUrl).toMatch(/^https:\/\/wa\.me\/5511988887777\?text=/);
+      expect(sender.lastTo(SINDICA)?.subject).toBe(
+        `Você foi convidado para ser síndico do Condomínio ${TEST_CONDO_ID}`,
+      );
+      const pending = (await (await admin(S)).json()) as Record<string, unknown>;
+      expect(pending).toEqual({
+        current: null,
+        invitation: { status: 'pendente', email: SINDICA, expiresAt: body.expiresAt },
+      });
+      const token = tokenOf(body.link);
+      expect(await (await publicRequest(app, token)).json()).toEqual({
+        role: 'sindico',
+        targetName: `Condomínio ${TEST_CONDO_ID}`,
+        condoName: `Condomínio ${TEST_CONDO_ID}`,
+        email: SINDICA,
+        accountExists: false,
+      });
+
+      const accepted = await publicRequest(app, `${token}/accept`, newSindica);
+
+      expect(accepted.status).toBe(200);
+      const session = (await accepted.json()) as { condos: Record<string, unknown>[] };
+      expect(session.condos).toEqual([
+        expect.objectContaining({ id: TEST_CONDO_ID, role: 'admin', condoRole: 'sindico' }),
+      ]);
+      expect(await (await admin(S)).json()).toEqual({
+        current: { name: 'Nova Síndica', email: SINDICA },
+        invitation: { status: 'aceito', email: SINDICA, expiresAt: body.expiresAt },
+      });
+    });
+
+    test('accepting a sindico invite retires the previous sindico', async () => {
+      const { app, request } = await sindicoApp();
+      const token = await inviteSindico(app);
+
+      await publicRequest(app, `${token}/accept`, newSindica);
+
+      expect(await count("condo_roles WHERE role = 'sindico' AND active")).toBe(1);
+      expect(await count("condo_roles WHERE user_id = 'u-sindico' AND role = 'sindico'")).toBe(1);
+      const me = (await (await request('/me/condos')).json()) as { condoRole: string }[];
+      expect(me.map((c) => c.condoRole)).toEqual(['morador']);
+    });
+
+    test('a sindico invite accepted with another e-mail is 401 and grants nothing', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      const token = await inviteSindico(app);
+
+      const res = await publicRequest(app, `${token}/accept`, {
+        ...newSindica,
+        email: 'intrusa@x.com',
+      });
+
+      expect(res.status).toBe(401);
+      expect(await count(`users WHERE email IN ('intrusa@x.com', '${SINDICA}')`)).toBe(0);
+      expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+      expect(await count("condo_roles WHERE role = 'sindico'")).toBe(0);
+    });
+
+    test('a sindico invite created in one condominium grants nothing in another', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      await createTestCondo(pool, 'condo-b', { orgId: `org-${TEST_CONDO_ID}` });
+      const admin = await adminRequest(app);
+      const token = await inviteSindico(app);
+
+      const accepted = await publicRequest(app, `${token}/accept`, newSindica);
+
+      const { condos } = (await accepted.json()) as { condos: { id: string }[] };
+      expect(condos.map((c) => c.id)).toEqual([TEST_CONDO_ID]);
+      expect(await (await admin('/api/condos/condo-b/sindico')).json()).toEqual({
+        current: null,
+        invitation: null,
+      });
+    });
+
+    test('reenviar and revoke leave the old links invalid', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      const admin = await adminRequest(app);
+      const first = await inviteSindico(app);
+      const second = await inviteSindico(app);
+
+      const revoked = await admin(`${S}/invitation/revoke`, { method: 'POST' });
+
+      expect(revoked.status).toBe(204);
+      for (const token of [first, second]) {
+        const res = await publicRequest(app, token);
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ error: 'Convite inválido ou expirado' });
+      }
+      expect(((await (await admin(S)).json()) as { invitation: unknown }).invitation).toMatchObject(
+        { status: 'revogado' },
+      );
+    });
+
+    test('creating a sindico invite without an e-mail is 400', async () => {
+      const app = await makeApp();
+      const admin = await adminRequest(app);
+
+      const res = await admin(`${S}/invitation`, json('POST', { phone: '(11) 98888-7777' }));
+
+      expect(res.status).toBe(400);
+      expect(await count('invitations')).toBe(0);
+    });
+
+    test('remove deactivates the sindico grant', async () => {
+      const { app, request } = await sindicoApp();
+      const admin = await adminRequest(app);
+
+      const removed = await admin(`${S}/remove`, { method: 'POST' });
+
+      expect(removed.status).toBe(204);
+      expect(await (await admin(S)).json()).toEqual({ current: null, invitation: null });
+      expect((await request(`${P}/dashboard`)).status).toBe(200);
+      expect((await request(`${P}/accounts`)).status).toBe(403);
+      await pool.query("UPDATE condo_roles SET active = FALSE WHERE id = 'role-sindico-home'");
+      expect((await request(`${P}/dashboard`)).status).toBe(404);
+      expect(await count("condo_roles WHERE id = 'role-sindico'")).toBe(1);
+    });
   });
 
   describe('activity log', () => {

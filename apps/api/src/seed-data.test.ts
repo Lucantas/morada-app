@@ -91,6 +91,11 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     },
     deactivateResidentGrants: async () => undefined,
     isOperational: async () => true,
+    deactivateOtherSindicos: async () => undefined,
+    currentSindico: async () => null,
+    removeSindico: async () => undefined,
+    addOrgMember: async () => undefined,
+    getOrganization: async () => null,
   };
 }
 

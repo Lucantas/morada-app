@@ -3,9 +3,11 @@ import {
   confirmEmailMessage,
   invitationLink,
   invitationMessage,
+  membroInvitationMessage,
   resetPasswordLink,
   resetPasswordMessage,
   signupAttemptMessage,
+  sindicoInvitationMessage,
 } from './emails';
 
 describe('e-mail templates', () => {
@@ -41,5 +43,21 @@ describe('e-mail templates', () => {
     expect(message.subject).toBe('Você foi convidado para o Bloco <2> & Cia');
     expect(message.html).toContain('Bloco &lt;2&gt; &amp; Cia');
     expect(message.html).not.toContain('<2>');
+  });
+
+  test('staff invitations use the exact subjects and carry the escaped link', () => {
+    const sindico = sindicoInvitationMessage(
+      's@x.com',
+      'Morada <Bloco 2>',
+      'https://l/#/convite/t',
+    );
+    const membro = membroInvitationMessage('m@x.com', 'Contábil Aurora', 'https://l/#/convite/t');
+
+    expect(sindico.subject).toBe('Você foi convidado para ser síndico do Morada <Bloco 2>');
+    expect(sindico.html).toContain('Morada &lt;Bloco 2&gt;');
+    expect(sindico.text).toContain('https://l/#/convite/t');
+    expect(membro.subject).toBe('Você foi convidado para a equipe Contábil Aurora');
+    expect(membro.to).toBe('m@x.com');
+    expect(membro.text).toContain('https://l/#/convite/t');
   });
 });

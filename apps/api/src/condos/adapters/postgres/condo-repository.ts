@@ -4,10 +4,11 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 
 import { condoSettingsSchema } from '../../../settings/domain/condo-settings';
-import { resolveAccess, type CondoAccess } from '../../domain/condo-access';
+import { resolveAccess, type CondoAccess, type OrgRoleName } from '../../domain/condo-access';
 import type {
   CondoGrant,
   CondoRepository,
+  CondoSindico,
   CreateCondominiumInput,
 } from '../../domain/condo-repository';
 import {
@@ -88,6 +89,16 @@ const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   ownerUserId: z.string().min(1),
 });
+
+const sindicoRowSchema = z.object({
+  user_id: z.string(),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+});
+
+const organizationRowSchema = z.object({ id: z.string(), name: z.string() });
+
+const orgRoleSchema = z.enum(['owner', 'member']);
 
 function toCondominium(row: unknown): Condominium {
   const parsed = condoRowSchema.parse(row);
@@ -230,6 +241,57 @@ export class PostgresCondoRepository implements CondoRepository {
          AND role = 'morador' AND active`,
       [condominiumId, residentId, exceptUserId],
     );
+  }
+
+  async deactivateOtherSindicos(condominiumId: string, keepUserId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE condo_roles SET active = FALSE
+       WHERE condominium_id = $1 AND role = 'sindico' AND user_id <> $2 AND active`,
+      [condominiumId, keepUserId],
+    );
+  }
+
+  async currentSindico(condominiumId: string): Promise<CondoSindico | null> {
+    const { rows } = await this.pool.query(
+      `SELECT u.id AS user_id, u.name, u.email
+       FROM condo_roles r JOIN users u ON u.id = r.user_id
+       WHERE r.condominium_id = $1 AND r.role = 'sindico' AND r.active
+       ORDER BY r.id LIMIT 1`,
+      [condominiumId],
+    );
+    if (!rows[0]) return null;
+    const row = sindicoRowSchema.parse(rows[0]);
+    return { userId: row.user_id, name: row.name, email: row.email };
+  }
+
+  async removeSindico(condominiumId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE condo_roles SET active = FALSE
+       WHERE condominium_id = $1 AND role = 'sindico' AND active`,
+      [condominiumId],
+    );
+  }
+
+  async addOrgMember(organizationId: string, userId: string, role: OrgRoleName): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (organization_id, user_id) DO UPDATE SET
+         role = CASE
+           WHEN organization_members.active AND organization_members.role = 'owner' THEN 'owner'
+           ELSE EXCLUDED.role
+         END,
+         active = TRUE`,
+      [randomUUID(), organizationId, userId, orgRoleSchema.parse(role)],
+    );
+  }
+
+  async getOrganization(organizationId: string): Promise<{ id: string; name: string } | null> {
+    const { rows } = await this.pool.query(
+      'SELECT id, name FROM organizations WHERE id = $1 AND active',
+      [organizationId],
+    );
+    return rows[0] ? organizationRowSchema.parse(rows[0]) : null;
   }
 
   private async inTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {

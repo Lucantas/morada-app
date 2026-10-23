@@ -13,6 +13,7 @@ import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
 import { publicInvitationRoutes } from './invitations/adapters/http/public-routes';
 import { invitationRoutes } from './invitations/adapters/http/routes';
+import { sindicoRoutes } from './invitations/adapters/http/sindico-routes';
 import { activateClaimedInvitations } from './invitations/app/activate-claimed-invitations';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
@@ -175,6 +176,14 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     '/residents',
     invitationRoutes(
       scoped(({ residents, invitations }) => ({ residents, invitations })),
+      { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
+    ),
+  );
+
+  api.route(
+    '/sindico',
+    sindicoRoutes(
+      scoped(({ invitations }) => ({ invitations })),
       { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
     ),
   );

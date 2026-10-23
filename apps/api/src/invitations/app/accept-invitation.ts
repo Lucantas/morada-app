@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { EmailUnavailableError, type EmailSender } from '../../platform/email/email-sender';
 import { issueConfirmation } from '../../users/app/issue-confirmation';
 import type { AuthTokenRepository } from '../../users/domain/auth-token-repository';
-import { emailSchema } from '../../users/domain/email';
+import { emailSchema, normalizeEmail } from '../../users/domain/email';
 import { EmailTakenError, InvalidCredentialsError } from '../../users/domain/errors';
 import type { PasswordHasher } from '../../users/domain/password-hasher';
 import type { User } from '../../users/domain/user';
@@ -142,6 +142,11 @@ async function acceptAsNew(
   return user;
 }
 
+function ensureInvitedEmail(invitation: Invitation, requested: string | undefined): void {
+  if (invitation.email === null || requested === undefined) return;
+  if (normalizeEmail(requested) !== invitation.email) throw new InvalidCredentialsError();
+}
+
 export async function acceptInvitation(
   deps: AcceptInvitationDeps,
   token: string,
@@ -149,6 +154,7 @@ export async function acceptInvitation(
 ): Promise<User> {
   const body = acceptBodySchema.parse(input);
   const { invitation } = await findUsableInvitation(deps, token);
+  ensureInvitedEmail(invitation, body.email);
   if (invitation.email === null) newAccountSchema.parse(body);
   const email = invitation.email ?? emailSchema.parse(body.email);
   const existing = await deps.users.findByEmail(email);

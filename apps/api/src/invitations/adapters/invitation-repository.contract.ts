@@ -27,6 +27,10 @@ function input(tokenHash: string, expiresAt: Date = LATER, email: string | null 
   };
 }
 
+function sindicoInput(tokenHash: string, expiresAt: Date = LATER) {
+  return { email: 'sindica@x.com', tokenHash, expiresAt, createdBy: CONTRACT_ADMIN_ID };
+}
+
 export function runInvitationRepositoryContract(
   label: string,
   makeRepos: (condominiumId: string) => Promise<ContractRepos>,
@@ -134,8 +138,7 @@ export function runInvitationRepositoryContract(
 
       const found = await b.tokens.findByTokenHash('hb', NOW);
 
-      expect(found?.id).toBe(created.id);
-      expect(found?.condominiumId).toBe('condo-b');
+      expect(found).toMatchObject({ id: created.id, condominiumId: 'condo-b' });
       expect(await b.tokens.findByTokenHash('ghost', NOW)).toBeNull();
     });
 
@@ -200,6 +203,71 @@ export function runInvitationRepositoryContract(
       expect((await tokens.findByTokenHash('h1', NOW))?.status).toBe('pendente');
       expect((await tokens.findByTokenHash('hb', NOW))?.claimedBy).toBe(CONTRACT_CLAIMER_ID);
       expect(await tokens.claim(pending.id, CONTRACT_ADMIN_ID)).toBe(true);
+    });
+
+    test('createSindico stores a pending sindico invitation that latestSindico returns', async () => {
+      const { invitations, tokens } = await makeRepos('condo-a');
+
+      const created = await invitations.createSindico(sindicoInput('hs1'), NOW);
+
+      expect(created).toMatchObject({
+        condominiumId: 'condo-a',
+        role: 'sindico',
+        email: 'sindica@x.com',
+        status: 'pendente',
+        createdBy: CONTRACT_ADMIN_ID,
+        claimedBy: null,
+      });
+      expect(created).not.toHaveProperty('residentId');
+      expect(await invitations.latestSindico(NOW)).toEqual(created);
+      expect(await tokens.findByTokenHash('hs1', NOW)).toEqual(created);
+      expect(await invitations.latestForResident(CONTRACT_RESIDENT_A, NOW)).toBeNull();
+    });
+
+    test('createSindico revokes the previous pending sindico invitation of that condo only', async () => {
+      const a = await makeRepos('condo-a');
+      const b = await makeRepos('condo-b');
+      await b.invitations.createSindico(sindicoInput('hsb'), NOW);
+      await a.invitations.create(input('hm'), NOW);
+      await a.invitations.createSindico(sindicoInput('hs1'), NOW);
+
+      const second = await a.invitations.createSindico(sindicoInput('hs2'), NOW);
+
+      expect((await a.tokens.findByTokenHash('hs1', NOW))?.status).toBe('revogado');
+      expect((await a.invitations.latestSindico(NOW))?.id).toBe(second.id);
+      expect((await b.invitations.latestSindico(NOW))?.status).toBe('pendente');
+      expect((await a.tokens.findByTokenHash('hm', NOW))?.status).toBe('pendente');
+    });
+
+    test('revokeSindico revokes only the pending sindico invitation of that condo', async () => {
+      const a = await makeRepos('condo-a');
+      const b = await makeRepos('condo-b');
+      await a.invitations.create(input('hm'), NOW);
+      await a.invitations.createSindico(sindicoInput('hs1', EARLIER), NOW);
+      expect((await a.invitations.latestSindico(NOW))?.status).toBe('expirado');
+      await a.invitations.createSindico(sindicoInput('hs2'), NOW);
+      await b.invitations.createSindico(sindicoInput('hsb'), NOW);
+
+      await a.invitations.revokeSindico();
+
+      expect((await a.invitations.latestSindico(NOW))?.status).toBe('revogado');
+      expect((await b.invitations.latestSindico(NOW))?.status).toBe('pendente');
+      expect((await a.tokens.findByTokenHash('hm', NOW))?.status).toBe('pendente');
+    });
+
+    test('createSindico refuses an unknown condominium', async () => {
+      const { invitations } = await makeRepos('condo-ghost');
+
+      await expect(invitations.createSindico(sindicoInput('hs'), NOW)).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+
+    test('latestSindico is null without a sindico invitation', async () => {
+      const { invitations } = await makeRepos('condo-a');
+      await invitations.create(input('hm'), NOW);
+
+      expect(await invitations.latestSindico(NOW)).toBeNull();
     });
   });
 }
