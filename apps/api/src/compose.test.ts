@@ -24,6 +24,11 @@ afterAll(async () => {
 
 type App = Awaited<ReturnType<typeof buildApp>>;
 
+async function count(from: string): Promise<number> {
+  const { rows } = await pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${from}`);
+  return rows[0]?.n ?? -1;
+}
+
 // Each call resets to a fresh seeded state, so a test may build more than one app
 // (e.g. one per credential) against the shared Postgres without id collisions.
 async function makeApp(): Promise<App> {
@@ -888,17 +893,35 @@ describe('Morada API — admin provisions resident logins', () => {
     const body = (await created.json()) as { username: string; tempPassword: string };
     expect(body.username).toBe('ana202');
     expect(body.tempPassword).toMatch(/.{8,}/);
-    await pool.query(
-      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
-       SELECT 'role-ana', $1, id, 'morador', resident_id FROM users WHERE username = 'ana202'`,
-      [TEST_CONDO_ID],
-    );
 
     const loginRes = await login(app, 'ana202', body.tempPassword);
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
     });
+  });
+
+  test("cannot provision a login for another condo's resident", async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    await makePostgresRepositories(pool).forCondo('condo-other').residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: '',
+      status: 'em_dia',
+    });
+    const auth = await adminAuth(app);
+
+    const res = await auth(`${P}/users`, {
+      method: 'POST',
+      body: JSON.stringify({ residentId: 'r-foreign' }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await count("users WHERE resident_id = 'r-foreign'")).toBe(0);
+    expect(await count("condo_roles WHERE resident_id = 'r-foreign'")).toBe(0);
   });
 
   test('provisioning a resident login is admin-only', async () => {
@@ -957,12 +980,40 @@ describe('Morada API — admin reads and resets resident logins', () => {
     expect(await res.json()).toEqual({ username: null, suggested: 'ana202' });
   });
 
-  test('reading the login of a nonexistent resident returns null', async () => {
+  test('reading the login of a nonexistent resident answers 404', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     const res = await auth(`${P}/residents/r-does-not-exist/login`);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toBeNull();
+    expect(res.status).toBe(404);
+  });
+
+  test("cannot read or reset the login of another condo's resident", async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const repos = makePostgresRepositories(pool);
+    await repos.forCondo('condo-other').residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: '',
+      status: 'em_dia',
+    });
+    await repos.users.save({
+      id: 'u-foreign',
+      username: 'forasteiro900',
+      passwordHash: 'hash-foreign',
+      role: 'resident',
+      residentId: 'r-foreign',
+    });
+    const auth = await adminAuthFor(app);
+
+    const read = await auth(`${P}/residents/r-foreign/login`);
+    const reset = await auth(`${P}/residents/r-foreign/login/reset`, { method: 'POST' });
+
+    expect(read.status).toBe(404);
+    expect(reset.status).toBe(404);
+    expect((await repos.users.findByUsername('forasteiro900'))?.passwordHash).toBe('hash-foreign');
   });
 
   test('reading a resident login is admin-only', async () => {

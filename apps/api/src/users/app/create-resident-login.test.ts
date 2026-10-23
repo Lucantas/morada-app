@@ -1,3 +1,4 @@
+import type { CondoGrant } from '../../condos/domain/condo-repository';
 import type { Resident } from '../../residents/domain/resident';
 import {
   ResidentLoginExistsError,
@@ -46,6 +47,18 @@ const lookupReturning =
     resident;
 const noResident: ResidentLookup = async () => null;
 
+function fakeCondos(): { grants: CondoGrant[]; grant: (input: CondoGrant) => Promise<void> } {
+  const grants: CondoGrant[] = [];
+  return {
+    grants,
+    grant: async (input) => {
+      grants.push(input);
+    },
+  };
+}
+
+const CONDO = 'condo-a';
+
 const hasher: PasswordHasher = {
   hash: (plain) => Promise.resolve(`hash:${plain}`),
   verify: (plain, hash) => Promise.resolve(hash === `hash:${plain}`),
@@ -54,10 +67,17 @@ const hasher: PasswordHasher = {
 describe('createResidentLogin', () => {
   test('derives the username from the resident name and apartment', async () => {
     const repo = fakeRepo();
-    const user = await createResidentLogin(repo, hasher, lookupReturning(fakeResident()), {
-      password: 's3nha-temp',
-      residentId: 'r-1',
-    });
+    const user = await createResidentLogin(
+      repo,
+      fakeCondos(),
+      hasher,
+      lookupReturning(fakeResident()),
+      {
+        password: 's3nha-temp',
+        residentId: 'r-1',
+        condominiumId: CONDO,
+      },
+    );
 
     expect(user.username).toBe('maria302');
     expect(user.role).toBe('resident');
@@ -67,6 +87,33 @@ describe('createResidentLogin', () => {
     expect(await repo.findByUsername('maria302')).toEqual(user);
   });
 
+  test('provisioning a login grants morador in the current condo', async () => {
+    const condos = fakeCondos();
+    const user = await createResidentLogin(
+      fakeRepo(),
+      condos,
+      hasher,
+      lookupReturning(fakeResident()),
+      { password: 's3nha-temp', residentId: 'r-1', condominiumId: CONDO },
+    );
+
+    expect(condos.grants).toEqual([
+      { condominiumId: CONDO, userId: user.id, role: 'morador', residentId: 'r-1' },
+    ]);
+  });
+
+  test('does not grant a role when provisioning fails', async () => {
+    const condos = fakeCondos();
+    await expect(
+      createResidentLogin(fakeRepo(), condos, hasher, noResident, {
+        password: 's3nha-temp',
+        residentId: 'r-nope',
+        condominiumId: CONDO,
+      }),
+    ).rejects.toBeInstanceOf(UnknownResidentError);
+    expect(condos.grants).toEqual([]);
+  });
+
   test('stores the hasher output, never the raw password', async () => {
     const opaqueHasher: PasswordHasher = {
       hash: () => Promise.resolve('opaque-hash'),
@@ -74,9 +121,10 @@ describe('createResidentLogin', () => {
     };
     const user = await createResidentLogin(
       fakeRepo(),
+      fakeCondos(),
       opaqueHasher,
       lookupReturning(fakeResident({ id: 'r-2', name: 'João Pereira', apt: 'Apto 101' })),
-      { password: 'plaintext-secret', residentId: 'r-2' },
+      { password: 'plaintext-secret', residentId: 'r-2', condominiumId: CONDO },
     );
     expect(user.username).toBe('joao101');
     expect(user.passwordHash).toBe('opaque-hash');
@@ -88,18 +136,20 @@ describe('createResidentLogin', () => {
       { id: 'u-9', username: 'maria302', passwordHash: 'x', role: 'resident', residentId: 'r-9' },
     ]);
     await expect(
-      createResidentLogin(repo, hasher, lookupReturning(fakeResident()), {
+      createResidentLogin(repo, fakeCondos(), hasher, lookupReturning(fakeResident()), {
         password: 's3nha-temp',
         residentId: 'r-1',
+        condominiumId: CONDO,
       }),
     ).rejects.toBeInstanceOf(UsernameTakenError);
   });
 
   test('throws UnknownResidentError when the resident does not exist', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, noResident, {
+      createResidentLogin(fakeRepo(), fakeCondos(), hasher, noResident, {
         password: 's3nha-temp',
         residentId: 'r-nope',
+        condominiumId: CONDO,
       }),
     ).rejects.toBeInstanceOf(UnknownResidentError);
   });
@@ -111,9 +161,10 @@ describe('createResidentLogin', () => {
     await expect(
       createResidentLogin(
         repo,
+        fakeCondos(),
         hasher,
         lookupReturning(fakeResident({ id: 'r-1', name: 'Carlos Souza', apt: 'Apto 402' })),
-        { password: 's3nha-temp', residentId: 'r-1' },
+        { password: 's3nha-temp', residentId: 'r-1', condominiumId: CONDO },
       ),
     ).rejects.toBeInstanceOf(ResidentLoginExistsError);
   });
@@ -122,18 +173,20 @@ describe('createResidentLogin', () => {
     await expect(
       createResidentLogin(
         fakeRepo(),
+        fakeCondos(),
         hasher,
         lookupReturning(fakeResident({ name: 'Al', apt: '' })),
-        { password: 's3nha-temp', residentId: 'r-1' },
+        { password: 's3nha-temp', residentId: 'r-1', condominiumId: CONDO },
       ),
     ).rejects.toBeInstanceOf(UserValidationError);
   });
 
   test('rejects a too-short password', async () => {
     await expect(
-      createResidentLogin(fakeRepo(), hasher, lookupReturning(fakeResident()), {
+      createResidentLogin(fakeRepo(), fakeCondos(), hasher, lookupReturning(fakeResident()), {
         password: 'short',
         residentId: 'r-1',
+        condominiumId: CONDO,
       }),
     ).rejects.toBeInstanceOf(UserValidationError);
   });

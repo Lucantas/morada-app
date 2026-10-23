@@ -67,10 +67,11 @@ describe('PostgresCategoryRepository — contract', () => {
 describe('PostgresCategoryRepository.replaceAll atomicity', () => {
   test('rolls back account updates when a category insert fails', async () => {
     await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
     await insertRows(
       pool,
       'accounts',
-      ['id', 'description', 'category', 'date', 'value_cents', 'status'],
+      ['id', 'description', 'category', 'date', 'value_cents', 'status', 'condominium_id'],
       [
         {
           id: 'acc-1',
@@ -79,10 +80,11 @@ describe('PostgresCategoryRepository.replaceAll atomicity', () => {
           date: '2026-07-01',
           value_cents: 1000,
           status: 'pendente',
+          condominium_id: 'condo-a',
         },
       ],
     );
-    const repo = new PostgresCategoryRepository(pool, 'condo-legacy');
+    const repo = new PostgresCategoryRepository(pool, 'condo-a');
     const validCategory = { id: 'cat-a', name: 'A', keywords: 'a', position: 0 };
 
     await expect(

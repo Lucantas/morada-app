@@ -223,6 +223,19 @@ describe('migrating a database that holds legacy single-condominium data', () =>
 
     expect(rows).toEqual([{ due_date: null }]);
   });
+
+  test('018 drops the condominium_id default of every scoped table', async () => {
+    const { rows } = await pool.query<{ table_name: string; column_default: string | null }>(
+      `SELECT table_name, column_default FROM information_schema.columns
+       WHERE table_schema = $1 AND column_name = 'condominium_id' AND table_name = ANY($2)
+       ORDER BY table_name`,
+      [SCHEMA, SCOPED_TABLES],
+    );
+
+    expect(rows).toEqual(
+      [...SCOPED_TABLES].sort().map((table_name) => ({ table_name, column_default: null })),
+    );
+  });
 });
 
 describe('migrating an empty database', () => {
