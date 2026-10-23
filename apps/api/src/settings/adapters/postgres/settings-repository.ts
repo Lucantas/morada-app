@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { condoSettingsSchema, type CondoSettings } from '../../domain/condo-settings';
 import type { SettingsRepository } from '../../domain/settings-repository';
 
-const ROW_ID = 'default';
+const LEGACY_CONDOMINIUM_ID = 'condo-legacy';
 
 interface SettingsRow {
   monthly_fee_cents: number;
@@ -15,8 +15,8 @@ export class PostgresSettingsRepository implements SettingsRepository {
 
   async get(): Promise<CondoSettings> {
     const { rows } = await this.pool.query<SettingsRow>(
-      'SELECT monthly_fee_cents, due_day FROM condo_settings WHERE id = $1',
-      [ROW_ID],
+      'SELECT monthly_fee_cents, due_day FROM condo_settings WHERE condominium_id = $1',
+      [LEGACY_CONDOMINIUM_ID],
     );
     const row = rows[0];
     return condoSettingsSchema.parse({
@@ -28,11 +28,11 @@ export class PostgresSettingsRepository implements SettingsRepository {
   async save(settings: CondoSettings): Promise<CondoSettings> {
     const parsed = condoSettingsSchema.parse(settings);
     await this.pool.query(
-      `INSERT INTO condo_settings (id, monthly_fee_cents, due_day)
+      `INSERT INTO condo_settings (condominium_id, monthly_fee_cents, due_day)
        VALUES ($1, $2, $3)
-       ON CONFLICT (id) DO UPDATE SET
+       ON CONFLICT (condominium_id) DO UPDATE SET
          monthly_fee_cents = EXCLUDED.monthly_fee_cents, due_day = EXCLUDED.due_day`,
-      [ROW_ID, parsed.monthlyFeeCents, parsed.dueDay],
+      [LEGACY_CONDOMINIUM_ID, parsed.monthlyFeeCents, parsed.dueDay],
     );
     return parsed;
   }
