@@ -24,6 +24,7 @@ type Props = {
   onSaveCategories: (drafts: CategoryDraft[]) => Promise<{ reclassified: number }>;
   canManageFees: boolean;
   canManageCondo: boolean;
+  onOpenActivity?: () => void;
   onBack: () => void;
 };
 
@@ -56,6 +57,7 @@ export function SettingsScreen({
   onSaveCategories,
   canManageFees,
   canManageCondo,
+  onOpenActivity,
   onBack,
 }: Props) {
   const scopeCondoName = useCondoName();
@@ -177,6 +179,32 @@ export function SettingsScreen({
         </div>
       </div>
       <ScreenBody>
+        {onOpenActivity && (
+          <button
+            type="button"
+            onClick={onOpenActivity}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              minHeight: 48,
+              padding: '0 14px',
+              marginBottom: 16,
+              background: 'var(--surface)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--r-md)',
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 600,
+              fontSize: '.95rem',
+              color: 'var(--ink-900)',
+              cursor: 'pointer',
+            }}
+          >
+            Atividade
+            <Icon name="chevronRight" size={18} color="var(--ink-500)" />
+          </button>
+        )}
         {(settings.isError || categoriesError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
         )}

@@ -33,12 +33,14 @@ function Harness({
   condoInfo = defaultCondoInfo(),
   canManageFees = true,
   canManageCondo = true,
+  onOpenActivity,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
   condoInfo?: CondoInfoRepository;
   canManageFees?: boolean;
   canManageCondo?: boolean;
+  onOpenActivity?: () => void;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -57,6 +59,7 @@ function Harness({
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
       canManageFees={canManageFees}
       canManageCondo={canManageCondo}
+      onOpenActivity={onOpenActivity}
       onBack={() => {}}
     />
   );
@@ -286,5 +289,27 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /salvar e reclassificar/i })).toBeEnabled(),
     );
+  });
+
+  test('shows the Atividade row only when an opener is provided and opens it', async () => {
+    const onOpenActivity = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenActivity={onOpenActivity}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Atividade' }));
+
+    expect(onOpenActivity).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Atividade' })).not.toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ export type View =
   | 'a-account-edit'
   | 'a-income-edit'
   | 'a-settings'
+  | 'a-activity'
   | 'a-notice'
   | 'a-messages'
   | 'r-home'

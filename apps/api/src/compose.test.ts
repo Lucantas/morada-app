@@ -1,5 +1,6 @@
 import { sign } from 'hono/jwt';
 
+import { moneyActivityResolver } from './activity/adapters/http/money-activity';
 import { buildApp } from './compose';
 import { config } from './platform/config';
 import {
@@ -2966,7 +2967,7 @@ describe('Síndico access', () => {
       id: 'u-sindico',
       username: sindicoCredentials.username,
       email: null,
-      name: null,
+      name: 'Síndica Teste',
       passwordHash: await hasher.hash(sindicoCredentials.password),
       role: 'resident',
       residentId: null,
@@ -3099,5 +3100,81 @@ describe('Síndico access', () => {
     });
 
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('X-Morada-View');
+  });
+
+  describe('activity log', () => {
+    const accountBody = {
+      description: 'Água',
+      category: 'Utilidades',
+      valueCents: 1000,
+      date: '2026-04-05',
+      status: 'pendente',
+    };
+
+    async function adminActivity(app: App) {
+      const admin = await authFor(app, adminCredentials);
+      return app.request(`${P}/activity`, {
+        headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
+      });
+    }
+
+    test("a síndico's account creation is logged with the síndico as actor", async () => {
+      const { app, request } = await sindicoApp();
+
+      await request(`${P}/accounts`, json('POST', accountBody));
+      const res = await adminActivity(app);
+
+      const body = (await res.json()) as Record<string, unknown>[];
+      expect(res.status).toBe(200);
+      expect(body).toHaveLength(1);
+      expect(body[0]).toMatchObject({
+        action: 'account.created',
+        label: 'Conta lançada',
+        actorName: 'Síndica Teste',
+      });
+    });
+
+    test('failed writes are not logged', async () => {
+      const { app, request } = await sindicoApp();
+
+      const bad = await request(`${P}/accounts`, json('POST', { description: '' }));
+      const res = await adminActivity(app);
+
+      expect(bad.status).toBe(400);
+      expect(await res.json()).toEqual([]);
+    });
+
+    test('sindico cannot read the activity', async () => {
+      const { request } = await sindicoApp();
+
+      const res = await request(`${P}/activity`);
+
+      expect(res.status).toBe(403);
+    });
+
+    test('every money write has an activity label', async () => {
+      const app = await makeApp();
+      const prefixes = ['accounts', 'incomes', 'categories', 'receipts'].map(
+        (name) => `${P.replace(TEST_CONDO_ID, ':condoId')}/${name}`,
+      );
+      const statusPath = `${P.replace(TEST_CONDO_ID, ':condoId')}/residents/:id/status`;
+
+      const writes = app.routes.filter(
+        (r) =>
+          r.method !== 'GET' &&
+          r.method !== 'ALL' &&
+          (r.path === statusPath ||
+            prefixes.some((p) => r.path === p || r.path.startsWith(`${p}/`))),
+      );
+
+      expect(writes.length).toBeGreaterThan(10);
+      for (const route of writes) {
+        expect([
+          route.method,
+          route.path,
+          moneyActivityResolver(route.method, route.path),
+        ]).not.toContain(null);
+      }
+    });
   });
 });

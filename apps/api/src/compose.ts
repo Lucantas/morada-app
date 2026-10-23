@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
+import { moneyActivityResolver } from './activity/adapters/http/money-activity';
+import { recordActivity } from './activity/adapters/http/record-activity';
+import { activityRoutes } from './activity/adapters/http/routes';
 import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
 import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
@@ -146,7 +149,17 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
+  const logMoneyActivity = recordActivity(
+    moneyActivityResolver,
+    scoped(({ activity }) => ({ record: (entry) => activity.record(entry) })),
+    now,
+  );
+  for (const prefix of ['accounts', 'incomes', 'categories', 'receipts', 'residents']) {
+    api.use(`/${prefix}/*`, logMoneyActivity);
+  }
+
   api.route('/info', condoInfoRoutes(condos));
+  api.route('/activity', activityRoutes(scoped(({ activity }) => ({ activity }))));
 
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.

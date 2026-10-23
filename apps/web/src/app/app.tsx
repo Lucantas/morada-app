@@ -29,6 +29,7 @@ import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
+import { ActivityScreen } from '@/features/activity/ui/activity-screen';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
@@ -39,6 +40,7 @@ import { StatusView } from '@/shared/ui/status-view';
 
 import {
   accountRepository,
+  activityRepository,
   categoryRepository,
   condoInfoRepository,
   confirmPayment,
@@ -72,6 +74,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-accounts': 'accounts',
   'a-account-edit': 'accounts',
   'a-settings': 'settings',
+  'a-activity': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -258,7 +261,9 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
         />
       );
     case 'a-settings':
-      return <AdminSettings onBack={() => go('a-home')} />;
+      return <AdminSettings onBack={() => go('a-home')} onOpenActivity={() => go('a-activity')} />;
+    case 'a-activity':
+      return <ActivityScreen repository={activityRepository} onBack={() => go('a-settings')} />;
     case 'a-notice':
       return (
         <SendNoticeScreen
@@ -283,13 +288,20 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
   }
 }
 
-function AdminSettings({ onBack }: { onBack: () => void }) {
+function AdminSettings({
+  onBack,
+  onOpenActivity,
+}: {
+  onBack: () => void;
+  onOpenActivity: () => void;
+}) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
   const condoInfo = useCondoInfo(condoInfoRepository);
   const renameCondo = useRenameCondo(condoInfoRepository);
   const canManageFees = useCanDo('manage_fees');
   const canManageCondo = useCanDo('manage_condo');
+  const canViewActivity = useCanDo('view_activity');
   return (
     <SettingsScreen
       repository={settingsRepository}
@@ -303,6 +315,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
       canManageFees={canManageFees}
       canManageCondo={canManageCondo}
+      onOpenActivity={canViewActivity ? onOpenActivity : undefined}
       onBack={onBack}
     />
   );

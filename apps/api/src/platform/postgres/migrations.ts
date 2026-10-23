@@ -436,4 +436,18 @@ WHERE status = 'pendente' AND id NOT IN (
 CREATE UNIQUE INDEX idx_invitations_one_pending ON invitations (resident_id) WHERE status = 'pendente';
 `,
   },
+  {
+    id: '024_activity_log',
+    sql: `
+CREATE TABLE activity_log (
+  id TEXT PRIMARY KEY,
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  actor_user_id TEXT NOT NULL REFERENCES users(id),
+  action TEXT NOT NULL,
+  subject_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_activity_log_condo_created ON activity_log (condominium_id, created_at DESC);
+`,
+  },
 ];

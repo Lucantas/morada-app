@@ -1,5 +1,7 @@
 import type { Pool } from 'pg';
 
+import { PostgresActivityRepository } from './activity/adapters/postgres/activity-repository';
+import type { ActivityRepository } from './activity/domain/activity-repository';
 import { PostgresAccountRepository } from './accounts/adapters/postgres/account-repository';
 import type { AccountRepository } from './accounts/domain/account-repository';
 import { PostgresCategoryRepository } from './categories/adapters/postgres/category-repository';
@@ -49,6 +51,7 @@ export interface CondoRepositories {
   categories: CategoryRepository;
   incomes: IncomeRepository;
   invitations: CondoInvitationRepository;
+  activity: ActivityRepository;
 }
 
 export interface Repositories {
@@ -73,6 +76,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
       categories: new PostgresCategoryRepository(pool, condominiumId),
       incomes: new PostgresIncomeRepository(pool, condominiumId, proofStorage),
       invitations: new PostgresInvitationRepository(pool, condominiumId),
+      activity: new PostgresActivityRepository(pool, condominiumId),
     }),
     users: new PostgresUserRepository(pool),
     authTokens: new PostgresAuthTokenRepository(pool),

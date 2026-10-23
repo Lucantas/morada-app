@@ -1,3 +1,4 @@
+import { HttpActivityRepository } from '@/features/activity/data/http-activity-repository';
 import { HttpAuthRepository } from '@/features/auth/data/http-auth-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
@@ -42,6 +43,7 @@ export const invitationRepository = new HttpInvitationRepository({
 export const residentRepository = new HttpResidentRepository(apiClient);
 export const accountRepository = new HttpAccountRepository(apiClient);
 export const receiptRepository = new HttpReceiptRepository(apiClient);
+export const activityRepository = new HttpActivityRepository(apiClient);
 export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
