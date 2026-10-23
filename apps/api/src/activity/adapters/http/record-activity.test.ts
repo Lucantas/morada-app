@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
 
+import { logServerError } from '../../../platform/http-error';
 import type { ApiEnv } from '../../../platform/auth';
 import { ACTIVITY_LABELS } from '../../domain/activity';
 
 import { MONEY_ACTIVITY_TABLE, moneyActivityResolver } from './money-activity';
 import { recordActivity } from './record-activity';
 
-function appWith(status: number) {
+jest.mock('../../../platform/http-error', () => ({ logServerError: jest.fn() }));
+
+function appWith(status: number, failing = false) {
   const recorded: unknown[] = [];
   const app = new Hono<ApiEnv>();
   app.use('*', async (c, next) => {
@@ -20,6 +23,7 @@ function appWith(status: number) {
       () => 'account.created',
       () => ({
         record: async (entry) => {
+          if (failing) throw new Error('db down');
           recorded.push(entry);
         },
       }),
@@ -32,6 +36,15 @@ function appWith(status: number) {
 }
 
 describe('recordActivity', () => {
+  test('a failing recorder is logged and the original response is kept', async () => {
+    const { app } = appWith(201, true);
+
+    const res = await app.request('/things/t-1', { method: 'POST' });
+
+    expect(res.status).toBe(201);
+    expect(logServerError).toHaveBeenCalledWith('Activity log failed:', expect.any(Error));
+  });
+
   test('records the actor, action, subject and time on a 2xx write', async () => {
     const { app, recorded } = appWith(201);
 

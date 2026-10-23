@@ -1,11 +1,19 @@
 import type { MiddlewareHandler } from 'hono';
 
 import type { ApiEnv } from '../../../platform/auth';
+import { logServerError } from '../../../platform/http-error';
 import type { Scoped } from '../../../platform/condo-scope';
 import type { ActivityAction } from '../../domain/activity';
 import type { ActivityRepository } from '../../domain/activity-repository';
 
 export type ActivityResolver = (method: string, routePath: string) => ActivityAction | null;
+
+const NEEDS_CREATED_RESULT: ReadonlySet<ActivityAction> = new Set(['receipt.monthly']);
+
+async function createdSomething(res: Response): Promise<boolean> {
+  const body: unknown = await res.clone().json();
+  return Array.isArray(body) && body.length > 0;
+}
 
 export function recordActivity(
   resolve: ActivityResolver,
@@ -18,12 +26,17 @@ export function recordActivity(
     if (c.res.status < 200 || c.res.status >= 300) return;
     const action = resolve(c.req.method, c.req.routePath);
     if (action === null) return;
-    await activityFor(c.get('condoId')).record({
-      actorUserId: c.get('uid'),
-      action,
-      subjectId: c.req.param('id') ?? null,
-      at: now(),
-    });
+    try {
+      if (NEEDS_CREATED_RESULT.has(action) && !(await createdSomething(c.res))) return;
+      await activityFor(c.get('condoId')).record({
+        actorUserId: c.get('uid'),
+        action,
+        subjectId: c.req.param('id') ?? null,
+        at: now(),
+      });
+    } catch (error) {
+      logServerError('Activity log failed:', error);
+    }
   };
 }
 

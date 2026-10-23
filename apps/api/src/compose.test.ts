@@ -3152,6 +3152,34 @@ describe('Síndico access', () => {
       expect(res.status).toBe(403);
     });
 
+    test('a no-op ensure-month adds no row and one that creates receipts adds exactly one', async () => {
+      const app = await makeApp();
+      const admin = await authFor(app, adminCredentials);
+      const headers = { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf };
+      const ensure = () => app.request(`${P}/receipts/ensure-month`, { method: 'POST', headers });
+
+      const first = (await (await ensure()).json()) as unknown[];
+      await ensure();
+      const res = await app.request(`${P}/activity`, { headers });
+
+      const body = (await res.json()) as { action: string }[];
+      expect(first.length).toBeGreaterThan(0);
+      expect(body.map((e) => e.action)).toEqual(['receipt.monthly']);
+    });
+
+    test('a :id route records the resource id as subjectId', async () => {
+      const { app, request } = await sindicoApp();
+      const created = (await (
+        await request(`${P}/accounts`, json('POST', accountBody))
+      ).json()) as { id: string };
+
+      await request(`${P}/accounts/${created.id}`, json('PUT', accountBody));
+      const res = await adminActivity(app);
+
+      const body = (await res.json()) as { action: string; subjectId: string | null }[];
+      expect(body.find((e) => e.action === 'account.updated')?.subjectId).toBe(created.id);
+    });
+
     test('every money write has an activity label', async () => {
       const app = await makeApp();
       const prefixes = ['accounts', 'incomes', 'categories', 'receipts'].map(
