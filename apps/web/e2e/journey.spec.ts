@@ -45,7 +45,7 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
     await page.getByRole('button', { name: 'Cadastrar apartamento' }).click();
 
     await expect(page.getByText(`Apto ${APT_NUMBER}`)).toBeVisible();
-    await expect(page.getByText(`${RESIDENT_NAME} · Bloco 2`)).toBeVisible();
+    await expect(page.getByText(`${RESIDENT_NAME} · Condomínio Demo`)).toBeVisible();
   });
 
   test('admin provisiona o acesso do morador e captura a senha temporária', async ({ page }) => {

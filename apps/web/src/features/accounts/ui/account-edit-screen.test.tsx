@@ -9,8 +9,9 @@ import { InMemoryAccountRepository } from '../data/in-memory-account-repository'
 
 import { AccountEditScreen } from './account-edit-screen';
 import { useCondoScope } from '@/shared/lib/condo-scope';
+import { TEST_CONDO_NAME } from '@/test/condo';
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: TEST_CONDO_NAME }));
 
 function makeSpyRepo(): { repo: AccountRepository; saved: unknown[] } {
   const saved: unknown[] = [];
@@ -27,6 +28,59 @@ function makeSpyRepo(): { repo: AccountRepository; saved: unknown[] } {
 }
 
 describe('AccountEditScreen', () => {
+  test('shows the condominium name in the header', () => {
+    renderWithClient(
+      <AccountEditScreen repository={new InMemoryAccountRepository([])} onBack={jest.fn()} />,
+    );
+
+    expect(screen.getByText(`Contas · ${TEST_CONDO_NAME}`)).toBeInTheDocument();
+  });
+
+  test('saves an optional due date', async () => {
+    const { repo, saved } = makeSpyRepo();
+    renderWithClient(<AccountEditScreen repository={repo} onBack={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Água — abril' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '25/04/2026' } });
+    fireEvent.change(screen.getByLabelText('Vencimento'), { target: { value: '10/05/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]).toMatchObject({ date: '2026-04-25', dueDate: '2026-05-10' });
+  });
+
+  test('always sends a null due date when the field is empty', async () => {
+    const { repo, saved } = makeSpyRepo();
+    renderWithClient(<AccountEditScreen repository={repo} onBack={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Água — abril' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'Utilidades' } });
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '25/04/2026' } });
+    fireEvent.change(screen.getByLabelText('Valor'), { target: { value: '124000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar conta' }));
+
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]).toHaveProperty('dueDate', null);
+  });
+
+  test('prefills and preserves the due date of an existing account', async () => {
+    const repository = new InMemoryAccountRepository([
+      buildAccount({ id: 'a-9', description: 'Energia', dueDate: '2026-05-10' }),
+    ]);
+    renderWithClient(
+      <AccountEditScreen repository={repository} accountId="a-9" onBack={jest.fn()} />,
+    );
+
+    expect(await screen.findByDisplayValue('10/05/2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /salvar alterações/i }));
+
+    await waitFor(async () =>
+      expect((await repository.getById('a-9'))?.dueDate).toBe('2026-05-10'),
+    );
+  });
+
   test('creates a new account with the typed amount in cents and navigates back', async () => {
     const repository = new InMemoryAccountRepository([]);
     const onBack = jest.fn();

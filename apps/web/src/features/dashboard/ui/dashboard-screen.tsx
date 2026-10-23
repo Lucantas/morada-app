@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -30,6 +31,7 @@ export function DashboardScreen({
   bottomNav,
   ensureMonthlyReceipts,
 }: Props) {
+  const condoName = useCondoName();
   const dashboard = useDashboard(repository);
   const [ensureError, setEnsureError] = useState(false);
 
@@ -47,7 +49,7 @@ export function DashboardScreen({
   return (
     <Screen>
       <TopBar
-        eyebrow="Condomínio Morada · Bloco 2"
+        eyebrow={condoName}
         title="Painel do administrador"
         right={
           <div style={{ display: 'flex', gap: 8 }}>

@@ -20,6 +20,10 @@ export const useCondoScope = create<CondoScopeState>()(
   ),
 );
 
+export function useCondoName(): string {
+  return useCondoScope((state) => state.condo?.name ?? '');
+}
+
 const API_PREFIX = '/api/';
 
 export function scopedApiPath(path: string, condoId: string | null): string {

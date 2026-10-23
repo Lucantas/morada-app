@@ -47,4 +47,22 @@ describe('saveAccount', () => {
       }),
     ).rejects.toBeInstanceOf(AccountValidationError);
   });
+
+  test('persists an optional due date and rejects a malformed one', async () => {
+    const repo = new InMemoryAccountRepository([]);
+    const base = {
+      description: 'Água',
+      category: 'Utilidades',
+      date: '2026-04-05',
+      valueCents: 1000,
+      status: 'pendente' as const,
+    };
+
+    const saved = await saveAccount(repo, { ...base, dueDate: '2026-05-10' });
+
+    expect(saved.dueDate).toBe('2026-05-10');
+    await expect(saveAccount(repo, { ...base, dueDate: '10/05/2026' })).rejects.toBeInstanceOf(
+      AccountValidationError,
+    );
+  });
 });

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { pendingReceipt } from '@/features/receipts/domain/pending-receipt';
 import type { Receipt } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
@@ -32,12 +33,13 @@ export function ResidentHomeScreen({
   onGoNotices,
   bottomNav,
 }: Props) {
+  const condoName = useCondoName();
   const home = useResidentHome(receiptRepository);
 
   return (
     <Screen>
       <TopBar
-        eyebrow={`${resident.apt} · Bloco 2`}
+        eyebrow={`${resident.apt} · ${condoName}`}
         title={`Olá, ${firstName(resident.name)}`}
         right={<NoticesButton onClick={onGoNotices} />}
       />

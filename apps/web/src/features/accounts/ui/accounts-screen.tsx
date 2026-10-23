@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { addMonths, formatIsoDate, formatMonthName } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -41,6 +42,7 @@ export function AccountsScreen({
   bottomNav,
   monthlyIncomeCents,
 }: Props) {
+  const condoName = useCondoName();
   const accounts = useAccounts(repository);
   const [filters, setFilters] = useState<AccountFilters>(emptyFilters);
 
@@ -71,7 +73,7 @@ export function AccountsScreen({
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Contas">
+      <TopBar eyebrow={condoName} title="Contas">
         <div
           style={{
             display: 'flex',

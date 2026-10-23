@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function ThreadScreen({ repository, threadId, onBack }: Props) {
+  const condoName = useCondoName();
   const thread = useThread(repository, threadId);
   const post = usePostMessage(repository);
   const markRead = useMarkRead(repository);
@@ -62,7 +64,7 @@ export function ThreadScreen({ repository, threadId, onBack }: Props) {
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Mensagens · Bloco 2
+            Mensagens · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             {title}

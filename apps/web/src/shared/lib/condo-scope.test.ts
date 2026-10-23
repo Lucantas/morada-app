@@ -1,6 +1,8 @@
 import { act } from '@testing-library/react';
 
-import { scopedApiPath, useCondoScope } from './condo-scope';
+import { renderHook } from '@testing-library/react';
+
+import { scopedApiPath, useCondoName, useCondoScope } from './condo-scope';
 
 describe('scopedApiPath', () => {
   test('prefixes /api paths with the condominium', () => {
@@ -33,5 +35,23 @@ describe('useCondoScope', () => {
   test('rename is a no-op without a condominium', () => {
     act(() => useCondoScope.getState().rename('Novo'));
     expect(useCondoScope.getState().condo).toBeNull();
+  });
+});
+
+describe('useCondoName', () => {
+  afterEach(() => act(() => useCondoScope.getState().setCondo(null)));
+
+  test('returns the current condominium name', () => {
+    act(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Residencial Ipê' }));
+
+    const { result } = renderHook(() => useCondoName());
+
+    expect(result.current).toBe('Residencial Ipê');
+  });
+
+  test('returns an empty string without a condominium', () => {
+    const { result } = renderHook(() => useCondoName());
+
+    expect(result.current).toBe('');
   });
 });

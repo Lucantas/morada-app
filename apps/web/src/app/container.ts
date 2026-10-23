@@ -1,4 +1,5 @@
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
+import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
 import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
 import { HttpDashboardRepository } from '@/features/dashboard/data/http-dashboard-repository';
 import { HttpIncomeRepository } from '@/features/income/data/http-income-repository';
@@ -36,6 +37,7 @@ export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
 export const settingsRepository = new HttpSettingsRepository(apiClient);
+export const condoInfoRepository = new HttpCondoInfoRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
 

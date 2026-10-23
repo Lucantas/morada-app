@@ -49,6 +49,23 @@ describe('condo-aware session', () => {
     expect(useCondoScope.getState().condo).toBeNull();
   });
 
+  test('signOut never exposes a role without a condo', () => {
+    applyLogin([{ id: 'c1', name: 'Morada', role: 'resident' }]);
+    const seen: { role: string | null; condo: unknown }[] = [];
+    const record = () =>
+      seen.push({
+        role: useSessionStore.getState().role,
+        condo: useCondoScope.getState().condo,
+      });
+    const stops = [useSessionStore.subscribe(record), useCondoScope.subscribe(record)];
+
+    act(() => useSessionStore.getState().signOut());
+    stops.forEach((stop) => stop());
+
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.some((state) => state.role !== null && state.condo === null)).toBe(false);
+  });
+
   test('boot with a session but no condo signs out', () => {
     act(() => useSessionStore.getState().authenticate('admin', null));
     act(() => useCondoScope.getState().setCondo(null));

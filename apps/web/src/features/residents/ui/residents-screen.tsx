@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -24,12 +25,13 @@ type Props = {
 };
 
 export function ResidentsScreen({ repository, onOpenResident, bottomNav }: Props) {
+  const condoName = useCondoName();
   const residents = useResidents(repository);
   const [query, setQuery] = useState('');
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Apartamentos">
+      <TopBar eyebrow={condoName} title="Apartamentos">
         <div style={{ position: 'relative', marginTop: 14 }}>
           <Icon
             name="search"
@@ -134,6 +136,7 @@ function ResidentsContent({
 }
 
 function ResidentRow({ resident, onClick }: { resident: Resident; onClick: () => void }) {
+  const condoName = useCondoName();
   const view = residentStatusView(resident.status);
   return (
     <SurfaceCard
@@ -158,7 +161,9 @@ function ResidentRow({ resident, onClick }: { resident: Resident; onClick: () =>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '1rem' }}>{resident.apt}</div>
-        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>{resident.name} · Bloco 2</div>
+        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
+          {resident.name} · {condoName}
+        </div>
       </div>
       <StatusPill tone={view.tone} label={view.label} />
       <Icon name="chevronRight" size={18} color="var(--ink-300)" style={{ flex: 'none' }} />

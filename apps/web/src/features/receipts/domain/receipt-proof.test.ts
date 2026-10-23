@@ -14,27 +14,56 @@ const paid: Receipt = {
 
 describe('buildReceiptProof', () => {
   test('renders a self-contained HTML document', () => {
-    const proof = buildReceiptProof(paid, { name: 'Maria Ribeiro', apt: 'Apto 302' });
+    const proof = buildReceiptProof(
+      paid,
+      { name: 'Maria Ribeiro', apt: 'Apto 302' },
+      'Residencial Ipê',
+    );
     expect(proof.startsWith('<!doctype html>')).toBe(true);
     expect(proof).toContain('<html lang="pt-BR">');
-    expect(proof).toContain('Condomínio · Bloco 2');
     expect(proof).toContain('Comprovante de pagamento');
   });
 
+  test('prints the condo name as the title', () => {
+    const proof = buildReceiptProof(
+      paid,
+      { name: 'Maria Ribeiro', apt: 'Apto 302' },
+      'Residencial Ipê',
+    );
+    expect(proof).toContain('<h1 class="title">Residencial Ipê</h1>');
+  });
+
+  test('escapes the condo name', () => {
+    const proof = buildReceiptProof(paid, { name: 'X', apt: 'Y' }, '<i>Ipê</i>');
+    expect(proof).toContain('&lt;i&gt;Ipê&lt;/i&gt;');
+  });
+
   test('shows the paid amount as the headline value', () => {
-    const proof = buildReceiptProof(paid, { name: 'Maria Ribeiro', apt: 'Apto 302' });
+    const proof = buildReceiptProof(
+      paid,
+      { name: 'Maria Ribeiro', apt: 'Apto 302' },
+      'Residencial Ipê',
+    );
     expect(proof).toContain('Valor pago');
     expect(proof).toContain('R$ 450,00');
   });
 
   test('includes the resident data with the apartment number', () => {
-    const proof = buildReceiptProof(paid, { name: 'Maria Ribeiro', apt: 'Apto 302' });
+    const proof = buildReceiptProof(
+      paid,
+      { name: 'Maria Ribeiro', apt: 'Apto 302' },
+      'Residencial Ipê',
+    );
     expect(proof).toContain('Maria Ribeiro');
     expect(proof).toContain('>302<');
   });
 
   test('includes the payment details with formatted dates and method', () => {
-    const proof = buildReceiptProof(paid, { name: 'Maria Ribeiro', apt: 'Apto 302' });
+    const proof = buildReceiptProof(
+      paid,
+      { name: 'Maria Ribeiro', apt: 'Apto 302' },
+      'Residencial Ipê',
+    );
     expect(proof).toContain('03/2026');
     expect(proof).toContain('Taxa condominial');
     expect(proof).toContain('Pix');
@@ -43,12 +72,20 @@ describe('buildReceiptProof', () => {
   });
 
   test('omits the payment method row when there is none', () => {
-    const proof = buildReceiptProof({ ...paid, method: undefined }, { name: 'X', apt: 'Y' });
+    const proof = buildReceiptProof(
+      { ...paid, method: undefined },
+      { name: 'X', apt: 'Y' },
+      'Residencial Ipê',
+    );
     expect(proof).not.toContain('Forma de pagamento');
   });
 
   test('omits the due date row when there is none', () => {
-    const proof = buildReceiptProof({ ...paid, dueDate: null }, { name: 'X', apt: 'Y' });
+    const proof = buildReceiptProof(
+      { ...paid, dueDate: null },
+      { name: 'X', apt: 'Y' },
+      'Residencial Ipê',
+    );
     expect(proof).not.toContain('Vencimento');
   });
 
@@ -56,6 +93,7 @@ describe('buildReceiptProof', () => {
     const proof = buildReceiptProof(
       { ...paid, title: '<script>alert(1)</script>' },
       { name: 'Maria <b>R</b>', apt: 'Apto 302' },
+      'Residencial Ipê',
     );
     expect(proof).not.toContain('<script>alert(1)</script>');
     expect(proof).toContain('&lt;script&gt;');

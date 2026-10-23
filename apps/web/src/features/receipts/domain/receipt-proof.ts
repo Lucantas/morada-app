@@ -30,6 +30,7 @@ function detailRow(label: string, value: string): string {
 export function buildReceiptProof(
   receipt: Receipt,
   resident: { name: string; apt: string },
+  condoName: string,
 ): string {
   const rows = [
     detailRow('Referência', receipt.ref),
@@ -157,7 +158,7 @@ export function buildReceiptProof(
 <body>
   <main class="sheet">
     <header>
-      <h1 class="title">Condomínio · Bloco 2</h1>
+      <h1 class="title">${escapeHtml(condoName)}</h1>
       <p class="subtitle">Comprovante de pagamento</p>
     </header>
     <hr class="divider" />

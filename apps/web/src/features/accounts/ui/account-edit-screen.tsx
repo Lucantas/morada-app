@@ -1,7 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
+import { scopedApiPath, useCondoScope, useCondoName } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -23,6 +23,7 @@ const EMPTY = {
   description: '',
   category: '',
   date: '',
+  dueDate: '',
   valueCents: 0,
   status: 'pendente' as AccountStatus,
   proofDataUrl: undefined as string | undefined,
@@ -35,6 +36,7 @@ type Props = {
 };
 
 export function AccountEditScreen({ repository, accountId, onBack }: Props) {
+  const condoName = useCondoName();
   const condoId = useCondoScope((s) => s.condo?.id ?? null);
   const existing = useQuery({
     queryKey: [...accountsQueryKey, accountId],
@@ -51,8 +53,16 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
 
   useEffect(() => {
     if (existing.data) {
-      const { description, category, date, valueCents, status } = existing.data;
-      setForm((prev) => ({ ...prev, description, category, date: date ?? '', valueCents, status }));
+      const { description, category, date, dueDate, valueCents, status } = existing.data;
+      setForm((prev) => ({
+        ...prev,
+        description,
+        category,
+        date: date ?? '',
+        dueDate: dueDate ?? '',
+        valueCents,
+        status,
+      }));
     }
   }, [existing.data]);
 
@@ -83,7 +93,15 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
       return;
     }
     setValidationError(null);
-    save.mutate({ ...form, id: accountId, proofDataUrl: form.proofDataUrl }, { onSuccess: onBack });
+    save.mutate(
+      {
+        ...form,
+        dueDate: form.dueDate === '' ? null : form.dueDate,
+        id: accountId,
+        proofDataUrl: form.proofDataUrl,
+      },
+      { onSuccess: onBack },
+    );
   };
 
   const title = accountId ? (existing.data?.description ?? 'Editar conta') : 'Nova conta';
@@ -120,7 +138,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Contas · Bloco 2
+            Contas · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             {title}
@@ -144,6 +162,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
               placeholder="Ex.: Utilidades"
             />
             <DateInput label="Data" value={form.date} onChange={set('date')} />
+            <DateInput label="Vencimento" value={form.dueDate} onChange={set('dueDate')} />
             <MoneyInput
               label="Valor"
               value={form.valueCents}

@@ -7,6 +7,12 @@ import type { CategoryRepository } from '@/features/categories/domain/category-r
 import { InMemoryCategoryRepository } from '@/features/categories/data/in-memory-category-repository';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
 
+import { InMemoryCondoInfoRepository } from '@/features/condos/data/in-memory-condo-info-repository';
+import type { CondoInfoRepository } from '@/features/condos/domain/condo-info-repository';
+import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
+import { useCondoScope } from '@/shared/lib/condo-scope';
+import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
+
 import type { SettingsRepository } from '../domain/settings-repository';
 import { InMemorySettingsRepository } from '../data/in-memory-settings-repository';
 import { SettingsScreen } from './settings-screen';
@@ -16,18 +22,30 @@ function renderWithClient(ui: ReactElement) {
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
+const defaultCondoInfo = () => new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+
+beforeEach(() => setTestCondo());
+afterEach(() => clearTestCondo());
+
 function Harness({
   settings,
   categoryRepo,
+  condoInfo = defaultCondoInfo(),
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
+  condoInfo?: CondoInfoRepository;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
+  const info = useCondoInfo(condoInfo);
+  const rename = useRenameCondo(condoInfo);
   return (
     <SettingsScreen
       repository={settings}
+      condoName={info.data?.name}
+      savingCondoName={rename.isPending}
+      onRenameCondo={(name) => rename.mutateAsync(name)}
       categories={categories.data}
       categoriesError={categories.isError}
       categoriesReady={categories.isSuccess}
@@ -46,6 +64,69 @@ function renderScreen(
 }
 
 describe('SettingsScreen', () => {
+  test('renames the condominium', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo = new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+      />,
+    );
+
+    const field = await screen.findByDisplayValue(TEST_CONDO_NAME);
+    await user.clear(field);
+    await user.type(field, 'Edifício Aurora');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await waitFor(() => expect(condoInfo.snapshot().name).toBe('Edifício Aurora'));
+    await waitFor(() => expect(useCondoScope.getState().condo?.name).toBe('Edifício Aurora'));
+  });
+
+  test('does not rename when the name is unchanged', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo = new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+    const rename = jest.spyOn(condoInfo, 'rename');
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+      />,
+    );
+
+    await screen.findByDisplayValue(TEST_CONDO_NAME);
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(rename).not.toHaveBeenCalled();
+  });
+
+  test('shows an error and keeps the old name when the rename is rejected', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo = new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+    jest.spyOn(condoInfo, 'rename').mockRejectedValue(new Error('Acesso negado'));
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+      />,
+    );
+
+    const field = await screen.findByDisplayValue(TEST_CONDO_NAME);
+    await user.clear(field);
+    await user.type(field, 'Outro');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Acesso negado');
+    expect(useCondoScope.getState().condo?.name).toBe(TEST_CONDO_NAME);
+  });
+
   it('loads the current fee and saves an edited value as cents', async () => {
     const repo = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
     renderScreen(repo);

@@ -1,5 +1,5 @@
 const API_ORIGIN = 'https://morada-api.fly.dev';
-const PROXIED_PREFIXES = ['/api/', '/auth/'];
+const PROXIED_PREFIXES = ['/api/', '/auth/', '/me/'];
 
 export default {
   async fetch(request, env) {
