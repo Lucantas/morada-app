@@ -121,6 +121,20 @@ were.
 Migrations `015`–`018` restructure the schema around condominiums. They run on
 release (`release_command`), so back up first.
 
+**Merging this branch to `main` IS the production deploy.** A green CI run on `main`
+triggers `.github/workflows/deploy.yml`, whose Fly `release_command` runs migrations
+`015`–`018` against Neon, and `.github/workflows/deploy-web.yml` deploys the web to
+Cloudflare Pages in parallel. Therefore take the Neon `pg_dump` and the pre-deploy row
+counts (step 1) BEFORE merging, not after.
+
+Mixed-version window: until Fly swaps the old API machines for the new release, the old
+API runs against the already-migrated schema, and the new web and the new API are not
+deployed atomically (new web against old API, or the reverse, depending on which
+pipeline finishes first). Expect brief login errors and 404s during this window; since
+every session is invalidated anyway (step 4), everyone logs in again afterwards. To
+narrow the window, deploy the API first and let it finish, then run `deploy-web.yml`
+manually (`workflow_dispatch`) instead of relying on the parallel run.
+
 1. **Take a `pg_dump` BEFORE deploying** (see Database backup & restore above):
 
    ```bash

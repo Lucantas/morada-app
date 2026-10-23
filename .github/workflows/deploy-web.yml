@@ -1,8 +1,8 @@
 name: Deploy Web
 
 # Builds the web and deploys it to Cloudflare Pages on a green CI run on main,
-# and on manual dispatch. The Pages worker (public/_worker.js) proxies /api/*
-# and /auth/* to the API origin, so the web calls it same-origin and no
+# and on manual dispatch. The Pages worker (public/_worker.js) proxies /api/*,
+# /auth/* and /me/* to the API origin, so the web calls it same-origin and no
 # cross-site API URL is needed at build time.
 on:
   workflow_dispatch:
