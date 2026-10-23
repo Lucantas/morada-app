@@ -128,7 +128,21 @@ release (`release_command`), so back up first.
      pg_dump -U morada -d morada --no-owner --no-privileges > backups/morada-pre-multicondo-$(date +%Y%m%d-%H%M%S).sql
    ```
 
-   For Neon, dump with the direct URL the same way and keep the file.
+   For Neon, dump with the direct URL the same way and keep the file. Also record the
+   per-table row counts to compare against after the deploy:
+
+   ```sql
+   SELECT 'apartments' t, count(*) FROM apartments
+   UNION ALL SELECT 'residents', count(*) FROM residents
+   UNION ALL SELECT 'accounts', count(*) FROM accounts
+   UNION ALL SELECT 'receipts', count(*) FROM receipts
+   UNION ALL SELECT 'notices', count(*) FROM notices
+   UNION ALL SELECT 'threads', count(*) FROM threads
+   UNION ALL SELECT 'categories', count(*) FROM categories
+   UNION ALL SELECT 'incomes', count(*) FROM incomes
+   UNION ALL SELECT 'condo_settings', count(*) FROM condo_settings
+   ORDER BY 1;
+   ```
 
 2. **What the migrations do**
    - `015_tenancy`: creates `organizations`, `condominiums`, `organization_members`,
@@ -145,12 +159,24 @@ release (`release_command`), so back up first.
 
 3. **Rollback = restore the `pg_dump`.** Reverting the app image alone is NOT safe:
    `015` drops `condo_settings.id`, so the old code cannot run against the new schema.
-   Restore the dump (including `_migrations`) and redeploy the previous image.
+   The dump is plain SQL without `DROP` statements, so restoring onto the
+   already-migrated database would collide. First reset the target (drop and recreate
+   the `public` schema, or drop and recreate the database), then load the dump, then
+   redeploy the previous image:
+
+   ```bash
+   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f backups/<pre-multicondo dump>.sql
+   ```
+
+   The dump includes `_migrations`, so the restored database is back at schema `014`.
 
 4. **Sessions:** the JWT shape changed, so login sessions issued before the deploy are
    invalidated and everyone has to log in again.
 
 5. **Post-deploy verification** (run with `psql` against the target database):
+
+   Per-table counts by condominium (must equal the pre-deploy totals from step 1, all under `condo-legacy`):
 
    ```sql
    SELECT 'apartments' t, condominium_id, count(*) FROM apartments GROUP BY 2
@@ -165,28 +191,51 @@ release (`release_command`), so back up first.
    ORDER BY 1, 2;
    ```
 
-   Counts per table must equal the pre-deploy counts, all under `condo-legacy`. Zero
-   NULL `condominium_id` (the columns are `NOT NULL`, so this also confirms the
-   constraint held):
+   NULL `condominium_id` (the columns are `NOT NULL`, so this is redundant, but must return `0`):
 
    ```sql
-   SELECT count(*) FROM apartments WHERE condominium_id IS NULL;
-   SELECT count(*) FROM receipts WHERE condominium_id IS NULL;
+   SELECT (SELECT count(*) FROM apartments WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM residents WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM accounts WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM receipts WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM notices WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM threads WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM categories WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM incomes WHERE condominium_id IS NULL)
+        + (SELECT count(*) FROM condo_settings WHERE condominium_id IS NULL) AS null_rows;
    ```
 
-   Repeat for the other tables; every result must be `0`. Legacy memberships:
+   Legacy membership mismatches (every query must return **0 rows**):
 
    ```sql
-   SELECT u.username, u.role AS user_role, r.role AS condo_role
-   FROM condo_roles r JOIN users u ON u.id = r.user_id
-   WHERE r.condominium_id = 'condo-legacy' ORDER BY 1;
+   -- resident users without an active morador role in condo-legacy
+   SELECT u.username FROM users u
+   JOIN residents r ON r.id = u.resident_id
+   WHERE u.role = 'resident'
+     AND NOT EXISTS (
+       SELECT 1 FROM condo_roles c
+       WHERE c.user_id = u.id AND c.condominium_id = 'condo-legacy'
+         AND c.role = 'morador' AND c.active
+     );
 
-   SELECT u.username, m.role FROM organization_members m
-   JOIN users u ON u.id = m.user_id WHERE m.organization_id = 'org-legacy';
+   -- admin users without an owner row in org-legacy
+   SELECT u.username FROM users u
+   WHERE u.role = 'admin'
+     AND NOT EXISTS (
+       SELECT 1 FROM organization_members m
+       WHERE m.user_id = u.id AND m.organization_id = 'org-legacy'
+         AND m.role = 'owner' AND m.active
+     );
+
+   -- admin users without an administrador row in condo-legacy
+   SELECT u.username FROM users u
+   WHERE u.role = 'admin'
+     AND NOT EXISTS (
+       SELECT 1 FROM condo_roles c
+       WHERE c.user_id = u.id AND c.condominium_id = 'condo-legacy'
+         AND c.role = 'administrador' AND c.active
+     );
    ```
-
-   Expected: the admin is `owner` of `org-legacy` and `administrador` of `condo-legacy`;
-   each resident user is `morador` of `condo-legacy`.
 
 ## CI auto-deploy
 
