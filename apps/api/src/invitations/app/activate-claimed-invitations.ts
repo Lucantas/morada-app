@@ -15,22 +15,24 @@ export async function grantInvitation(
   invitation: Invitation,
   userId: string,
   at: Date,
-): Promise<void> {
+): Promise<boolean> {
+  if (!(await deps.invitations.accept(invitation.id, userId, at))) return false;
   const { condominiumId, residentId } = invitation;
   await deps.condos.grant({ condominiumId, userId, role: 'morador', residentId });
-  await deps.invitations.accept(invitation.id, at);
   await deps.condos.deactivateResidentGrants(condominiumId, residentId, userId);
+  return true;
 }
 
 export interface ActivateClaimedDeps extends GrantInvitationDeps {
+  condos: GrantInvitationDeps['condos'] & Pick<CondoRepository, 'isOperational'>;
   users: Pick<UserRepository, 'findById'>;
   residentsFor: ResidentsFor;
   now: () => Date;
 }
 
-async function residentIsActive(deps: ActivateClaimedDeps, invitation: Invitation) {
+async function stillUsable(deps: ActivateClaimedDeps, invitation: Invitation): Promise<boolean> {
   const resident = await deps.residentsFor(invitation.condominiumId).getById(invitation.residentId);
-  return resident?.active === true;
+  return resident?.active === true && (await deps.condos.isOperational(invitation.condominiumId));
 }
 
 export async function activateClaimedInvitations(
@@ -41,8 +43,6 @@ export async function activateClaimedInvitations(
   if (!user || user.email === null || user.emailVerifiedAt === null) return;
   const now = deps.now();
   for (const invitation of await deps.invitations.claimedBy(userId, now)) {
-    if (await residentIsActive(deps, invitation)) {
-      await grantInvitation(deps, invitation, userId, now);
-    }
+    if (await stillUsable(deps, invitation)) await grantInvitation(deps, invitation, userId, now);
   }
 }

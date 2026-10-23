@@ -144,6 +144,7 @@ describe('acceptInvitation', () => {
     const user = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
+      name: 'Maria',
     });
 
     expect(user).toEqual(account());
@@ -173,6 +174,7 @@ describe('acceptInvitation', () => {
     const user = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
+      name: 'Maria',
     });
 
     expect(user.emailVerifiedAt).toBeNull();
@@ -187,7 +189,11 @@ describe('acceptInvitation', () => {
       invitation: { email: null, claimedBy: 'u-maria' },
     });
 
-    await acceptInvitation(deps, TOKEN, { email: 'maria@x.com', password: 'senha-antiga' });
+    await acceptInvitation(deps, TOKEN, {
+      email: 'maria@x.com',
+      password: 'senha-antiga',
+      name: 'Maria',
+    });
 
     expect(invitations.byId('inv-1')?.status).toBe('aceito');
   });
@@ -228,6 +234,33 @@ describe('acceptInvitation', () => {
     await expect(
       acceptInvitation(inactive.deps, TOKEN, { password: 'senha-segura', name: 'Maria' }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+
+  test('a WhatsApp invite answers the same 400 for a body unfit for a new account, account or not', async () => {
+    const existing = setup({ users: [account()], invitation: { email: null } });
+    const fresh = setup({ invitation: { email: null } });
+    const body = { email: 'maria@x.com', password: 'senha-antiga' };
+
+    const answers = await Promise.all(
+      [existing, fresh].map(({ deps }) =>
+        acceptInvitation(deps, TOKEN, body).catch((error: unknown) => error),
+      ),
+    );
+
+    expect(answers.map((e) => (e as { name?: string }).name)).toEqual(['ZodError', 'ZodError']);
+    expect(existing.invitations.byId('inv-1')?.claimedBy).toBeNull();
+    expect(fresh.users.all()).toEqual([]);
+  });
+
+  test('an invite revoked between claim and accept grants nothing', async () => {
+    const { deps, condos } = setup({ users: [account()] });
+    const racing = { ...deps, invitations: { ...deps.invitations, accept: async () => false } };
+
+    await expect(
+      acceptInvitation(racing, TOKEN, { password: 'senha-antiga' }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(condos.grants()).toEqual([]);
+    expect(condos.deactivations()).toEqual([]);
   });
 
   test('accept is single use', async () => {

@@ -26,6 +26,7 @@ export interface SignUpDeps {
   email: EmailSender;
   appUrl: string;
   now: () => Date;
+  onCredentialsReplaced: (userId: string) => Promise<void>;
 }
 
 async function warnOwner(deps: SignUpDeps, owner: { id: string; email: string }): Promise<void> {
@@ -38,6 +39,7 @@ async function takeOverUnverified(
   owner: { id: string; email: string },
   credentials: { name: string; passwordHash: string },
 ): Promise<void> {
+  await deps.onCredentialsReplaced(owner.id);
   await deps.users.updateCredentialsAndBump(owner.id, credentials);
   await deps.tokens.revokeAll(owner.id, 'confirm_email', deps.now());
   await issueConfirmation(deps, owner);

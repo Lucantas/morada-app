@@ -44,6 +44,7 @@ function setup(user: User = ana) {
   const users = inMemoryUsers([user]);
   const tokens = inMemoryAuthTokens();
   const confirmed: string[] = [];
+  const events: string[] = [];
   const deps = {
     users,
     tokens,
@@ -51,17 +52,23 @@ function setup(user: User = ana) {
     now: () => NOW,
     afterEmailConfirmed: async (userId: string) => {
       confirmed.push(userId);
+      events.push(`confirmed:${userId}`);
+    },
+    onCredentialsReplaced: async (userId: string) => {
+      events.push(`released:${userId}:${(await users.findById(userId))?.passwordHash ?? ''}`);
     },
   };
-  return { users, tokens, deps, confirmed };
+  return { users, tokens, deps, confirmed, events };
 }
 
 describe('resetPassword', () => {
   test('sets the new hash, verifies the e-mail, bumps the session and runs the hook', async () => {
-    const { users, tokens, deps, confirmed } = setup();
+    const { users, tokens, deps, confirmed, events } = setup();
     const token = await issue(tokens);
 
     const user = await resetPassword(deps, { token, password: 'nova-senha-1' });
+
+    expect(events).toEqual(['released:u-ana:hash:old', 'confirmed:u-ana']);
 
     const stored = await users.findById('u-ana');
     expect(stored).toEqual({
@@ -76,10 +83,12 @@ describe('resetPassword', () => {
 
   test('an already verified e-mail keeps its date and skips the hook', async () => {
     const earlier = new Date('2026-01-01T00:00:00.000Z');
-    const { users, tokens, deps, confirmed } = setup({ ...ana, emailVerifiedAt: earlier });
+    const { users, tokens, deps, confirmed, events } = setup({ ...ana, emailVerifiedAt: earlier });
     const token = await issue(tokens);
 
     await resetPassword(deps, { token, password: 'nova-senha-1' });
+
+    expect(events).toEqual([]);
 
     expect((await users.findById('u-ana'))?.emailVerifiedAt).toEqual(earlier);
     expect(confirmed).toEqual([]);

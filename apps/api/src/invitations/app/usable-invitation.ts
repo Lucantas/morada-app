@@ -11,7 +11,7 @@ export type ResidentsFor = (condominiumId: string) => Pick<ResidentRepository, '
 
 export interface UsableInvitationDeps {
   invitations: InvitationTokenRepository;
-  condos: Pick<CondoRepository, 'getById'>;
+  condos: Pick<CondoRepository, 'getById' | 'isOperational'>;
   residentsFor: ResidentsFor;
   now: () => Date;
 }
@@ -31,6 +31,6 @@ export async function findUsableInvitation(
   const resident = await deps.residentsFor(invitation.condominiumId).getById(invitation.residentId);
   if (!resident?.active) throw new InvalidInvitationError();
   const condo = await deps.condos.getById(invitation.condominiumId);
-  if (!condo?.active) throw new InvalidInvitationError();
+  if (!condo || !(await deps.condos.isOperational(condo.id))) throw new InvalidInvitationError();
   return { invitation, resident, condo };
 }

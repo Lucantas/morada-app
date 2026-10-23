@@ -121,6 +121,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       signupLimiter,
       afterEmailConfirmed: activateClaimed,
       onVerifiedLogin: activateClaimed,
+      onCredentialsReplaced: (userId) => repos.invitationTokens.releaseClaims(userId),
     }),
   );
   app.route(

@@ -139,13 +139,20 @@ export class PostgresInvitationTokenRepository implements InvitationTokenReposit
     return (result.rowCount ?? 0) > 0;
   }
 
-  async accept(id: string, at: Date): Promise<boolean> {
+  async accept(id: string, userId: string, at: Date): Promise<boolean> {
     const result = await this.pool.query(
-      `UPDATE invitations SET status = 'aceito', accepted_at = $2
-       WHERE id = $1 AND status = 'pendente'`,
-      [id, at],
+      `UPDATE invitations SET status = 'aceito', accepted_at = $3
+       WHERE id = $1 AND claimed_by = $2 AND status = 'pendente'`,
+      [id, userId, at],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async releaseClaims(userId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE invitations SET claimed_by = NULL WHERE claimed_by = $1 AND status = 'pendente'`,
+      [userId],
+    );
   }
 
   async claimedBy(userId: string, now: Date = new Date()): Promise<Invitation[]> {

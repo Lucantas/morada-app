@@ -128,6 +128,15 @@ export class PostgresCondoRepository implements CondoRepository {
     return rows[0] ? toCondominium(rows[0]) : null;
   }
 
+  async isOperational(condominiumId: string): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM condominiums c JOIN organizations o ON o.id = c.organization_id
+       WHERE c.id = $1 AND c.active AND o.active`,
+      [condominiumId],
+    );
+    return rows.length > 0;
+  }
+
   async rename(condominiumId: string, name: string): Promise<Condominium> {
     const parsedName = condominiumSchema.shape.name.parse(name);
     const { rows } = await this.pool.query(
@@ -198,7 +207,8 @@ export class PostgresCondoRepository implements CondoRepository {
   ): Promise<void> {
     await this.pool.query(
       `UPDATE condo_roles SET active = FALSE
-       WHERE condominium_id = $1 AND resident_id = $2 AND user_id <> $3 AND active`,
+       WHERE condominium_id = $1 AND resident_id = $2 AND user_id <> $3
+         AND role = 'morador' AND active`,
       [condominiumId, residentId, exceptUserId],
     );
   }

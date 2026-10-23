@@ -153,12 +153,15 @@ export function runInvitationRepositoryContract(
       expect(await tokens.claim(next.id, CONTRACT_CLAIMER_ID)).toBe(false);
     });
 
-    test('accept moves pending to aceito only once', async () => {
+    test('accept moves a pending invitation claimed by that user to aceito only once', async () => {
       const { invitations, tokens } = await makeRepos('condo-a');
       const created = await invitations.create(input('h1'), NOW);
+      expect(await tokens.accept(created.id, CONTRACT_CLAIMER_ID, NOW)).toBe(false);
+      await tokens.claim(created.id, CONTRACT_CLAIMER_ID);
 
-      expect(await tokens.accept(created.id, NOW)).toBe(true);
-      expect(await tokens.accept(created.id, NOW)).toBe(false);
+      expect(await tokens.accept(created.id, CONTRACT_ADMIN_ID, NOW)).toBe(false);
+      expect(await tokens.accept(created.id, CONTRACT_CLAIMER_ID, NOW)).toBe(true);
+      expect(await tokens.accept(created.id, CONTRACT_CLAIMER_ID, NOW)).toBe(false);
 
       const accepted = await invitations.latestForResident(CONTRACT_RESIDENT_A, NOW);
       expect(accepted?.status).toBe('aceito');
@@ -175,8 +178,28 @@ export function runInvitationRepositoryContract(
       ]);
       expect(await tokens.claimedBy(CONTRACT_ADMIN_ID, NOW)).toEqual([]);
 
-      await tokens.accept(created.id, NOW);
+      await tokens.accept(created.id, CONTRACT_CLAIMER_ID, NOW);
       expect(await tokens.claimedBy(CONTRACT_CLAIMER_ID, NOW)).toEqual([]);
+    });
+
+    test('releaseClaims frees only the pending claims of that user', async () => {
+      const { invitations, tokens } = await makeRepos('condo-a');
+      const b = await makeRepos('condo-b');
+      const accepted = await b.invitations.create(
+        { ...input('hb'), residentId: CONTRACT_RESIDENT_B },
+        NOW,
+      );
+      await tokens.claim(accepted.id, CONTRACT_CLAIMER_ID);
+      await tokens.accept(accepted.id, CONTRACT_CLAIMER_ID, NOW);
+      const pending = await invitations.create(input('h1'), NOW);
+      await tokens.claim(pending.id, CONTRACT_CLAIMER_ID);
+
+      await tokens.releaseClaims(CONTRACT_CLAIMER_ID);
+
+      expect((await tokens.findByTokenHash('h1', NOW))?.claimedBy).toBeNull();
+      expect((await tokens.findByTokenHash('h1', NOW))?.status).toBe('pendente');
+      expect((await tokens.findByTokenHash('hb', NOW))?.claimedBy).toBe(CONTRACT_CLAIMER_ID);
+      expect(await tokens.claim(pending.id, CONTRACT_ADMIN_ID)).toBe(true);
     });
   });
 }

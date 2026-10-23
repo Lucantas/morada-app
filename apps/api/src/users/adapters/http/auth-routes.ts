@@ -67,6 +67,7 @@ export function authRoutes(deps: {
   signupLimiter: RateLimiter;
   afterEmailConfirmed: (userId: string) => Promise<void>;
   onVerifiedLogin: (userId: string) => Promise<void>;
+  onCredentialsReplaced: (userId: string) => Promise<void>;
 }) {
   const app = new Hono<ApiEnv>();
 
@@ -109,6 +110,7 @@ export function authRoutes(deps: {
         email: deps.email,
         appUrl: deps.appUrl,
         now: deps.now,
+        onCredentialsReplaced: deps.onCredentialsReplaced,
       },
       await readJson(c),
     );
@@ -158,6 +160,7 @@ export function authRoutes(deps: {
         hasher: deps.hasher,
         now: deps.now,
         afterEmailConfirmed: deps.afterEmailConfirmed,
+        onCredentialsReplaced: deps.onCredentialsReplaced,
       },
       { token, password },
     );

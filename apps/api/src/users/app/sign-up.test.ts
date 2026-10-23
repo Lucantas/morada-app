@@ -30,8 +30,19 @@ function setup(initial: User[] = []) {
   const users = inMemoryUsers(initial);
   const tokens = inMemoryAuthTokens();
   const email = new InMemoryEmailSender();
-  const deps = { users, tokens, hasher, email, appUrl: APP_URL, now: () => NOW };
-  return { users, tokens, email, deps };
+  const released: string[] = [];
+  const deps = {
+    users,
+    tokens,
+    hasher,
+    email,
+    appUrl: APP_URL,
+    now: () => NOW,
+    onCredentialsReplaced: async (userId: string) => {
+      released.push(`${userId}:${(await users.findById(userId))?.passwordHash ?? ''}`);
+    },
+  };
+  return { users, tokens, email, deps, released };
 }
 
 function tokenFrom(text: string, route: string): string {
@@ -103,7 +114,7 @@ describe('signUp', () => {
 
   test('an unverified e-mail takes the new credentials, ends sessions and gets a fresh link', async () => {
     const unverified: User = { ...existing, emailVerifiedAt: null, sessionVersion: 4 };
-    const { users, email, tokens, deps } = setup([unverified]);
+    const { users, email, tokens, deps, released } = setup([unverified]);
     const atomic = jest.spyOn(users, 'updateCredentialsAndBump');
     await tokens.issue({
       userId: 'u-ana',
@@ -123,6 +134,7 @@ describe('signUp', () => {
       },
     ]);
     expect(atomic).toHaveBeenCalledTimes(1);
+    expect(released).toEqual([`u-ana:${unverified.passwordHash}`]);
     expect(atomic).toHaveBeenCalledWith('u-ana', {
       name: 'Ana Real',
       passwordHash: 'hash:senha-nova-1',

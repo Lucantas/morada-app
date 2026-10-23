@@ -17,6 +17,7 @@ export interface CondoInvitationRepository {
 export interface InvitationTokenRepository {
   findByTokenHash(hash: string, now?: Date): Promise<Invitation | null>;
   claim(id: string, userId: string): Promise<boolean>;
-  accept(id: string, at: Date): Promise<boolean>;
+  accept(id: string, userId: string, at: Date): Promise<boolean>;
+  releaseClaims(userId: string): Promise<void>;
   claimedBy(userId: string, now?: Date): Promise<Invitation[]>;
 }

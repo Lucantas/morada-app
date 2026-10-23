@@ -37,10 +37,19 @@ export function inMemoryInvitationTokens(
       update(id, (i) =>
         i.claimedBy === null && stored(i) === 'pendente' ? { ...i, claimedBy: userId } : null,
       ),
-    accept: async (id, at) =>
+    accept: async (id, userId, at) =>
       update(id, (i) =>
-        stored(i) === 'pendente' ? { ...i, status: 'aceito', acceptedAt: at } : null,
+        stored(i) === 'pendente' && i.claimedBy === userId
+          ? { ...i, status: 'aceito', acceptedAt: at }
+          : null,
       ),
+    releaseClaims: async (userId) => {
+      rows = rows.map((r) =>
+        r.invitation.claimedBy === userId && stored(r.invitation) === 'pendente'
+          ? { ...r, invitation: { ...r.invitation, claimedBy: null } }
+          : r,
+      );
+    },
     claimedBy: async (userId, now = new Date()) =>
       rows
         .map((r) => r.invitation)
@@ -49,7 +58,10 @@ export function inMemoryInvitationTokens(
   };
 }
 
-export type FakeCondos = Pick<CondoRepository, 'getById' | 'grant' | 'deactivateResidentGrants'> & {
+export type FakeCondos = Pick<
+  CondoRepository,
+  'getById' | 'isOperational' | 'grant' | 'deactivateResidentGrants'
+> & {
   grants: () => CondoGrant[];
   deactivations: () => { condominiumId: string; residentId: string; exceptUserId: string }[];
 };
@@ -61,6 +73,7 @@ export function fakeCondos(condos: Condominium[]): FakeCondos {
     grants: () => grants,
     deactivations: () => deactivations,
     getById: async (id) => condos.find((c) => c.id === id) ?? null,
+    isOperational: async (id) => condos.find((c) => c.id === id)?.active === true,
     grant: async (grant) => {
       grants = [...grants, grant];
     },

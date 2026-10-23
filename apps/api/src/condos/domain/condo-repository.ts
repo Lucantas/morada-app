@@ -19,6 +19,7 @@ export interface CondoRepository {
   listForUser(userId: string): Promise<CondoAccess[]>;
   accessFor(userId: string, condominiumId: string): Promise<CondoAccess | null>;
   getById(condominiumId: string): Promise<Condominium | null>;
+  isOperational(condominiumId: string): Promise<boolean>;
   rename(condominiumId: string, name: string): Promise<Condominium>;
   create(input: CreateCondominiumInput): Promise<Condominium>;
   createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }>;

@@ -47,6 +47,16 @@ async function claimFor(
   if (!(await deps.invitations.claim(invitation.id, userId))) throw new InvalidInvitationError();
 }
 
+async function grantOrFail(
+  deps: AcceptInvitationDeps,
+  invitation: Invitation,
+  userId: string,
+): Promise<void> {
+  if (!(await grantInvitation(deps, invitation, userId, deps.now()))) {
+    throw new InvalidInvitationError();
+  }
+}
+
 async function sendConfirmation(deps: AcceptInvitationDeps, user: { id: string; email: string }) {
   await deps.tokens.revokeAll(user.id, 'confirm_email', deps.now());
   await issueConfirmation(deps, user);
@@ -71,12 +81,12 @@ async function acceptAsExisting(
   await claimFor(deps, invitation, user.id);
 
   if (user.emailVerifiedAt !== null) {
-    await grantInvitation(deps, invitation, user.id, deps.now());
+    await grantOrFail(deps, invitation, user.id);
     return user;
   }
   if (invitation.email !== null) {
     const verified = await verifyByInvitation(deps, user);
-    await grantInvitation(deps, invitation, user.id, deps.now());
+    await grantOrFail(deps, invitation, user.id);
     await deps.activateClaimed(user.id);
     return verified;
   }
@@ -119,7 +129,7 @@ async function acceptAsNew(
   if (invitation.email === null) {
     await issueConfirmation(deps, { id: user.id, email });
   } else {
-    await grantInvitation(deps, invitation, user.id, now);
+    await grantOrFail(deps, invitation, user.id);
   }
   return user;
 }
@@ -131,6 +141,7 @@ export async function acceptInvitation(
 ): Promise<User> {
   const body = acceptBodySchema.parse(input);
   const { invitation } = await findUsableInvitation(deps, token);
+  if (invitation.email === null) newAccountSchema.parse(body);
   const email = invitation.email ?? emailSchema.parse(body.email);
   const existing = await deps.users.findByEmail(email);
   return existing

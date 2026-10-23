@@ -15,6 +15,7 @@ export interface ResetPasswordDeps {
   hasher: PasswordHasher;
   now: () => Date;
   afterEmailConfirmed: (userId: string) => Promise<void>;
+  onCredentialsReplaced: (userId: string) => Promise<void>;
 }
 
 export async function resetPassword(
@@ -29,10 +30,11 @@ export async function resetPassword(
   const user = await deps.users.findById(consumed.userId);
   if (!user) throw new InvalidLinkError();
 
+  const newlyVerified = !isEmailVerified(user);
+  if (newlyVerified) await deps.onCredentialsReplaced(user.id);
   const passwordHash = await deps.hasher.hash(password);
   const sessionVersion = await deps.users.setPasswordHashAndBump(user.id, passwordHash);
   await deps.tokens.revokeAll(user.id, 'reset_password', now);
-  const newlyVerified = !isEmailVerified(user);
   if (newlyVerified) await deps.users.markEmailVerified(user.id, now);
   if (newlyVerified) await deps.afterEmailConfirmed(user.id);
 

@@ -2664,6 +2664,65 @@ describe('Accepting an invitation', () => {
     expect((await accept(app, token, newAccount)).status).toBe(404);
   });
 
+  function postJson(app: App, path: string, body: unknown) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '8.8.8.8' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function linkIn(sender: InMemoryEmailSender, to: string, route: string): string {
+    return new RegExp(`${route}/([\\w-]+)`).exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  test('a sign-up takeover of the claiming account releases the claim', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'vitima@x.com' });
+
+    await postJson(app, '/auth/signup', {
+      name: 'Vítima',
+      email: 'vitima@x.com',
+      password: 'senha-da-vitima',
+    });
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      token: linkIn(sender, 'vitima@x.com', 'confirmar-email'),
+      password: 'senha-da-vitima',
+    });
+
+    expect(await confirmed.json()).toEqual({ condos: [], emailVerified: true });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('resetting the password of an unverified claiming account releases the claim', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'vitima@x.com' });
+
+    await postJson(app, '/auth/password/forgot', { email: 'vitima@x.com' });
+    const reset = await postJson(app, '/auth/password/reset', {
+      token: linkIn(sender, 'vitima@x.com', 'redefinir-senha'),
+      password: 'senha-da-vitima',
+    });
+
+    expect(await reset.json()).toEqual({ condos: [], emailVerified: true });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('a WhatsApp invite answers 400 to a body without a name whether or not the account exists', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await whatsappInvite(app);
+
+    const existing = await accept(app, token, { email: 'ana@x.com', password: 'senha-da-ana' });
+    const missing = await accept(app, token, { email: 'nova@x.com', password: 'senha-da-ana' });
+
+    expect([existing.status, missing.status]).toEqual([400, 400]);
+  });
+
   test('preview and accept share the sign-up limiter', async () => {
     const app = await makeApp({ email: new InMemoryEmailSender() });
     const token = await invite(app);

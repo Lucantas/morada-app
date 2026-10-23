@@ -88,6 +88,7 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
       grants.push(grant);
     },
     deactivateResidentGrants: async () => undefined,
+    isOperational: async () => true,
   };
 }
 

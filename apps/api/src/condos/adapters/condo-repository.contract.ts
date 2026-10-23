@@ -294,17 +294,21 @@ export function runCondoRepositoryContract(
       await morador('condo-a', 'u-new', 'r-1');
       await morador('condo-a', 'u-neighbor', 'r-2');
       await morador('condo-b', 'u-legacy', 'r-b');
+      await pool.query(
+        "INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) VALUES ('cr-odd', 'condo-a', 'u-neighbor', 'sindico', 'r-1')",
+      );
 
       await repo.deactivateResidentGrants('condo-a', 'r-1', 'u-new');
 
       const { rows } = await pool.query(
-        'SELECT condominium_id, user_id, active FROM condo_roles ORDER BY condominium_id, user_id',
+        'SELECT condominium_id, user_id, role, active FROM condo_roles ORDER BY condominium_id, user_id, role',
       );
       expect(rows).toEqual([
-        { condominium_id: 'condo-a', user_id: 'u-legacy', active: false },
-        { condominium_id: 'condo-a', user_id: 'u-neighbor', active: true },
-        { condominium_id: 'condo-a', user_id: 'u-new', active: true },
-        { condominium_id: 'condo-b', user_id: 'u-legacy', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-legacy', role: 'morador', active: false },
+        { condominium_id: 'condo-a', user_id: 'u-neighbor', role: 'morador', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-neighbor', role: 'sindico', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-new', role: 'morador', active: true },
+        { condominium_id: 'condo-b', user_id: 'u-legacy', role: 'morador', active: true },
       ]);
       expect(await repo.accessFor('u-legacy', 'condo-a')).toBeNull();
       expect((await repo.accessFor('u-new', 'condo-a'))?.residentId).toBe('r-1');
@@ -465,6 +469,20 @@ export function runCondoRepositoryContract(
       const error = await repo.rename('condo-missing', 'X').catch((e: unknown) => e);
       expect(error).toBeInstanceOf(CondoNotFoundError);
       expect(error).toMatchObject({ status: 404, message: 'Condomínio não encontrado' });
+    });
+
+    test('isOperational requires an active condominium in an active organization', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a', { orgId: 'org-a' });
+      await createTestCondo(pool, 'condo-b', { orgId: 'org-b' });
+      await createTestCondo(pool, 'condo-c', { orgId: 'org-c' });
+      await pool.query("UPDATE condominiums SET active = FALSE WHERE id = 'condo-b'");
+      await pool.query("UPDATE organizations SET active = FALSE WHERE id = 'org-c'");
+
+      expect(await repo.isOperational('condo-a')).toBe(true);
+      expect(await repo.isOperational('condo-b')).toBe(false);
+      expect(await repo.isOperational('condo-c')).toBe(false);
+      expect(await repo.isOperational('condo-missing')).toBe(false);
     });
 
     test('getById returns null when missing', async () => {

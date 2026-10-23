@@ -1,4 +1,5 @@
 import {
+  CONDO_A,
   INVITE_NOW,
   fakeCondos,
   fakeResidentsFor,
@@ -25,7 +26,7 @@ const maria: User = {
 
 const AFTER_EXPIRY = new Date(INVITE_NOW.getTime() + 24 * 60 * 60 * 1000);
 
-function setup(user: User = maria) {
+function setup(user: User = maria, condoActive = true) {
   const invitations = inMemoryInvitationTokens([
     { invitation: invitationFixture({ claimedBy: 'u-maria' }), tokenHash: 'h1' },
     {
@@ -34,7 +35,7 @@ function setup(user: User = maria) {
     },
     { invitation: invitationFixture({ id: 'inv-3', claimedBy: 'u-other' }), tokenHash: 'h3' },
   ]);
-  const condos = fakeCondos([]);
+  const condos = fakeCondos([{ ...CONDO_A, active: condoActive }]);
   const deps = {
     invitations,
     condos,
@@ -62,6 +63,25 @@ describe('activateClaimedInvitations', () => {
     expect(invitations.byId('inv-1')?.status).toBe('aceito');
     expect(invitations.byId('inv-2')?.status).toBe('pendente');
     expect(invitations.byId('inv-3')?.status).toBe('pendente');
+  });
+
+  test('an invitation revoked mid-activation grants nothing', async () => {
+    const { deps, condos } = setup();
+    const racing = { ...deps, invitations: { ...deps.invitations, accept: async () => false } };
+
+    await activateClaimedInvitations(racing, 'u-maria');
+
+    expect(condos.grants()).toEqual([]);
+    expect(condos.deactivations()).toEqual([]);
+  });
+
+  test('skips invitations of an inactive condominium', async () => {
+    const { deps, invitations, condos } = setup(maria, false);
+
+    await activateClaimedInvitations(deps, 'u-maria');
+
+    expect(condos.grants()).toEqual([]);
+    expect(invitations.byId('inv-1')?.status).toBe('pendente');
   });
 
   test('is idempotent', async () => {
