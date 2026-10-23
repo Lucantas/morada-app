@@ -1,3 +1,4 @@
+import { HttpUserAccountRepository } from '@/features/account/data/http-account-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
 import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
@@ -8,13 +9,7 @@ import { HttpNoticeRepository } from '@/features/notices/data/http-notice-reposi
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
-import { parseLoginResponse } from '@/features/session/domain/login-response';
-import type { Role } from '@/features/session/domain/session';
-import {
-  applyLogin,
-  signOutIfCondoMissing,
-  useSessionStore,
-} from '@/features/session/ui/session-store';
+import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
 import { ApiError, createApiClient } from '@/shared/lib/api-client';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
@@ -28,7 +23,14 @@ const apiClient = createApiClient({
   condoId: () => useCondoScope.getState().condo?.id ?? null,
 });
 
+const publicApiClient = createApiClient({ baseUrl: apiUrl });
+
 signOutIfCondoMissing();
+
+export const userAccountRepository = new HttpUserAccountRepository({
+  api: apiClient,
+  publicApi: publicApiClient,
+});
 
 export const residentRepository = new HttpResidentRepository(apiClient);
 export const accountRepository = new HttpAccountRepository(apiClient);
@@ -40,20 +42,6 @@ export const settingsRepository = new HttpSettingsRepository(apiClient);
 export const condoInfoRepository = new HttpCondoInfoRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
-
-/** Authenticate with a username and password against the API. The API sets the
- *  session cookie; the body lists the condominiums and roles the user can access. */
-export async function login(username: string, password: string): Promise<Role> {
-  const res = await fetch(`${apiUrl}/auth/login`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
-  if (res.status === 401) throw new Error('Usuário ou senha inválidos.');
-  if (!res.ok) throw new Error('Não foi possível entrar. Verifique a conexão com o servidor.');
-  return applyLogin(parseLoginResponse(await res.json()));
-}
 
 /** Sign out: tell the server to clear the session cookie, then clear local state
  *  regardless of whether the server call succeeds. */

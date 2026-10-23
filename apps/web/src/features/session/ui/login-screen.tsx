@@ -3,7 +3,9 @@ import { useState, type CSSProperties } from 'react';
 import { Icon } from '@/shared/ui/icon';
 
 type Props = {
-  onSubmit: (username: string, password: string) => void;
+  onSubmit: (login: string, password: string) => void;
+  onSignUp: () => void;
+  onForgotPassword: () => void;
   error?: string | null;
   pending?: boolean;
 };
@@ -21,6 +23,20 @@ const inputStyle: CSSProperties = {
   outline: 'none',
 };
 
+const linkStyle: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: '10px 2px',
+  minHeight: 44,
+  color: '#EAF2F2',
+  fontFamily: "'Inter', sans-serif",
+  fontWeight: 600,
+  fontSize: '.95rem',
+  cursor: 'pointer',
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+};
+
 const labelStyle: CSSProperties = {
   display: 'block',
   fontSize: '.72rem',
@@ -31,14 +47,14 @@ const labelStyle: CSSProperties = {
   margin: '0 0 6px 2px',
 };
 
-export function LoginScreen({ onSubmit, error, pending }: Props) {
-  const [username, setUsername] = useState('');
+export function LoginScreen({ onSubmit, onSignUp, onForgotPassword, error, pending }: Props) {
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
 
   const submit = () => {
-    const u = username.trim();
-    if (!u || !password) return;
-    onSubmit(u, password);
+    const trimmed = login.trim();
+    if (!trimmed || !password) return;
+    onSubmit(trimmed, password);
   };
 
   return (
@@ -110,17 +126,17 @@ export function LoginScreen({ onSubmit, error, pending }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
           <div>
             <label htmlFor="login-username" style={labelStyle}>
-              Usuário
+              E-mail ou usuário
             </label>
             <input
               id="login-username"
-              name="username"
+              name="login"
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
               enterKeyHint="next"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -167,6 +183,17 @@ export function LoginScreen({ onSubmit, error, pending }: Props) {
           >
             {pending ? 'Entrando…' : 'Entrar'}
           </button>
+
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}
+          >
+            <button type="button" onClick={onSignUp} style={linkStyle}>
+              Criar conta
+            </button>
+            <button type="button" onClick={onForgotPassword} style={linkStyle}>
+              Esqueci a senha
+            </button>
+          </div>
         </div>
       </form>
     </div>

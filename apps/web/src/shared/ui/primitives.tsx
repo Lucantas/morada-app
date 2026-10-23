@@ -134,12 +134,14 @@ export function Field({
   onChange,
   placeholder,
   type = 'text',
+  autoComplete,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  autoComplete?: string;
 }) {
   return (
     <label style={{ display: 'block', marginBottom: 16 }}>
@@ -158,6 +160,7 @@ export function Field({
         type={type}
         value={value}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
         style={{
           width: '100%',

@@ -2,12 +2,20 @@ import { z } from 'zod';
 
 import { roleSchema } from './session';
 
-const loginResponseSchema = z.object({
-  condos: z.array(z.object({ id: z.string().min(1), name: z.string(), role: roleSchema })).min(1),
+export const loginCondoSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  role: roleSchema,
 });
 
-export type LoginCondo = z.infer<typeof loginResponseSchema>['condos'][number];
+const loginResponseSchema = z.object({
+  condos: z.array(loginCondoSchema),
+  emailVerified: z.boolean(),
+});
 
-export function parseLoginResponse(data: unknown): LoginCondo[] {
-  return loginResponseSchema.parse(data).condos;
+export type LoginCondo = z.infer<typeof loginCondoSchema>;
+export type LoginResponse = z.infer<typeof loginResponseSchema>;
+
+export function parseLoginResponse(data: unknown): LoginResponse {
+  return loginResponseSchema.parse(data);
 }
