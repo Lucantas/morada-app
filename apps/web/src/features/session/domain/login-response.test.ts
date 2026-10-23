@@ -1,12 +1,23 @@
 import { parseLoginResponse } from './login-response';
 
 describe('parseLoginResponse', () => {
-  test('returns the condos list', () => {
+  test('returns the condos and the e-mail verification flag', () => {
     const condos = [{ id: 'c1', name: 'Morada', role: 'admin' }];
-    expect(parseLoginResponse({ condos })).toEqual(condos);
+
+    expect(parseLoginResponse({ condos, emailVerified: true })).toEqual({
+      condos,
+      emailVerified: true,
+    });
   });
 
-  test('rejects an empty list', () => {
+  test('accepts an empty condo list', () => {
+    expect(parseLoginResponse({ condos: [], emailVerified: false })).toEqual({
+      condos: [],
+      emailVerified: false,
+    });
+  });
+
+  test('rejects a body without the verification flag', () => {
     expect(() => parseLoginResponse({ condos: [] })).toThrow();
   });
 

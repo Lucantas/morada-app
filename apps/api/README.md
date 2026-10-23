@@ -1,6 +1,6 @@
 # Morada API
 
-Hono + SQLite (better-sqlite3), hexagonal architecture (domain / app / adapters /
+Hono + Postgres (pg), hexagonal architecture (domain / app / adapters /
 platform), Zod at every boundary, JWT auth. Boundaries are lint-enforced.
 
 ## Run
@@ -11,20 +11,31 @@ make api-test       # pnpm --filter @morada/api test:coverage  (gate = 80%)
 ```
 
 Env: `PORT`, `JWT_SECRET` (required in production — startup fails without it),
-`DB_PATH` (default `morada.db`), `WEB_ORIGIN` (CORS, default Vite dev origin),
-`BCRYPT_COST` (default 12).
+`DATABASE_URL` (Postgres; defaults to the local docker DB), `WEB_ORIGIN` (CORS,
+default Vite dev origin), `APP_URL` (base of e-mailed links, default the first
+`WEB_ORIGIN`), `BCRYPT_COST` (default 12), `PROXY_SECRET` (optional; when set, the
+client IP forwarded by the Pages worker in `X-Morada-Client-IP` is trusted only with
+a matching `X-Morada-Proxy-Secret`).
 
 ## Auth model
 
-- `POST /auth/login { username, password }` verifies bcrypt-hashed credentials and
-  issues an HS256 JWT with a `role` claim and a `sub` (the resident's own id;
-  admins get their user id). 8h expiry. Bad credentials return 401.
-- Residents do **not** self-register. An admin provisions a resident login via
-  `POST /api/users { username, residentId }` (admin-only). The server generates a
-  temp password and returns it **once** in the response for the admin to relay;
-  only the bcrypt hash is stored. Duplicate usernames return 409.
-- `authMiddleware` verifies the token; `requireRole` guards admin routes.
-- Authorization: residents/accounts/user-provisioning are **admin-only**;
+- `POST /auth/login { login, password }` accepts an e-mail or a legacy username,
+  verifies the bcrypt-hashed password and sets the httpOnly `session` cookie (an
+  HS256 JWT, 8h) plus the readable `csrf` cookie. It answers
+  `{ condos, emailVerified }`; bad credentials return 401.
+- Residents join by invitation. An admin creates one via
+  `POST /api/condos/:id/residents/:rid/invitation { email? }` (admin-only), which
+  returns the link and a WhatsApp URL once and e-mails it when an address is
+  given. `emailSent` says whether that e-mail went out; an unavailable or failed
+  send never fails the invite. The resident accepts it at `POST /auth/invitations/:token/accept`.
+  Derived username logins can no longer be provisioned; existing ones keep the
+  admin reset (`POST /api/residents/:id/login/reset`).
+- `authMiddleware(resolveSessionVersion)` is a factory: it verifies the session JWT
+  and rejects it (401) unless its `sv` claim matches the user's stored
+  `session_version` (bumped on password reset, e-mail confirmation, admin
+  password reset and logout). `compose.ts` wires it once with the user lookup; `requireRole`
+  guards admin routes.
+- Authorization: residents/accounts/invitations are **admin-only**;
   receipts/dashboard are any authenticated user; notices are read-any /
   **write-admin**; thread listing is **admin-only** and per-thread access is
   scoped to the caller's `sub` (a resident can only read/write their own thread).
@@ -42,9 +53,9 @@ accounts/receipts/notices are created through the app.
 | ----- | -------- | -------------- |
 | Admin | `admin`  | `morada-admin` |
 
-To onboard a resident: the admin creates the resident, provisions a login
-(`POST /api/users`, which returns a one-time temp password), and hands over the
-credentials. The resident then logs in normally.
+To onboard a resident: the admin creates the resident and generates an invitation
+from "Acesso do morador". The resident opens the link, sets a password and lands in
+the app; later logins use the e-mail and that password.
 
 ## Still deferred (post-auth hardening)
 

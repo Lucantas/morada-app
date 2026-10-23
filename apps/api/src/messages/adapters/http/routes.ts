@@ -25,12 +25,6 @@ interface ThreadRoutesDeps {
   threads: ThreadRepository;
 }
 
-/**
- * A resident may only touch their own thread (their JWT `sub`). Admins are
- * unrestricted. Returns a 403 Response to short-circuit, or null to proceed.
- * When there is no auth context (role unset, e.g. isolated unit tests) it is
- * permissive — the composition root always mounts this behind authMiddleware.
- */
 function denyForeignThread(c: Context<ApiEnv>, threadId: string): Response | null {
   const role = c.get('role');
   if (role === 'resident' && c.get('sub') !== threadId) {

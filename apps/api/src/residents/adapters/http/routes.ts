@@ -13,7 +13,6 @@ import { listResidents } from '../../app/list-residents';
 import { overrideStatus } from '../../app/override-status';
 import { saveResident } from '../../app/save-resident';
 import { ResidentNotFoundError } from '../../domain/errors';
-import { deriveResidentLogin } from '../../domain/login';
 import { residentDraftSchema } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
 
@@ -33,20 +32,12 @@ export function residentRoutes(scope: Scoped<ResidentRoutesDeps>, hasher: Passwo
     return c.json(await getResident(residents, receipts, c.get('sub')));
   });
 
-  // Admin-only: read a resident's login state — the existing username (never the
-  // hash) and the login derived from name + apartment. The resident is resolved
-  // through the condo-scoped repo first, so another condo's resident is a 404.
-  // Registered before '/:id' below or they would be shadowed by its param.
   app.get('/:id/login', requireRole('admin'), async (c) => {
     const { residents, users } = scope(c.get('condoId'));
     const id = c.req.param('id');
-    const resident = await residents.getById(id);
-    if (!resident) throw new ResidentNotFoundError(id);
+    if (!(await residents.getById(id))) throw new ResidentNotFoundError(id);
     const user = await users.findByResidentId(id);
-    return c.json({
-      username: user ? user.username : null,
-      suggested: deriveResidentLogin(resident.name, resident.apt),
-    });
+    return c.json({ username: user ? user.username : null });
   });
   app.post('/:id/login/reset', requireRole('admin'), async (c) => {
     const { residents, users } = scope(c.get('condoId'));

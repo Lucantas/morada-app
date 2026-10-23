@@ -16,12 +16,19 @@ import { config } from './platform/config';
 function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
+    findById: async (id) => [...map.values()].find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => [...map.values()].find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    markEmailVerifiedAndBump: async () => 1,
+    setPasswordHashAndBump: async () => 1,
+    updateCredentialsAndBump: async () => 1,
+    sessionVersionOf: async () => 0,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => map.has(username),
-    existsByResidentId: async (residentId) =>
-      [...map.values()].some((u) => u.residentId === residentId),
+    bumpSessionVersion: async () => undefined,
     hasAny: async () => map.size > 0,
     save: async (u) => {
       map.set(u.username, u);
@@ -71,6 +78,7 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
       condominiums.push(condo);
       return condo;
     },
+    ownedOrganization: async () => null,
     createOrganization: async (input) => {
       const org = { id: `org-${organizations.length + 1}`, ...input };
       organizations.push(org);
@@ -79,6 +87,8 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     grant: async (grant) => {
       grants.push(grant);
     },
+    deactivateResidentGrants: async () => undefined,
+    isOperational: async () => true,
   };
 }
 
@@ -93,6 +103,10 @@ const existingResident: User = {
   passwordHash: 'existing-hash',
   role: 'resident',
   residentId: 'r-1',
+  email: null,
+  name: null,
+  emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 describe('seedAdmin', () => {
@@ -113,6 +127,10 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -140,6 +158,10 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -150,12 +172,20 @@ describe('seedAdmin', () => {
     (config as { isProduction: boolean }).isProduction = true;
     const saveSpy = jest.fn(async (u: User) => u);
     const repo: UserRepository = {
+      findById: async () => null,
+      findByEmail: async () => null,
+      existsByEmail: async () => false,
+      markEmailVerified: async () => undefined,
+      markEmailVerifiedAndBump: async () => 1,
+      setPasswordHashAndBump: async () => 1,
+      updateCredentialsAndBump: async () => 1,
+      sessionVersionOf: async () => 0,
       findByUsername: async (username) =>
         username === existingResident.username ? existingResident : null,
       findByResidentId: async (residentId) =>
         residentId === existingResident.residentId ? existingResident : null,
       existsByUsername: async (username) => username === existingResident.username,
-      existsByResidentId: async (residentId) => residentId === existingResident.residentId,
+      bumpSessionVersion: async () => undefined,
       hasAny: async () => true,
       save: saveSpy,
     };
@@ -196,6 +226,10 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const condos = fakeCondos([
       { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
@@ -215,6 +249,10 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const condos = fakeCondos();
 

@@ -18,7 +18,7 @@ Steady-state cost is effectively **$0/mo**.
 ## Architecture notes
 
 - The API is a single esbuild bundle (`apps/api/build.mjs` → `dist/main.js` +
-  `dist/migrate-main.js`). No native dependencies, so the runtime image is a plain
+  `dist/migrate-main.js` + `dist/set-user-email.js`). No native dependencies, so the runtime image is a plain
   `node:22-slim` with no `node_modules`.
 - **Migrations run on release**, not at boot: `fly.toml`'s
   `release_command = "node dist/migrate-main.js"` applies pending migrations against
@@ -81,6 +81,71 @@ keep being served by the same endpoints — no backfill needed.
 > R2 (its DB `proof_data_url` is NULL); if the secrets are removed or you roll back to
 > pre-R2 code, those proofs become unreadable (the receipt still reports `hasProof: true`
 > but "Ver comprovante" 404s) until R2 is restored. They are not lost, just unreachable.
+
+#### E-mail (Cloudflare Email Sending)
+
+Sign-up, confirmation, password reset and invitations send e-mail through Cloudflare
+Email Sending. Onboard the sending domain in the Cloudflare dashboard first (Email
+Sending → add the domain, publish the SPF/DKIM DNS records it shows, wait until it
+verifies). Then create an API token that can send e-mail and set:
+
+```bash
+fly secrets set --app morada-api --stage \
+  CLOUDFLARE_ACCOUNT_ID="<account id>" \
+  CLOUDFLARE_EMAIL_API_TOKEN="<email sending token>" \
+  EMAIL_FROM="Morada <no-reply@<verified domain>>" \
+  APP_URL="https://morada-a6g.pages.dev"
+```
+
+`APP_URL` is the base of every e-mailed link and defaults to the first `WEB_ORIGIN`.
+Without the three e-mail secrets the API still starts: sign-up and "esqueci a senha"
+answer 503 `"Envio de e-mail indisponível"`. Invitations are still created
+(`emailSent: false`) and can be shared by WhatsApp or copied link, but only an
+invitation **with** an e-mail can be accepted that way (the invite proves the
+address). A link-only invitation (no e-mail) needs a confirmation e-mail, so with
+e-mail sending off its acceptance answers 503 and creates no account; an already
+confirmed account can still accept it.
+
+Delivery failures (an upstream HTTP status, a network error or the 10 s timeout) are
+logged server-side as `E-mail delivery failed:` with the upstream status, never the
+token or the message body. Check `fly logs --app morada-api` when an admin reports
+`emailSent: false`.
+
+#### Client IP behind the Pages proxy (`PROXY_SECRET`)
+
+Production traffic reaches Fly through the Pages worker (`apps/web/public/_worker.js`),
+so `Fly-Client-IP` is the worker's egress IP. The worker forwards the real client IP
+(`CF-Connecting-IP`) as `X-Morada-Client-IP` plus a shared secret in
+`X-Morada-Proxy-Secret`, and strips both headers from the incoming request. The API
+trusts `X-Morada-Client-IP` only when that secret matches `PROXY_SECRET`; otherwise
+it falls back to `Fly-Client-IP`, then `X-Forwarded-For`. Without it every IP-keyed
+rate limit (login, sign-up, forgot, invitations) collapses into one shared key.
+
+Before (or at) the merge, generate one random value and set it in both places:
+
+```bash
+PROXY_SECRET="$(openssl rand -base64 48)"
+fly secrets set --app morada-api --stage PROXY_SECRET="$PROXY_SECRET"
+printf '%s' "$PROXY_SECRET" | pnpm dlx wrangler@4 pages secret put PROXY_SECRET \
+  --project-name=morada
+```
+
+The Pages variable must be set for the **production** environment (the
+`wrangler pages secret put` default; in the dashboard: Settings → Variables and
+Secrets → Production) and takes effect on the next Pages deploy.
+
+#### Owner e-mail (legacy admin)
+
+The legacy `admin` login has no e-mail. After deploying, give it one (this also marks
+it verified) so the owner can sign in by e-mail:
+
+```bash
+fly ssh console --app morada-api -C "node dist/set-user-email.js admin <email>"
+```
+
+Locally: `make set-user-email username=admin email=<email>` (or
+`pnpm --filter @morada/api set-user-email admin <email>`). An unknown username or an
+e-mail already in use exits with an error and changes nothing.
 
 ### 3. Cloudflare Pages (web)
 
@@ -251,6 +316,20 @@ manually (`workflow_dispatch`) instead of relying on the parallel run.
      );
    ```
 
+## Accounts and invitations (migrations 019–023)
+
+Migrations `019`–`023` add e-mail identity to `users`, `auth_tokens`, `session_version`
+and `invitations`. They run on release, so take a `pg_dump` first as above. Before
+merging, set the e-mail secrets above and the owner-email step after the deploy.
+
+- **All existing sessions are invalidated on deploy.** The session JWT now carries
+  `sv` and tokens without it are rejected, so everyone logs in once.
+- Legacy logins keep working (and keep the admin "Redefinir senha") until the resident
+  accepts an invitation, which retires the derived login for that condominium.
+- Derived-login provisioning (`POST /api/condos/:id/users`) is gone; residents are
+  invited instead.
+- Rollback = restore the `pg_dump` (the old code cannot read `username`-less rows).
+
 ## CI auto-deploy
 
 `.github/workflows/deploy.yml` (API → Fly) and `deploy-web.yml` (web → Cloudflare
@@ -263,6 +342,17 @@ GitHub repo secrets (`Lucantas/morada-app`):
 | `FLY_API_TOKEN`         | `fly tokens create deploy -a morada-api`                                            |
 | `CLOUDFLARE_ACCOUNT_ID` | `wrangler whoami`                                                                   |
 | `CLOUDFLARE_API_TOKEN`  | Cloudflare dashboard → My Profile → API Tokens → **Edit Cloudflare Pages** template |
+
+> **Rotate `CLOUDFLARE_API_TOKEN` before the next merge to `main`.** It was found
+> invalid on 2026-10-23: `deploy-web.yml` failed while the API deployed. Until it is
+> rotated (Cloudflare dashboard → My Profile → API Tokens → **Edit Cloudflare Pages**,
+> then update the GitHub secret), a merge deploys the API but not the web, and
+> production breaks. Manual fallback:
+>
+> ```bash
+> VITE_API_URL='' pnpm --filter @morada/web build
+> pnpm dlx wrangler@4 pages deploy apps/web/dist --project-name=morada --branch=main
+> ```
 
 ## Verify
 

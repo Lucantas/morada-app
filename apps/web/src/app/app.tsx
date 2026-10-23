@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
@@ -20,9 +20,8 @@ import { useReceipts } from '@/features/receipts/ui/use-receipts';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
-import { LoginScreen } from '@/features/session/ui/login-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
-import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
+import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
@@ -44,21 +43,20 @@ import {
   dashboardRepository,
   editReceipt,
   ensureMonthlyReceipts,
-  getResidentLogin,
   incomeRepository,
+  invitationRepository,
   issueCharge,
-  login,
   logout,
   noticeRepository,
   overrideResidentStatus,
-  provisionResidentLogin,
   receiptRepository,
   registerPayment,
   rejectPayment,
-  resetResidentLogin,
   residentRepository,
   settingsRepository,
+  authRepository,
 } from './container';
+import { EntryRouter } from './entry-router';
 import { useNavStore, type View } from './nav-store';
 
 const queryClient = new QueryClient({
@@ -94,42 +92,33 @@ export function App() {
 }
 
 function Router() {
-  const role = useSessionStore((s) => s.role);
-  const condoId = useCondoScope((s) => s.condo?.id ?? null);
-  const view = useNavStore((s) => s.view);
-  const residentId = useNavStore((s) => s.residentId);
-  const incomeId = useNavStore((s) => s.incomeId);
   const go = useNavStore((s) => s.go);
   const queryClient = useQueryClient();
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
 
   const handleSignOut = useCallback(() => {
     queryClient.clear();
     void logout();
   }, [queryClient]);
 
-  if (!role) {
-    return (
-      <LoginScreen
-        pending={pending}
-        error={loginError}
-        onSubmit={(username, password) => {
-          setPending(true);
-          setLoginError(null);
-          login(username, password)
-            .then((r) => {
-              queryClient.clear();
-              go(r === 'admin' ? 'a-home' : 'r-home');
-            })
-            .catch((err: unknown) =>
-              setLoginError(err instanceof Error ? err.message : 'Não foi possível entrar.'),
-            )
-            .finally(() => setPending(false));
-        }}
-      />
-    );
-  }
+  return (
+    <EntryRouter
+      repository={authRepository}
+      invitations={invitationRepository}
+      onLanded={(role) => go(role === 'admin' ? 'a-home' : 'r-home')}
+      onSignOut={handleSignOut}
+    >
+      <SessionRouter signOut={handleSignOut} />
+    </EntryRouter>
+  );
+}
+
+function SessionRouter({ signOut }: { signOut: () => void }) {
+  const role = useSessionStore((s) => s.role);
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
+  const view = useNavStore((s) => s.view);
+  const residentId = useNavStore((s) => s.residentId);
+  const incomeId = useNavStore((s) => s.incomeId);
+  const go = useNavStore((s) => s.go);
 
   if (role === 'admin') {
     return (
@@ -138,7 +127,7 @@ function Router() {
         residentId={residentId}
         incomeId={incomeId}
         go={go}
-        signOut={handleSignOut}
+        signOut={signOut}
       />
     );
   }
@@ -148,7 +137,7 @@ function Router() {
       residentId={residentId}
       condoId={condoId}
       go={go}
-      signOut={handleSignOut}
+      signOut={signOut}
     />
   );
 }
@@ -194,7 +183,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           receiptRepository={receiptRepository}
           residentId={residentId}
           onBack={() => go('a-residents')}
-          onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
+          onOpenAccess={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           dueDay={dueDay}
           defaultReceiptValueCents={defaultReceiptValueCents}
           issueCharge={issueCharge}
@@ -207,11 +196,10 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
       );
     case 'a-resident-login':
       return residentId !== undefined ? (
-        <CreateLoginScreen
+        <ResidentAccessScreen
           residentId={residentId}
-          provision={provisionResidentLogin}
-          fetchLogin={getResidentLogin}
-          reset={resetResidentLogin}
+          repository={invitationRepository}
+          residents={residentRepository}
           onBack={() => go('a-resident-edit', { residentId })}
         />
       ) : (

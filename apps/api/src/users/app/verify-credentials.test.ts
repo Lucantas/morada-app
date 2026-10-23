@@ -8,12 +8,19 @@ import { verifyCredentials } from './verify-credentials';
 function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
+    findById: async (id) => [...map.values()].find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => [...map.values()].find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    markEmailVerifiedAndBump: async () => 1,
+    setPasswordHashAndBump: async () => 1,
+    updateCredentialsAndBump: async () => 1,
+    sessionVersionOf: async () => 0,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => map.has(username),
-    existsByResidentId: async (residentId) =>
-      [...map.values()].some((u) => u.residentId === residentId),
+    bumpSessionVersion: async () => undefined,
     hasAny: async () => map.size > 0,
     save: async (u) => {
       map.set(u.username, u);
@@ -33,9 +40,33 @@ const maria: User = {
   passwordHash: 'hash:s3nha',
   role: 'resident',
   residentId: 'r-1',
+  email: null,
+  name: null,
+  emailVerifiedAt: null,
+  sessionVersion: 0,
+};
+
+const ana: User = {
+  ...maria,
+  id: 'u-2',
+  username: null,
+  email: 'ana@x.com',
+  name: 'Ana',
 };
 
 describe('verifyCredentials', () => {
+  test('looks up by normalized e-mail when the login contains @', async () => {
+    const repo = fakeRepo([ana]);
+    const user = await verifyCredentials(repo, acceptHasher, ' ANA@x.com ', 's3nha');
+    expect(user).toEqual(ana);
+  });
+
+  test('rejects an unknown e-mail', async () => {
+    await expect(
+      verifyCredentials(fakeRepo([ana]), acceptHasher, 'ghost@x.com', 's3nha'),
+    ).rejects.toBeInstanceOf(InvalidCredentialsError);
+  });
+
   test('returns the user when username and password match', async () => {
     const user = await verifyCredentials(fakeRepo([maria]), acceptHasher, 'maria302', 's3nha');
     expect(user).toEqual(maria);

@@ -1,9 +1,11 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
 import { App } from './app';
+import { authRepository } from './container';
 
 jest.mock('./container', () => {
   const { InMemoryReceiptRepository } = jest.requireActual(
@@ -11,7 +13,9 @@ jest.mock('./container', () => {
   );
   const { buildResident: build } = jest.requireActual('@/test/factories');
   const unused = {};
+  const { fakeAuthRepository } = jest.requireActual('@/test/factories.auth');
   return {
+    authRepository: fakeAuthRepository(),
     residentRepository: {
       getCurrent: async () => build({ id: 'r-1', name: 'Maria Ribeiro' }),
     },
@@ -21,26 +25,27 @@ jest.mock('./container', () => {
     condoInfoRepository: unused,
     dashboardRepository: unused,
     incomeRepository: unused,
+    invitationRepository: unused,
     noticeRepository: unused,
     settingsRepository: unused,
     confirmPayment: jest.fn(),
     editReceipt: jest.fn(),
     ensureMonthlyReceipts: jest.fn(),
-    getResidentLogin: jest.fn(),
     issueCharge: jest.fn(),
-    login: jest.fn(),
     logout: jest.fn(),
     overrideResidentStatus: jest.fn(),
-    provisionResidentLogin: jest.fn(),
     registerPayment: jest.fn(),
     rejectPayment: jest.fn(),
-    resetResidentLogin: jest.fn(),
   };
 });
+
+const repository = jest.mocked(authRepository);
 
 describe('App router', () => {
   afterEach(() => {
     act(() => useSessionStore.getState().signOut());
+    window.history.replaceState(null, '', '/');
+    jest.clearAllMocks();
   });
 
   test('renders the resident home for a resident session with a condominium', async () => {
@@ -58,5 +63,17 @@ describe('App router', () => {
     render(<App />);
 
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument();
+  });
+
+  test('signs in with the typed login and lands in the app', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByLabelText('E-mail ou usuário'), 'ana@exemplo.com');
+    await user.type(screen.getByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(repository.login).toHaveBeenCalledWith('ana@exemplo.com', 'segredo123');
+    await waitFor(() => expect(useSessionStore.getState().role).toBe('admin'));
   });
 });

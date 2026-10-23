@@ -128,6 +128,15 @@ export class PostgresCondoRepository implements CondoRepository {
     return rows[0] ? toCondominium(rows[0]) : null;
   }
 
+  async isOperational(condominiumId: string): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM condominiums c JOIN organizations o ON o.id = c.organization_id
+       WHERE c.id = $1 AND c.active AND o.active`,
+      [condominiumId],
+    );
+    return rows.length > 0;
+  }
+
   async rename(condominiumId: string, name: string): Promise<Condominium> {
     const parsedName = condominiumSchema.shape.name.parse(name);
     const { rows } = await this.pool.query(
@@ -162,6 +171,18 @@ export class PostgresCondoRepository implements CondoRepository {
     });
   }
 
+  async ownedOrganization(userId: string): Promise<{ id: string } | null> {
+    const { rows } = await this.pool.query(
+      `SELECT o.id FROM organizations o
+       JOIN organization_members m ON m.organization_id = o.id
+       WHERE m.user_id = $1 AND m.role = 'owner' AND m.active AND o.active
+       ORDER BY o.created_at, o.id
+       LIMIT 1`,
+      [userId],
+    );
+    return rows[0] ? z.object({ id: z.string() }).parse(rows[0]) : null;
+  }
+
   async createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }> {
     const parsed = organizationInputSchema.parse(input);
     const id = randomUUID();
@@ -188,6 +209,19 @@ export class PostgresCondoRepository implements CondoRepository {
        ON CONFLICT (condominium_id, user_id, role)
        DO UPDATE SET active = TRUE, resident_id = EXCLUDED.resident_id`,
       [randomUUID(), parsed.condominiumId, parsed.userId, parsed.role, parsed.residentId],
+    );
+  }
+
+  async deactivateResidentGrants(
+    condominiumId: string,
+    residentId: string,
+    exceptUserId: string,
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE condo_roles SET active = FALSE
+       WHERE condominium_id = $1 AND resident_id = $2 AND user_id <> $3
+         AND role = 'morador' AND active`,
+      [condominiumId, residentId, exceptUserId],
     );
   }
 

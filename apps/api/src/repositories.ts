@@ -12,6 +12,14 @@ import { PostgresIncomeRepository } from './income/adapters/postgres/income-repo
 import type { IncomeRepository } from './income/domain/income-repository';
 import { PostgresThreadRepository } from './messages/adapters/postgres/thread-repository';
 import type { ThreadRepository } from './messages/domain/thread-repository';
+import {
+  PostgresInvitationRepository,
+  PostgresInvitationTokenRepository,
+} from './invitations/adapters/postgres/invitation-repository';
+import type {
+  CondoInvitationRepository,
+  InvitationTokenRepository,
+} from './invitations/domain/invitation-repository';
 import { PostgresNoticeRepository } from './notices/adapters/postgres/notice-repository';
 import type { NoticeRepository } from './notices/domain/notice-repository';
 import { PostgresReceiptRepository } from './receipts/adapters/postgres/receipt-repository';
@@ -20,7 +28,9 @@ import { PostgresResidentRepository } from './residents/adapters/postgres/reside
 import type { ResidentRepository } from './residents/domain/resident-repository';
 import { PostgresSettingsRepository } from './settings/adapters/postgres/settings-repository';
 import type { SettingsRepository } from './settings/domain/settings-repository';
+import { PostgresAuthTokenRepository } from './users/adapters/postgres/auth-token-repository';
 import { PostgresUserRepository } from './users/adapters/postgres/user-repository';
+import type { AuthTokenRepository } from './users/domain/auth-token-repository';
 import type { UserRepository } from './users/domain/user-repository';
 
 import { migrate } from './platform/postgres/migrate';
@@ -38,12 +48,15 @@ export interface CondoRepositories {
   settings: SettingsRepository;
   categories: CategoryRepository;
   incomes: IncomeRepository;
+  invitations: CondoInvitationRepository;
 }
 
 export interface Repositories {
   forCondo(condominiumId: string): CondoRepositories;
   users: UserRepository;
+  authTokens: AuthTokenRepository;
   condos: CondoRepository;
+  invitationTokens: InvitationTokenRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -59,9 +72,12 @@ export function makePostgresRepositories(pool: Pool): Repositories {
       settings: new PostgresSettingsRepository(pool, condominiumId),
       categories: new PostgresCategoryRepository(pool, condominiumId),
       incomes: new PostgresIncomeRepository(pool, condominiumId, proofStorage),
+      invitations: new PostgresInvitationRepository(pool, condominiumId),
     }),
     users: new PostgresUserRepository(pool),
+    authTokens: new PostgresAuthTokenRepository(pool),
     condos: new PostgresCondoRepository(pool),
+    invitationTokens: new PostgresInvitationTokenRepository(pool),
   };
 }
 

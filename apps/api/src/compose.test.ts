@@ -2,12 +2,21 @@ import { sign } from 'hono/jwt';
 
 import { buildApp } from './compose';
 import { config } from './platform/config';
+import {
+  DisabledEmailSender,
+  EmailDeliveryError,
+  type EmailSender,
+} from './platform/email/email-sender';
+import { InMemoryEmailSender } from './platform/email/in-memory-email-sender';
 import { migrate } from './platform/postgres/migrate';
+import { hashToken } from './platform/tokens';
 import { createPool } from './platform/postgres/pool';
 import { makePostgresRepositories } from './repositories';
 import { adminCredentials } from './seed-data';
 import { resetPg } from './test-support/pg';
 import { createTestCondo } from './test-support/condos';
+import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
+import { PostgresUserRepository } from './users/adapters/postgres/user-repository';
 import { residentCredentials, seedFixtures, TEST_CONDO_ID } from './test-fixtures';
 
 const P = `/api/condos/${TEST_CONDO_ID}`;
@@ -31,10 +40,10 @@ async function count(from: string): Promise<number> {
 
 // Each call resets to a fresh seeded state, so a test may build more than one app
 // (e.g. one per credential) against the shared Postgres without id collisions.
-async function makeApp(): Promise<App> {
+async function makeApp(opts?: { email?: EmailSender; now?: () => Date }): Promise<App> {
   await resetPg(pool);
   await seedFixtures(pool);
-  return buildApp(makePostgresRepositories(pool));
+  return buildApp(makePostgresRepositories(pool), opts);
 }
 
 async function login(app: App, username: string, password: string): Promise<Response> {
@@ -43,6 +52,37 @@ async function login(app: App, username: string, password: string): Promise<Resp
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
+}
+
+async function loginWith(app: App, body: Record<string, string>): Promise<Response> {
+  return app.request('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function insertUser(input: {
+  username: string | null;
+  email: string | null;
+  password: string;
+}): Promise<void> {
+  const hasher = new BcryptPasswordHasher(config.bcryptCost);
+  await new PostgresUserRepository(pool).save({
+    id: input.email === null ? `u-${input.username}` : 'u-ana',
+    username: input.username,
+    email: input.email,
+    name: input.email === null ? null : 'Ana',
+    passwordHash: await hasher.hash(input.password),
+    role: 'resident',
+    residentId: null,
+    emailVerifiedAt: null,
+    sessionVersion: 0,
+  });
+}
+
+async function insertEmailUser(email: string, password: string): Promise<void> {
+  await insertUser({ username: null, email, password });
 }
 
 type Auth = { cookie: string; csrf: string };
@@ -764,7 +804,173 @@ describe('Morada API — real credentials', () => {
     expect(body).not.toHaveProperty('token');
     expect(body).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' }],
+      emailVerified: true,
     });
+  });
+
+  test('login returns emailVerified true for a legacy username user', async () => {
+    const res = await login(await makeApp(), adminCredentials.username, adminCredentials.password);
+    expect(await res.json()).toMatchObject({ emailVerified: true });
+  });
+
+  test('login by email ignores case and surrounding spaces', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: ' ANA@x.com ', password: 'senha-segura-1' });
+    expect(res.status).toBe(200);
+  });
+
+  test('an e-mail account with zero condos logs in', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+  });
+
+  test('a legacy username user with zero condos is refused with 401', async () => {
+    const app = await makeApp();
+    await insertUser({ username: 'solto101', email: null, password: 'senha-segura-1' });
+    const res = await loginWith(app, { login: 'solto101', password: 'senha-segura-1' });
+    expect(res.status).toBe(401);
+  });
+
+  test('login accepts both login and the username alias but not neither', async () => {
+    const app = await makeApp();
+    const neither = await loginWith(app, { password: adminCredentials.password });
+    expect(neither.status).toBe(400);
+  });
+
+  test('GET /me returns the account state', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = res.headers.getSetCookie();
+    const cookie = `session=${parseCookie(cookies, 'session')}; csrf=${parseCookie(cookies, 'csrf')}`;
+    const me = await app.request('/me', { headers: { Cookie: cookie } });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toEqual({
+      id: 'u-ana',
+      name: 'Ana',
+      email: 'ana@x.com',
+      emailVerified: false,
+      condos: [],
+    });
+  });
+
+  async function verifiedEmailAuth(app: App, email: string): Promise<Auth> {
+    await insertEmailUser(email, 'senha-segura-1');
+    await pool.query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email]);
+    const res = await loginWith(app, { login: email, password: 'senha-segura-1' });
+    const cookies = res.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    return { cookie: `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`, csrf };
+  }
+
+  async function createCondo(app: App, auth: Auth, body: unknown): Promise<Response> {
+    return app.request('/me/condos', {
+      method: 'POST',
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  test('POST /me/condos refuses an unconfirmed e-mail', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const login1 = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = login1.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    const auth = { cookie: `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`, csrf };
+
+    const res = await createCondo(app, auth, { name: 'Ipê' });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Confirme seu e-mail antes de criar um condomínio' });
+  });
+
+  test('POST /me/condos requires CSRF and a session', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const noCsrf = await app.request('/me/condos', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Ipê' }),
+    });
+    const anonymous = await app.request('/me/condos', { method: 'POST' });
+
+    expect(noCsrf.status).toBe(403);
+    expect(anonymous.status).toBe(401);
+  });
+
+  test('a verified user creates a condominium, listed in /me as admin', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const res = await createCondo(app, auth, { name: '  Residencial Ipê ' });
+    const me = await app.request('/me', { headers: { Cookie: auth.cookie } });
+
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string; name: string; role: string };
+    expect(created).toMatchObject({ name: 'Residencial Ipê', role: 'admin' });
+    expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
+  });
+
+  test('a second condominium reuses the same organization', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    await createCondo(app, auth, { name: 'Primeiro' });
+    const second = await createCondo(app, auth, { name: 'Segundo' });
+
+    expect(second.status).toBe(201);
+    const { rows } = await pool.query<{ n: number }>(
+      `SELECT count(DISTINCT c.organization_id)::int AS n FROM condominiums c
+       JOIN condo_roles r ON r.condominium_id = c.id WHERE r.user_id = 'u-ana'`,
+    );
+    expect(rows[0]?.n).toBe(1);
+  });
+
+  test('a blank name answers 400 and creates nothing', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const before = await count('organizations');
+
+    const res = await createCondo(app, auth, { name: '   ' });
+
+    expect(res.status).toBe(400);
+    expect(await count('organizations')).toBe(before);
+  });
+
+  test('a user who is only a morador elsewhere gets their own organization', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    await pool.query(
+      "INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) SELECT 'cr-ana', $1, 'u-ana', 'morador', id FROM residents WHERE condominium_id = $1 LIMIT 1",
+      [TEST_CONDO_ID],
+    );
+
+    const res = await createCondo(app, auth, { name: 'Meu Prédio' });
+    const { rows } = await pool.query<{ organization_id: string }>(
+      "SELECT organization_id FROM condominiums WHERE name = 'Meu Prédio'",
+    );
+
+    expect(res.status).toBe(201);
+    expect(rows[0]?.organization_id).not.toBe(`org-${TEST_CONDO_ID}`);
+    const { rows: members } = await pool.query(
+      "SELECT 1 FROM organization_members WHERE user_id = 'u-ana' AND role = 'owner'",
+    );
+    expect(members).toHaveLength(1);
+  });
+
+  test('GET /me requires a session', async () => {
+    const res = await (await makeApp()).request('/me');
+    expect(res.status).toBe(401);
   });
 
   test('a wrong password is rejected with 401', async () => {
@@ -840,6 +1046,33 @@ describe('Morada API — real credentials', () => {
     expect(out.status).toBe(204);
     const cleared = out.headers.getSetCookie().find((c) => c.startsWith('session='));
     expect(cleared).toMatch(/Max-Age=0/i);
+  });
+
+  test('logout ends the session server-side, so a copied cookie stops working', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+
+    await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+    });
+    const replay = await app.request('/me', { headers: { Cookie: auth.cookie } });
+
+    expect(replay.status).toBe(401);
+    expect(await count("users WHERE id = 'u-admin' AND session_version = 1")).toBe(1);
+  });
+
+  test('logout with an invalid session still answers 204 and bumps nothing', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+
+    const out = await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: `session=garbage; csrf=${auth.csrf}`, 'X-CSRF-Token': auth.csrf },
+    });
+
+    expect(out.status).toBe(204);
+    expect(await count('users WHERE session_version <> 0')).toBe(0);
   });
 
   test('logout without a CSRF token is rejected', async () => {
@@ -946,85 +1179,18 @@ describe('Morada API — apartments & occupancy', () => {
   });
 });
 
-describe('Morada API — admin provisions resident logins', () => {
-  const adminAuth = adminAuthFor;
-
-  test('an admin creates a login and the new resident can log in with the temp password', async () => {
+describe('Morada API — derived logins are no longer provisioned', () => {
+  test('the resident-login provisioning route is gone', async () => {
     const app = await makeApp();
-    const auth = await adminAuth(app);
+    const auth = await adminAuthFor(app);
 
-    const created = await auth(`${P}/users`, {
+    const res = await auth(`${P}/users`, {
       method: 'POST',
       body: JSON.stringify({ residentId: 'r-3' }),
     });
-    expect(created.status).toBe(201);
-    const body = (await created.json()) as { username: string; tempPassword: string };
-    expect(body.username).toBe('ana202');
-    expect(body.tempPassword).toMatch(/.{8,}/);
-
-    const loginRes = await login(app, 'ana202', body.tempPassword);
-    expect(loginRes.status).toBe(200);
-    expect(await loginRes.json()).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
-    });
-  });
-
-  test("cannot provision a login for another condo's resident", async () => {
-    const app = await makeApp();
-    await createTestCondo(pool, 'condo-other');
-    await makePostgresRepositories(pool).forCondo('condo-other').residents.save({
-      id: 'r-foreign',
-      name: 'Forasteiro',
-      apt: 'Apto 900',
-      phone: '',
-      email: '',
-      status: 'em_dia',
-    });
-    const auth = await adminAuth(app);
-
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: 'r-foreign' }),
-    });
 
     expect(res.status).toBe(404);
-    expect(await count("users WHERE resident_id = 'r-foreign'")).toBe(0);
-    expect(await count("condo_roles WHERE resident_id = 'r-foreign'")).toBe(0);
-  });
-
-  test('provisioning a resident login is admin-only', async () => {
-    const app = await makeApp();
-    const auth = await authFor(app, residentCredentials);
-    const res = await app.request(`${P}/users`, {
-      method: 'POST',
-      headers: {
-        Cookie: auth.cookie,
-        'X-CSRF-Token': auth.csrf,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ residentId: 'r-4' }),
-    });
-    expect(res.status).toBe(403);
-  });
-
-  test('provisioning for a nonexistent resident is rejected with 404', async () => {
-    const app = await makeApp();
-    const auth = await adminAuth(app);
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: 'r-does-not-exist' }),
-    });
-    expect(res.status).toBe(404);
-  });
-
-  test('provisioning a login for a resident that already has one is rejected with 409', async () => {
-    const app = await makeApp();
-    const auth = await adminAuth(app);
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: residentCredentials.residentId }),
-    });
-    expect(res.status).toBe(409);
+    expect(await count("users WHERE resident_id = 'r-3'")).toBe(0);
   });
 });
 
@@ -1034,18 +1200,15 @@ describe('Morada API — admin reads and resets resident logins', () => {
     const auth = await adminAuthFor(app);
     const res = await auth(`${P}/residents/${residentCredentials.residentId}/login`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      username: residentCredentials.username,
-      suggested: residentCredentials.username,
-    });
+    expect(await res.json()).toEqual({ username: residentCredentials.username });
   });
 
-  test('reading the login of a resident without one returns the derived suggestion', async () => {
+  test('reading the login of a resident without one answers a null username', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     const res = await auth(`${P}/residents/r-3/login`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ username: null, suggested: 'ana202' });
+    expect(await res.json()).toEqual({ username: null });
   });
 
   test('reading the login of a nonexistent resident answers 404', async () => {
@@ -1073,6 +1236,10 @@ describe('Morada API — admin reads and resets resident logins', () => {
       passwordHash: 'hash-foreign',
       role: 'resident',
       residentId: 'r-foreign',
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
     });
     const auth = await adminAuthFor(app);
 
@@ -1093,6 +1260,18 @@ describe('Morada API — admin reads and resets resident logins', () => {
     expect(res.status).toBe(403);
   });
 
+  test("an admin reset ends the resident's existing sessions", async () => {
+    const app = await makeApp();
+    const resident = await authFor(app, residentCredentials);
+    const meBefore = await app.request('/me', { headers: { Cookie: resident.cookie } });
+    expect(meBefore.status).toBe(200);
+    const auth = await adminAuthFor(app);
+
+    await auth(`${P}/residents/${residentCredentials.residentId}/login/reset`, { method: 'POST' });
+
+    expect((await app.request('/me', { headers: { Cookie: resident.cookie } })).status).toBe(401);
+  });
+
   test('an admin resets a resident password and the resident logs in with the new one', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
@@ -1109,6 +1288,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+      emailVerified: true,
     });
   });
 
@@ -1658,5 +1838,1085 @@ describe('Morada API — authorization wiring', () => {
       (await app.request(`${P}/accounts/ghost/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
     ).toBe(404);
+  });
+});
+
+describe('Morada API — sign-up and e-mail confirmation', () => {
+  const signupBody = { name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' };
+
+  function postJson(app: App, path: string, body: unknown, headers: Record<string, string> = {}) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function signup(app: App, body: unknown = signupBody, ip = '1.1.1.1') {
+    return postJson(app, '/auth/signup', body, { 'X-Forwarded-For': ip });
+  }
+
+  function confirmTokenIn(sender: InMemoryEmailSender, to: string): string {
+    return /confirmar-email\/([\w-]+)/.exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  test('sign-up answers 202, creates an unconfirmed user and e-mails a confirmation link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const res = await signup(app);
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({});
+    const { rows } = await pool.query(
+      'SELECT name, role, username, email_verified_at FROM users WHERE email = $1',
+      ['ana@x.com'],
+    );
+    expect(rows).toEqual([{ name: 'Ana', role: 'admin', username: null, email_verified_at: null }]);
+    expect(sender.lastTo('ana@x.com')?.subject).toBe('Confirme seu e-mail no Morada');
+    expect(res.headers.getSetCookie()).toEqual([]);
+  });
+
+  test('sign-up with a verified e-mail answers 202, creates nothing and warns the owner', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    await postJson(app, '/auth/email/confirm', {
+      token: confirmTokenIn(sender, 'ana@x.com'),
+      password: signupBody.password,
+    });
+
+    const res = await signup(app, { ...signupBody, name: 'Intruso' });
+
+    expect(res.status).toBe(202);
+    expect(await count("users WHERE email = 'ana@x.com'")).toBe(1);
+    expect(sender.sent).toHaveLength(2);
+    expect(await count("users WHERE email = 'ana@x.com' AND name = 'Ana'")).toBe(1);
+    expect(sender.lastTo('ana@x.com')?.subject).not.toBe('Confirme seu e-mail no Morada');
+    expect(sender.lastTo('ana@x.com')?.text).toContain('/#/redefinir-senha/');
+  });
+
+  test('sign-up rejects invalid data with 400', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await signup(app, { ...signupBody, password: 'curta' })).status).toBe(400);
+  });
+
+  test('the 11th sign-up from one IP is rate limited', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i += 1) {
+      statuses.push((await signup(app, { ...signupBody, email: `u${i}@x.com` })).status);
+    }
+
+    expect(statuses.slice(0, 10)).toEqual(Array(10).fill(202));
+    expect(statuses[10]).toBe(429);
+    expect((await signup(app, signupBody, '2.2.2.2')).status).toBe(202);
+  });
+
+  test('confirming sets emailVerifiedAt, logs in, and a second use of the token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: true });
+    expect(res.headers.getSetCookie().some((c) => c.startsWith('session='))).toBe(true);
+    const { rows } = await pool.query('SELECT email_verified_at FROM users WHERE email = $1', [
+      'ana@x.com',
+    ]);
+    expect(rows[0]?.email_verified_at).toBeInstanceOf(Date);
+
+    const again = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Link inválido ou expirado' });
+  });
+
+  test('confirming needs the account password; a wrong one is 401 and keeps the link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+
+    const wrong = await postJson(app, '/auth/email/confirm', { token, password: 'outra-senha-1' });
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({ error: 'Usuário ou senha inválidos' });
+    expect((await postJson(app, '/auth/email/confirm', { token })).status).toBe(400);
+
+    const right = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
+    expect(right.status).toBe(200);
+  });
+
+  test('the owner cannot confirm an account an intruder created with their e-mail', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app, { ...signupBody, password: 'senha-do-intruso' });
+
+    const res = await postJson(app, '/auth/email/confirm', {
+      token: confirmTokenIn(sender, 'ana@x.com'),
+      password: signupBody.password,
+    });
+
+    expect(res.status).toBe(401);
+    expect(await count("users WHERE email = 'ana@x.com' AND email_verified_at IS NULL")).toBe(1);
+  });
+
+  test('an unknown or malformed token is 404', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect(
+      (await postJson(app, '/auth/email/confirm', { token: 'nope', password: 'x' })).status,
+    ).toBe(404);
+    expect((await postJson(app, '/auth/email/confirm', {})).status).toBe(404);
+  });
+
+  test('an expired token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const issuedAt = new Date('2026-01-01T00:00:00.000Z');
+    const app = await makeApp({ email: sender, now: () => issuedAt });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+    const lateApp = await buildApp(makePostgresRepositories(pool), {
+      email: sender,
+      now: () => new Date('2026-01-03T00:00:00.000Z'),
+    });
+
+    expect(
+      (await postJson(lateApp, '/auth/email/confirm', { token, password: signupBody.password }))
+        .status,
+    ).toBe(404);
+  });
+
+  test('resend needs a session and CSRF, sends a new link and revokes the previous one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const first = confirmTokenIn(sender, 'ana@x.com');
+
+    expect((await postJson(app, '/auth/email/resend', {})).status).toBe(401);
+
+    const unconfirmed = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = unconfirmed.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    const cookie = `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`;
+
+    expect((await postJson(app, '/auth/email/resend', {}, { Cookie: cookie })).status).toBe(403);
+    const res = await postJson(
+      app,
+      '/auth/email/resend',
+      {},
+      { Cookie: cookie, 'X-CSRF-Token': csrf },
+    );
+    expect(res.status).toBe(204);
+    const second = confirmTokenIn(sender, 'ana@x.com');
+    expect(second).not.toBe(first);
+
+    expect(
+      (await postJson(app, '/auth/email/confirm', { token: first, password: signupBody.password }))
+        .status,
+    ).toBe(404);
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      token: second,
+      password: signupBody.password,
+    });
+    expect(confirmed.status).toBe(200);
+    expect(
+      (await postJson(app, '/auth/email/resend', {}, { Cookie: cookie, 'X-CSRF-Token': csrf }))
+        .status,
+    ).toBe(401);
+
+    const fresh = confirmed.headers.getSetCookie();
+    const freshCsrf = parseCookie(fresh, 'csrf');
+    const freshCookie = `session=${parseCookie(fresh, 'session')}; csrf=${freshCsrf}`;
+    const sentBefore = sender.sent.length;
+    const noop = await postJson(
+      app,
+      '/auth/email/resend',
+      {},
+      { Cookie: freshCookie, 'X-CSRF-Token': freshCsrf },
+    );
+    expect(noop.status).toBe(204);
+    expect(sender.sent).toHaveLength(sentBefore);
+  });
+});
+
+describe('Morada API — forgot and reset password', () => {
+  function postJson(app: App, path: string, body: unknown, headers: Record<string, string> = {}) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function forgot(app: App, email: string, ip = '1.1.1.1') {
+    return postJson(app, '/auth/password/forgot', { email }, { 'X-Forwarded-For': ip });
+  }
+
+  function resetTokenIn(sender: InMemoryEmailSender, to: string): string {
+    return /redefinir-senha\/([\w-]+)/.exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  function sessionCookieOf(res: Response): string {
+    return `session=${parseCookie(res.headers.getSetCookie(), 'session')}`;
+  }
+
+  test('an unknown e-mail answers 204 and sends nothing', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const res = await forgot(app, 'ghost@x.com');
+
+    expect(res.status).toBe(204);
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('a known e-mail answers 204 and receives a reset link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+
+    const res = await forgot(app, 'ANA@x.com');
+
+    expect(res.status).toBe(204);
+    expect(sender.lastTo('ana@x.com')?.subject).toBe('Redefinição de senha do Morada');
+    expect(resetTokenIn(sender, 'ana@x.com')).not.toBe('');
+  });
+
+  test('forgot rejects an invalid e-mail with 400', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await forgot(app, 'nope')).status).toBe(400);
+  });
+
+  test('forgot shares the sign-up IP limiter', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    for (let i = 0; i < 10; i += 1) {
+      expect((await forgot(app, `u${i}@x.com`)).status).toBe(204);
+    }
+
+    expect((await forgot(app, 'u10@x.com')).status).toBe(429);
+    const signup = await postJson(
+      app,
+      '/auth/signup',
+      { name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' },
+      { 'X-Forwarded-For': '1.1.1.1' },
+    );
+    expect(signup.status).toBe(429);
+    expect((await forgot(app, 'u10@x.com', '2.2.2.2')).status).toBe(204);
+  });
+
+  test('reset changes the password, verifies the e-mail and logs in', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: true });
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-antiga-1' })).status).toBe(
+      401,
+    );
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-nova-123' })).status).toBe(
+      200,
+    );
+    expect(await count("users WHERE email = 'ana@x.com' AND email_verified_at IS NOT NULL")).toBe(
+      1,
+    );
+  });
+
+  test('reset ends earlier sessions and the returned session works', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    const before = await loginWith(app, { login: 'ana@x.com', password: 'senha-antiga-1' });
+    const oldCookie = sessionCookieOf(before);
+    expect((await app.request('/me', { headers: { Cookie: oldCookie } })).status).toBe(200);
+    await forgot(app, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    const stale = await app.request('/me', { headers: { Cookie: oldCookie } });
+    expect(stale.status).toBe(401);
+    expect(await stale.json()).toEqual({ error: 'Sessão inválida' });
+    const fresh = await app.request('/me', { headers: { Cookie: sessionCookieOf(res) } });
+    expect(fresh.status).toBe(200);
+  });
+
+  test('a reused token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const token = resetTokenIn(sender, 'ana@x.com');
+    await postJson(app, '/auth/password/reset', { token, password: 'senha-nova-123' });
+
+    const again = await postJson(app, '/auth/password/reset', { token, password: 'outra-123' });
+
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Link inválido ou expirado' });
+  });
+
+  test('a token older than one hour is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const lateApp = await buildApp(makePostgresRepositories(pool), {
+      email: sender,
+      now: () => new Date('2026-01-01T01:00:00.000Z'),
+    });
+
+    const res = await postJson(lateApp, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('a short password is 400 and keeps the token usable; a malformed token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const token = resetTokenIn(sender, 'ana@x.com');
+
+    expect((await postJson(app, '/auth/password/reset', { token, password: 'curta' })).status).toBe(
+      400,
+    );
+    expect(
+      (await postJson(app, '/auth/password/reset', { token: 42, password: 'senha-nova-123' }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await postJson(app, '/auth/password/reset', { token, password: 'senha-nova-123' })).status,
+    ).toBe(200);
+  });
+
+  test('confirm rejects a non-string token with 404', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await postJson(app, '/auth/email/confirm', { token: 42, password: 'x' })).status).toBe(
+      404,
+    );
+  });
+
+  test('sign-up on an unverified e-mail replaces the credentials and ends its sessions', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const intruder = { name: 'Intruso', email: 'ana@x.com', password: 'senha-intruso-1' };
+    await postJson(app, '/auth/signup', intruder, { 'X-Forwarded-For': '9.9.9.9' });
+    const intruderSession = sessionCookieOf(
+      await loginWith(app, { login: 'ana@x.com', password: 'senha-intruso-1' }),
+    );
+
+    const res = await postJson(
+      app,
+      '/auth/signup',
+      { name: 'Ana', email: 'ana@x.com', password: 'senha-da-ana-1' },
+      { 'X-Forwarded-For': '1.1.1.1' },
+    );
+
+    expect(res.status).toBe(202);
+    expect((await app.request('/me', { headers: { Cookie: intruderSession } })).status).toBe(401);
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-intruso-1' })).status).toBe(
+      401,
+    );
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      password: 'senha-da-ana-1',
+      token: /confirmar-email\/([\w-]+)/.exec(sender.lastTo('ana@x.com')?.text ?? '')?.[1],
+    });
+    expect(confirmed.status).toBe(200);
+    const me = await app.request('/me', { headers: { Cookie: sessionCookieOf(confirmed) } });
+    expect(await me.json()).toMatchObject({ name: 'Ana', emailVerified: true });
+  });
+
+  test('a session token without a version is rejected', async () => {
+    const app = await makeApp();
+    const now = Math.floor(Date.now() / 1000);
+    const legacy = await sign(
+      { uid: 'u-admin', iat: now, exp: now + 60 },
+      config.jwtSecret,
+      'HS256',
+    );
+
+    const res = await app.request('/me', { headers: { Cookie: `session=${legacy}` } });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('Resident invitations', () => {
+  const APP_URL = config.appUrl;
+
+  async function adminSession(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf, 'Content-Type': 'application/json' };
+  }
+
+  function post(app: App, path: string, headers: Record<string, string>, body?: unknown) {
+    return app.request(`${P}${path}`, {
+      method: 'POST',
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  function tokenIn(link: string): string {
+    return link.slice(`${APP_URL}/#/convite/`.length);
+  }
+
+  async function setResident(id: string, fields: { phone?: string; email?: string }) {
+    await pool.query(
+      'UPDATE residents SET phone = COALESCE($2, phone), email = COALESCE($3, email) WHERE id = $1',
+      [id, fields.phone ?? null, fields.email ?? null],
+    );
+  }
+
+  test('creates a pending invitation, returns the link once and e-mails the resident', async () => {
+    const sender = new InMemoryEmailSender();
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: sender, now: () => now });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      status: string;
+      email: string;
+      expiresAt: string;
+      link: string;
+      whatsappUrl: string;
+    };
+    expect(body).toMatchObject({
+      status: 'pendente',
+      email: 'maria@email.com',
+      emailSent: true,
+      expiresAt: '2026-10-30T12:00:00.000Z',
+    });
+    expect(body.link).toMatch(new RegExp(`^${APP_URL}/#/convite/[\\w-]{43}$`));
+    const mail = sender.lastTo('maria@email.com');
+    expect(mail?.subject).toBe('Você foi convidado para o Condomínio condo-test');
+    expect(mail?.text).toContain(body.link);
+    const { rows } = await pool.query(
+      'SELECT token_hash, created_by, resident_id, condominium_id FROM invitations',
+    );
+    expect(rows).toEqual([
+      {
+        token_hash: hashToken(tokenIn(body.link)),
+        created_by: 'u-admin',
+        resident_id: 'r-1',
+        condominium_id: TEST_CONDO_ID,
+      },
+    ]);
+  });
+
+  test('uses the e-mail from the body, normalized, instead of the stored one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: '  Nova@X.com ' });
+
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { email: string }).email).toBe('nova@x.com');
+    expect(sender.sent.map((m) => m.to)).toEqual(['nova@x.com']);
+  });
+
+  test('rejects an invalid e-mail in the body with 400 and writes nothing', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: 'nope' });
+
+    expect(res.status).toBe(400);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('sends no e-mail when neither the body nor the resident has a valid one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await setResident('r-1', { email: 'not-an-email' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers);
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ email: null, emailSent: false });
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('whatsappUrl carries the Brazilian country code and the greeting', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await setResident('r-1', { phone: '(11) 98888-7777' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    const body = (await res.json()) as { link: string; whatsappUrl: string };
+    const message = `Olá, Maria! Seu acesso ao Condomínio condo-test no Morada: ${body.link}`;
+    expect(body.whatsappUrl).toBe(
+      `https://wa.me/5511988887777?text=${encodeURIComponent(message)}`,
+    );
+  });
+
+  test('whatsappUrl falls back to the generic link without a phone', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await setResident('r-1', { phone: '' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(((await res.json()) as { whatsappUrl: string }).whatsappUrl).toMatch(
+      /^https:\/\/wa\.me\/\?text=/,
+    );
+  });
+
+  test('with e-mail off, an e-mail invite still answers 201 with the link and emailSent false', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: 'a@x.com' });
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { email: string; emailSent: boolean; link: string };
+    expect(body).toMatchObject({ email: 'a@x.com', emailSent: false });
+    expect(body.link).toMatch(new RegExp(`^${APP_URL}/#/convite/`));
+    const { rows } = await pool.query('SELECT status, email FROM invitations');
+    expect(rows).toEqual([{ status: 'pendente', email: 'a@x.com' }]);
+  });
+
+  test('a failed delivery still answers 201 with emailSent false and is logged', async () => {
+    const failure = new EmailDeliveryError(500);
+    const failing: EmailSender = {
+      send: () => Promise.reject(failure),
+      isAvailable: () => true,
+    };
+    const app = await makeApp({ email: failing });
+    const headers = await adminSession(app);
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await post(app, '/residents/r-1/invitation', headers);
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ email: 'maria@email.com', emailSent: false });
+    expect(logged).toHaveBeenCalledWith('E-mail delivery failed:', failure);
+    logged.mockRestore();
+  });
+
+  test('a malformed JSON body answers 400 and writes nothing', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers,
+      body: '{nope',
+    });
+
+    expect(res.status).toBe(400);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('the 31st invitation one admin creates within an hour is rate limited', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      statuses.push((await post(app, '/residents/r-1/invitation', headers, {})).status);
+    }
+    const blocked = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(statuses).toEqual(Array(30).fill(201));
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: 'Muitas tentativas, tente mais tarde' });
+    expect(await count('invitations')).toBe(30);
+  });
+
+  test('GET returns null, then the status without the link or token', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const headers = await adminSession(app);
+    const none = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, { headers });
+
+    expect(none.status).toBe(200);
+    expect(await none.json()).toBeNull();
+    expect(await res.json()).toEqual({
+      status: 'pendente',
+      email: 'maria@email.com',
+      expiresAt: '2026-10-30T12:00:00.000Z',
+    });
+  });
+
+  test('GET reports expirado once the invitation passes its expiry', async () => {
+    let now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+    now = new Date('2026-10-30T12:00:00.000Z');
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, { headers });
+
+    expect(((await res.json()) as { status: string }).status).toBe('expirado');
+  });
+
+  test('inviting again revokes the previous invitation', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const { rows } = await pool.query('SELECT status FROM invitations ORDER BY created_at');
+    expect(rows).toEqual([{ status: 'revogado' }, { status: 'pendente' }]);
+  });
+
+  test('revoke answers 204 and marks the invitation revogado', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const res = await post(app, '/residents/r-1/invitation/revoke', headers);
+
+    expect(res.status).toBe(204);
+    const status = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    expect(((await status.json()) as { status: string }).status).toBe('revogado');
+  });
+
+  test('a resident session cannot manage invitations', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const auth = await authFor(app, residentCredentials);
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const create = await post(app, '/residents/r-1/invitation', headers, {});
+    const read = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    const revoke = await post(app, '/residents/r-1/invitation/revoke', headers);
+
+    expect([create.status, read.status, revoke.status]).toEqual([403, 403, 403]);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('foreign or unknown residents answer 404 and write nothing', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: 'f@x.com',
+      status: 'em_dia',
+    });
+    const headers = await adminSession(app);
+
+    const create = await post(app, '/residents/r-foreign/invitation', headers, {});
+    const read = await app.request(`${P}/residents/r-foreign/invitation`, { headers });
+    const revoke = await post(app, '/residents/r-foreign/invitation/revoke', headers);
+    const unknown = await post(app, '/residents/ghost/invitation', headers, {});
+
+    expect([create.status, read.status, revoke.status, unknown.status]).toEqual([
+      404, 404, 404, 404,
+    ]);
+    expect(await count('invitations')).toBe(0);
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('condominium B invitations are invisible and untouched by condominium A admin', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: '',
+      status: 'em_dia',
+    });
+    await other.invitations.create({
+      residentId: 'r-foreign',
+      email: null,
+      tokenHash: 'hb',
+      expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      createdBy: 'u-admin',
+    });
+    const headers = await adminSession(app);
+
+    await post(app, '/residents/r-foreign/invitation/revoke', headers);
+
+    expect((await other.invitations.latestForResident('r-foreign'))?.status).toBe('pendente');
+  });
+});
+
+describe('Accepting an invitation', () => {
+  const APP_URL = config.appUrl;
+  const CONDO = { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' };
+
+  async function adminHeaders(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf, 'Content-Type': 'application/json' };
+  }
+
+  async function invite(app: App, body: { email?: string } = {}): Promise<string> {
+    const res = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers: await adminHeaders(app),
+      body: JSON.stringify(body),
+    });
+    const { link } = (await res.json()) as { link: string };
+    return link.slice(`${APP_URL}/#/convite/`.length);
+  }
+
+  async function whatsappInvite(app: App): Promise<string> {
+    await pool.query("UPDATE residents SET email = '' WHERE id = 'r-1'");
+    return invite(app);
+  }
+
+  function accept(app: App, token: string, body: unknown, ip = '9.9.9.9') {
+    return app.request(`/auth/invitations/${token}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function preview(app: App, token: string, ip = '9.9.9.9') {
+    return app.request(`/auth/invitations/${token}`, { headers: { 'X-Forwarded-For': ip } });
+  }
+
+  function cookieOf(res: Response): string {
+    const setCookies = res.headers.getSetCookie();
+    return `session=${parseCookie(setCookies, 'session')}`;
+  }
+
+  const newAccount = { password: 'senha-segura-1', name: 'Maria Ribeiro' };
+
+  test('the preview shows the condo, resident and apartment, never the token or the phone', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const res = await preview(app, token);
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({
+      condoName: CONDO.name,
+      residentName: 'Maria Ribeiro',
+      apt: 'Apto 302',
+      email: 'maria@email.com',
+      accountExists: false,
+    });
+    expect(text).not.toContain(token);
+    expect(text).not.toContain('90000-0001');
+    const unknown = await preview(app, 'nao-existe');
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ error: 'Convite inválido ou expirado' });
+  });
+
+  test('an e-mail invite with a new account logs in verified with the condo listed', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const res = await accept(app, token, newAccount);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    const me = await app.request('/me', { headers: { Cookie: cookieOf(res) } });
+    expect(me.status).toBe(200);
+    expect(await count("invitations WHERE status = 'aceito'")).toBe(1);
+  });
+
+  test('accept is single use', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+    await accept(app, token, newAccount);
+
+    const again = await accept(app, token, { ...newAccount, email: 'outra@x.com' });
+
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Convite inválido ou expirado' });
+    expect((await preview(app, token)).status).toBe(404);
+  });
+
+  test('the legacy derived login of that resident gets 401 after acceptance', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    expect(
+      (await login(app, residentCredentials.username, residentCredentials.password)).status,
+    ).toBe(200);
+    const token = await invite(app);
+
+    await accept(app, token, newAccount);
+
+    const legacy = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(legacy.status).toBe(401);
+    expect(await count("condo_roles WHERE user_id = 'u-maria' AND active")).toBe(0);
+  });
+
+  test('existing account must authenticate', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await invite(app, { email: 'ana@x.com' });
+
+    const preview1 = (await (await preview(app, token)).json()) as { accountExists: boolean };
+    const wrong = await accept(app, token, { password: 'errada' });
+
+    expect(preview1.accountExists).toBe(true);
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({ error: 'Usuário ou senha inválidos' });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+
+    const right = await accept(app, token, { password: 'senha-da-ana' });
+
+    expect(right.status).toBe(200);
+    expect(await right.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect((await app.request('/me', { headers: { Cookie: cookieOf(right) } })).status).toBe(200);
+  });
+
+  test('a WhatsApp invite with a new account waits for the e-mail; claim activates on confirmation', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, { ...newAccount, email: 'Maria.Nova@x.com' });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+    const confirmToken =
+      /confirmar-email\/([\w-]+)/.exec(sender.lastTo('maria.nova@x.com')?.text ?? '')?.[1] ?? '';
+    const confirmed = await app.request('/auth/email/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: confirmToken, password: newAccount.password }),
+    });
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    const legacy = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(legacy.status).toBe(401);
+  });
+
+  test('a WhatsApp invite requires the e-mail in the body', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+
+    expect((await accept(app, token, newAccount)).status).toBe(400);
+  });
+
+  test('claimed invite cannot be claimed again', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'primeira@x.com' });
+
+    const second = await accept(app, token, { ...newAccount, email: 'segunda@x.com' });
+
+    expect(second.status).toBe(404);
+    expect(await count("users WHERE email = 'segunda@x.com'")).toBe(0);
+  });
+
+  test('a verified login retries the activation of claimed invitations', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'primeira@x.com' });
+    await pool.query("UPDATE users SET email_verified_at = now() WHERE email = 'primeira@x.com'");
+
+    const res = await loginWith(app, { login: 'primeira@x.com', password: newAccount.password });
+
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+  });
+
+  test('an invite for a resident who moved out is invalid, and new ones are refused', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+    await makePostgresRepositories(pool).forCondo(TEST_CONDO_ID).residents.deactivate('r-1');
+
+    const res = await accept(app, token, newAccount);
+    const again = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers: await adminHeaders(app),
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(404);
+    expect((await preview(app, token)).status).toBe(404);
+    expect(again.status).toBe(409);
+    expect(await again.json()).toEqual({ error: 'Morador inativo' });
+  });
+
+  test('an expired invite is invalid', async () => {
+    let now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const token = await invite(app);
+    now = new Date('2026-10-30T12:00:00.000Z');
+
+    expect((await accept(app, token, newAccount)).status).toBe(404);
+  });
+
+  function postJson(app: App, path: string, body: unknown) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '8.8.8.8' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function linkIn(sender: InMemoryEmailSender, to: string, route: string): string {
+    return new RegExp(`${route}/([\\w-]+)`).exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  test('a sign-up takeover of the claiming account releases the claim', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'vitima@x.com' });
+
+    await postJson(app, '/auth/signup', {
+      name: 'Vítima',
+      email: 'vitima@x.com',
+      password: 'senha-da-vitima',
+    });
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      token: linkIn(sender, 'vitima@x.com', 'confirmar-email'),
+      password: 'senha-da-vitima',
+    });
+
+    expect(await confirmed.json()).toEqual({ condos: [], emailVerified: true });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('resetting the password of an unverified claiming account releases the claim', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'vitima@x.com' });
+
+    await postJson(app, '/auth/password/forgot', { email: 'vitima@x.com' });
+    const reset = await postJson(app, '/auth/password/reset', {
+      token: linkIn(sender, 'vitima@x.com', 'redefinir-senha'),
+      password: 'senha-da-vitima',
+    });
+
+    expect(await reset.json()).toEqual({ condos: [], emailVerified: true });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('a WhatsApp invite answers 400 to a body without a name whether or not the account exists', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await whatsappInvite(app);
+
+    const existing = await accept(app, token, { email: 'ana@x.com', password: 'senha-da-ana' });
+    const missing = await accept(app, token, { email: 'nova@x.com', password: 'senha-da-ana' });
+
+    expect([existing.status, missing.status]).toEqual([400, 400]);
+  });
+
+  test('preview and accept share their own limiter, apart from sign-up', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 10; i += 1) statuses.push((await preview(app, token, '7.7.7.7')).status);
+    const blocked = await accept(app, token, newAccount, '7.7.7.7');
+    const signup = await app.request('/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '7.7.7.7' },
+      body: JSON.stringify({ name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' }),
+    });
+
+    expect(statuses).toEqual(Array(10).fill(200));
+    expect(blocked.status).toBe(429);
+    expect(signup.status).toBe(202);
+  });
+
+  test('sign-up attempts do not consume the invitation limiter', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    for (let i = 0; i < 10; i += 1) {
+      await app.request('/auth/password/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '6.6.6.6' },
+        body: JSON.stringify({ email: `x${i}@x.com` }),
+      });
+    }
+
+    expect((await preview(app, token, '6.6.6.6')).status).toBe(200);
+  });
+
+  test('with e-mail off, a link-only invite answers 503 and creates no account', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, { ...newAccount, email: 'nova@x.com' });
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'Envio de e-mail indisponível' });
+    expect(await count("users WHERE email = 'nova@x.com'")).toBe(0);
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('with e-mail off, an unconfirmed account cannot claim a link-only invite', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, {
+      email: 'ana@x.com',
+      password: 'senha-da-ana',
+      name: 'Ana',
+    });
+
+    expect(res.status).toBe(503);
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('with e-mail off, a verified account still accepts a link-only invite', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    await pool.query("UPDATE users SET email_verified_at = now() WHERE email = 'ana@x.com'");
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, {
+      email: 'ana@x.com',
+      password: 'senha-da-ana',
+      name: 'Ana',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
   });
 });

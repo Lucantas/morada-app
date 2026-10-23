@@ -8,6 +8,9 @@ import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
 import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
+import { publicInvitationRoutes } from './invitations/adapters/http/public-routes';
+import { invitationRoutes } from './invitations/adapters/http/routes';
+import { activateClaimedInvitations } from './invitations/app/activate-claimed-invitations';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
@@ -17,6 +20,8 @@ import { config } from './platform/config';
 import { createRepositories, type CondoRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { healthRoutes } from './platform/http/health-routes';
+import { createEmailSender } from './platform/email/create-email-sender';
+import type { EmailSender } from './platform/email/email-sender';
 import { createRateLimiter } from './platform/rate-limit';
 import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
@@ -25,7 +30,6 @@ import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
-import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
@@ -35,8 +39,18 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   return group;
 }
 
-export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
-  const { users, condos } = repos;
+const SIGNUP_LIMIT = { maxAttempts: 10, windowMs: 3_600_000, lockoutMs: 3_600_000 };
+const INVITATION_CREATE_LIMIT = { maxAttempts: 30, windowMs: 3_600_000, lockoutMs: 3_600_000 };
+
+export interface AppOptions {
+  email?: EmailSender;
+  now?: () => Date;
+}
+
+export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<Hono<ApiEnv>> {
+  const { users, condos, authTokens } = repos;
+  const email = opts?.email ?? createEmailSender(config);
+  const now = opts?.now ?? (() => new Date());
   const scoped =
     <T>(pick: (condoRepos: CondoRepositories) => T): Scoped<T> =>
     (condoId) =>
@@ -80,34 +94,59 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   app.route('/healthz', healthRoutes());
 
+  const auth = authMiddleware((userId) => users.sessionVersionOf(userId));
   const loginLimiter = createRateLimiter();
+  const signupLimiter = createRateLimiter(SIGNUP_LIMIT);
+  const invitationLimiter = createRateLimiter(SIGNUP_LIMIT);
+  const invitationCreateLimiter = createRateLimiter(INVITATION_CREATE_LIMIT);
+  const condosFor = (userId: string) => listMyCondos(condos, userId);
+  const invitationAccess = {
+    invitations: repos.invitationTokens,
+    condos,
+    users,
+    residentsFor: (condoId: string) => repos.forCondo(condoId).residents,
+    now,
+  };
+  const activateClaimed = (userId: string) => activateClaimedInvitations(invitationAccess, userId);
   app.route(
     '/auth',
     authRoutes({
+      auth,
       users,
       hasher,
-      condosFor: (userId) => listMyCondos(condos, userId),
+      condosFor,
       limiter: loginLimiter,
+      tokens: authTokens,
+      email,
+      appUrl: config.appUrl,
+      now,
+      signupLimiter,
+      afterEmailConfirmed: activateClaimed,
+      onVerifiedLogin: activateClaimed,
+      onCredentialsReplaced: (userId) => repos.invitationTokens.releaseClaims(userId),
     }),
   );
-  app.route('/me', meRoutes(condos));
+  app.route(
+    '/auth/invitations',
+    publicInvitationRoutes({
+      ...invitationAccess,
+      hasher,
+      tokens: authTokens,
+      email,
+      appUrl: config.appUrl,
+      activateClaimed,
+      condosFor,
+      limiter: invitationLimiter,
+    }),
+  );
+  app.route('/me', meRoutes({ auth, condos, users }));
 
   const api = new Hono<ApiEnv>();
-  api.use('*', authMiddleware);
+  api.use('*', auth);
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
   api.route('/info', condoInfoRoutes(condos));
-
-  // Admin-only: provision a resident login. Returns the generated temp password
-  // once for the admin to relay; only the hash is ever stored.
-  api.route(
-    '/users',
-    userRoutes(
-      scoped(({ residents }) => ({ users, residents, condos })),
-      hasher,
-    ),
-  );
 
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.
@@ -116,6 +155,14 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     residentRoutes(
       scoped(({ residents, receipts }) => ({ residents, receipts, users })),
       hasher,
+    ),
+  );
+
+  api.route(
+    '/residents',
+    invitationRoutes(
+      scoped(({ residents, invitations }) => ({ residents, invitations })),
+      { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
     ),
   );
 

@@ -33,10 +33,13 @@ describe('condo-aware session', () => {
   });
 
   test('login stores the first condo and its role', () => {
-    const role = applyLogin([
-      { id: 'c1', name: 'Morada', role: 'resident' },
-      { id: 'c2', name: 'Outro', role: 'admin' },
-    ]);
+    const role = applyLogin({
+      condos: [
+        { id: 'c1', name: 'Morada', role: 'resident' },
+        { id: 'c2', name: 'Outro', role: 'admin' },
+      ],
+      emailVerified: true,
+    });
 
     expect(role).toBe('resident');
     expect(useSessionStore.getState().role).toBe('resident');
@@ -44,13 +47,13 @@ describe('condo-aware session', () => {
   });
 
   test('signOut clears the condo', () => {
-    applyLogin([{ id: 'c1', name: 'Morada', role: 'admin' }]);
+    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
     act(() => useSessionStore.getState().signOut());
     expect(useCondoScope.getState().condo).toBeNull();
   });
 
   test('signOut never exposes a role without a condo', () => {
-    applyLogin([{ id: 'c1', name: 'Morada', role: 'resident' }]);
+    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'resident' }], emailVerified: true });
     const seen: { role: string | null; condo: unknown }[] = [];
     const record = () =>
       seen.push({
@@ -66,6 +69,49 @@ describe('condo-aware session', () => {
     expect(seen.some((state) => state.role !== null && state.condo === null)).toBe(false);
   });
 
+  test('login with condos keeps no pending user', () => {
+    applyLogin({ condos: [], emailVerified: false });
+
+    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
+
+    expect(useSessionStore.getState().pendingUser).toBeNull();
+  });
+
+  test('login with zero condos stores an unverified pending user and no role', () => {
+    const role = applyLogin({ condos: [], emailVerified: false });
+
+    expect(role).toBeNull();
+    expect(useSessionStore.getState()).toMatchObject({
+      role: null,
+      pendingUser: { emailVerified: false },
+    });
+    expect(useCondoScope.getState().condo).toBeNull();
+  });
+
+  test('login with zero condos stores a verified pending user', () => {
+    applyLogin({ condos: [], emailVerified: true });
+
+    expect(useSessionStore.getState().pendingUser).toEqual({ emailVerified: true });
+  });
+
+  test('signOut clears the pending user', () => {
+    applyLogin({ condos: [], emailVerified: false });
+
+    act(() => useSessionStore.getState().signOut());
+
+    expect(useSessionStore.getState().pendingUser).toBeNull();
+  });
+
+  test('the pending user survives a reload', () => {
+    applyLogin({ condos: [], emailVerified: false });
+
+    const persisted = JSON.parse(window.localStorage.getItem('morada-session') ?? '{}') as {
+      state?: unknown;
+    };
+
+    expect(persisted.state).toMatchObject({ pendingUser: { emailVerified: false } });
+  });
+
   test('boot with a session but no condo signs out', () => {
     act(() => useSessionStore.getState().authenticate('admin', null));
     act(() => useCondoScope.getState().setCondo(null));
@@ -76,7 +122,7 @@ describe('condo-aware session', () => {
   });
 
   test('boot with a session and a condo keeps the session', () => {
-    applyLogin([{ id: 'c1', name: 'Morada', role: 'admin' }]);
+    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
 
     signOutIfCondoMissing();
 

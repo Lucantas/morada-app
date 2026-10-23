@@ -11,27 +11,49 @@ export type ApiEnv = { Variables: { uid: string; role: Role; sub: string; condoI
 
 const EIGHT_HOURS = 60 * 60 * 8;
 
-export async function signSession(userId: string): Promise<string> {
+export type SessionVersionResolver = (userId: string) => Promise<number | null>;
+
+export async function signSession(userId: string, sessionVersion: number): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ uid: userId, iat: now, exp: now + EIGHT_HOURS }, config.jwtSecret, 'HS256');
+  return sign(
+    { uid: userId, sv: sessionVersion, iat: now, exp: now + EIGHT_HOURS },
+    config.jwtSecret,
+    'HS256',
+  );
 }
 
-export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE);
-  if (!token) return c.json({ error: 'Não autenticado' }, 401);
+async function sessionClaims(token: string): Promise<{ uid: string; sv: number } | null> {
   try {
-    const payload = await verify(token, config.jwtSecret, 'HS256');
-    const uid = payload.uid;
-    if (typeof uid !== 'string' || uid === '') {
-      return c.json({ error: 'Sessão inválida' }, 401);
-    }
+    const { uid, sv } = await verify(token, config.jwtSecret, 'HS256');
+    if (typeof uid !== 'string' || uid === '') return null;
+    if (typeof sv !== 'number' || !Number.isInteger(sv)) return null;
+    return { uid, sv };
+  } catch {
+    return null;
+  }
+}
+
+export async function currentSessionUser(
+  token: string,
+  resolveSessionVersion: SessionVersionResolver,
+): Promise<string | null> {
+  const claims = await sessionClaims(token);
+  if (!claims || (await resolveSessionVersion(claims.uid)) !== claims.sv) return null;
+  return claims.uid;
+}
+
+export function authMiddleware(
+  resolveSessionVersion: SessionVersionResolver,
+): MiddlewareHandler<ApiEnv> {
+  return async (c, next) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    if (!token) return c.json({ error: 'Não autenticado' }, 401);
+    const uid = await currentSessionUser(token, resolveSessionVersion);
+    if (uid === null) return c.json({ error: 'Sessão inválida' }, 401);
     c.set('uid', uid);
     await next();
-    return;
-  } catch {
-    return c.json({ error: 'Sessão inválida' }, 401);
-  }
-};
+  };
+}
 
 export function requireRole(role: Role): MiddlewareHandler<ApiEnv> {
   return async (c, next) => {

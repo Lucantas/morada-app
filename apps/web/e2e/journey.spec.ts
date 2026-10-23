@@ -12,6 +12,8 @@ const APT_NUMBER = String(900 + (Math.floor(Date.now() / 1000) % 100));
 // two apartments share it and break the strict-mode getByText lookups below.
 // Deriving the name from APT_NUMBER keeps every attempt's resident distinct.
 const RESIDENT_NAME = `Maria Ribeiro ${APT_NUMBER}`;
+const RESIDENT_EMAIL = `e2e-${Date.now()}@morada.test`;
+const RESIDENT_PASSWORD = 'senha-e2e-123';
 // A future competência avoids colliding with the current month's auto-issued
 // charge (the admin dashboard calls ensureMonthlyReceipts() on every mount,
 // which issues a receipt for the current month to every active resident).
@@ -20,14 +22,13 @@ const RECEIPT_VALUE_DIGITS = '35000';
 
 async function login(page: Page, username: string, password: string): Promise<void> {
   await page.goto('/');
-  await page.getByLabel(/usuário/i).fill(username);
+  await page.getByLabel('E-mail ou usuário').fill(username);
   await page.getByLabel(/senha/i).fill(password);
   await page.getByRole('button', { name: /entrar/i }).click();
 }
 
 test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
-  let tempPassword = '';
-  let residentUsername = '';
+  let inviteToken = '';
 
   test('admin faz login e vê o dashboard', async ({ page }) => {
     await login(page, 'admin', 'morada-admin');
@@ -42,33 +43,57 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
 
     await page.getByLabel('Número do apartamento').fill(APT_NUMBER);
     await page.getByLabel('Nome completo').fill(RESIDENT_NAME);
+    await page.getByLabel('E-mail').fill(RESIDENT_EMAIL);
     await page.getByRole('button', { name: 'Cadastrar apartamento' }).click();
 
     await expect(page.getByText(`Apto ${APT_NUMBER}`)).toBeVisible();
     await expect(page.getByText(`${RESIDENT_NAME} · Condomínio Demo`)).toBeVisible();
   });
 
-  test('admin provisiona o acesso do morador e captura a senha temporária', async ({ page }) => {
+  test('admin gera o convite do morador e captura o link', async ({ page }) => {
     await login(page, 'admin', 'morada-admin');
 
     await page.getByRole('button', { name: 'Apartamentos' }).click();
     await page.getByText(`Apto ${APT_NUMBER}`).click();
-    await page.getByRole('button', { name: 'Criar acesso do morador' }).click();
+    await page.getByRole('button', { name: 'Acesso do morador' }).click();
 
-    // The resident login is derived (first name + apartment) and shown read-only —
-    // capture the suggested value instead of typing one.
-    const suggestedUsername = page.getByTestId('suggested-username');
-    await expect(suggestedUsername).toBeVisible();
-    residentUsername = (await suggestedUsername.textContent())?.trim() ?? '';
-    expect(residentUsername.length).toBeGreaterThan(0);
-    await page.getByRole('button', { name: 'Criar acesso' }).click();
+    await expect(page.getByLabel('E-mail do morador')).toHaveValue(RESIDENT_EMAIL);
+    await page.getByRole('button', { name: 'Gerar convite' }).click();
 
-    await expect(page.getByText('Senha temporária')).toBeVisible();
+    await expect(page.getByText(`E-mail enviado para ${RESIDENT_EMAIL}`)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copiar link' })).toBeVisible();
+    const link = (await page.getByTestId('invite-link').textContent())?.trim() ?? '';
+    inviteToken = link.split('#/convite/')[1] ?? '';
+    expect(inviteToken.length).toBeGreaterThan(20);
+  });
 
-    await expect(page.getByTestId('login-username')).toHaveText(residentUsername);
+  test('morador abre o convite, cria a senha e entra no app', async ({ browser }) => {
+    const residentContext = await browser.newContext();
+    const residentPage = await residentContext.newPage();
 
-    tempPassword = (await page.getByTestId('temp-password').textContent())?.trim() ?? '';
-    expect(tempPassword.length).toBeGreaterThan(0);
+    await residentPage.goto(`/#/convite/${inviteToken}`);
+    await expect(
+      residentPage.getByRole('heading', { name: /Você foi convidado para o/ }),
+    ).toBeVisible();
+    await expect(residentPage.getByLabel('E-mail')).toHaveValue(RESIDENT_EMAIL);
+    await expect(residentPage).not.toHaveURL(/convite/);
+    await residentPage.getByLabel('Seu nome').fill(RESIDENT_NAME);
+    await residentPage.getByLabel('Senha', { exact: true }).fill(RESIDENT_PASSWORD);
+    await residentPage.getByLabel('Confirme a senha').fill(RESIDENT_PASSWORD);
+    await residentPage.getByRole('button', { name: 'Aceitar convite' }).click();
+
+    await expect(residentPage.getByText('Olá, Maria')).toBeVisible();
+    await residentContext.close();
+  });
+
+  test('admin vê o acesso ativo do morador', async ({ page }) => {
+    await login(page, 'admin', 'morada-admin');
+
+    await page.getByRole('button', { name: 'Apartamentos' }).click();
+    await page.getByText(`Apto ${APT_NUMBER}`).click();
+    await page.getByRole('button', { name: 'Acesso do morador' }).click();
+
+    await expect(page.getByText('Acesso ativo por e-mail')).toBeVisible();
   });
 
   test('admin emite uma cobrança pendente para o apartamento', async ({ page }) => {
@@ -91,11 +116,11 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
     await expect(receiptRow.getByText('Pendente', { exact: true })).toBeVisible();
   });
 
-  test('morador loga com a senha temporária, vê a cobrança e paga via pix', async ({ browser }) => {
+  test('morador loga com e-mail e senha, vê a cobrança e paga via pix', async ({ browser }) => {
     const residentContext = await browser.newContext();
     const residentPage = await residentContext.newPage();
 
-    await login(residentPage, residentUsername, tempPassword);
+    await login(residentPage, RESIDENT_EMAIL, RESIDENT_PASSWORD);
     await expect(residentPage.getByText(/próxima taxa/i)).toBeVisible();
     await expect(residentPage.getByText(`Taxa condominial · ${RECEIPT_REF}`)).toBeVisible();
 
@@ -140,17 +165,17 @@ test.describe.serial('jornada crítica: ciclo de vida do morador', () => {
   test('morador e admin fazem logout e voltam à tela de login', async ({ browser }) => {
     const residentContext = await browser.newContext();
     const residentPage = await residentContext.newPage();
-    await login(residentPage, residentUsername, tempPassword);
+    await login(residentPage, RESIDENT_EMAIL, RESIDENT_PASSWORD);
     await residentPage.getByRole('button', { name: 'Perfil' }).click();
     await residentPage.getByRole('button', { name: 'Sair' }).click();
-    await expect(residentPage.getByLabel(/usuário/i)).toBeVisible();
+    await expect(residentPage.getByLabel('E-mail ou usuário')).toBeVisible();
     await residentContext.close();
 
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await login(adminPage, 'admin', 'morada-admin');
     await adminPage.getByRole('button', { name: 'Sair' }).click();
-    await expect(adminPage.getByLabel(/usuário/i)).toBeVisible();
+    await expect(adminPage.getByLabel('E-mail ou usuário')).toBeVisible();
     await adminContext.close();
   });
 });

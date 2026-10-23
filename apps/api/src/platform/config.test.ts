@@ -1,4 +1,21 @@
-import { parseWebOrigins, parseR2Config } from './config';
+import {
+  parseWebOrigins,
+  parseR2Config,
+  parseEmailConfig,
+  parseAppUrl,
+  parseProxySecret,
+} from './config';
+
+describe('parseProxySecret', () => {
+  test('keeps a configured secret, trimmed', () => {
+    expect(parseProxySecret('  s3gredo ')).toBe('s3gredo');
+  });
+
+  test('is null when unset or blank', () => {
+    expect(parseProxySecret(undefined)).toBeNull();
+    expect(parseProxySecret('   ')).toBeNull();
+  });
+});
 
 describe('parseWebOrigins', () => {
   test('splits a comma-separated list and trims blanks', () => {
@@ -44,5 +61,42 @@ describe('parseR2Config', () => {
 
   test('returns null when no env vars are set', () => {
     expect(parseR2Config({})).toBeNull();
+  });
+});
+
+describe('parseEmailConfig', () => {
+  const fullEnv = {
+    CLOUDFLARE_ACCOUNT_ID: 'acc',
+    CLOUDFLARE_EMAIL_API_TOKEN: 'tok',
+    EMAIL_FROM: 'no-reply@morada.app',
+  };
+
+  test('returns the config when all 3 env vars are set', () => {
+    expect(parseEmailConfig(fullEnv)).toEqual({
+      accountId: 'acc',
+      apiToken: 'tok',
+      from: 'no-reply@morada.app',
+    });
+  });
+
+  test.each(['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_EMAIL_API_TOKEN', 'EMAIL_FROM'])(
+    'returns null when %s is missing',
+    (missingKey) => {
+      expect(parseEmailConfig({ ...fullEnv, [missingKey]: undefined })).toBeNull();
+    },
+  );
+});
+
+describe('parseAppUrl', () => {
+  test('falls back to the first web origin', () => {
+    expect(parseAppUrl(undefined, ['https://a'])).toBe('https://a');
+  });
+
+  test('strips trailing slashes', () => {
+    expect(parseAppUrl('https://app.dev/', ['https://a'])).toBe('https://app.dev');
+  });
+
+  test('uses the configured value when set', () => {
+    expect(parseAppUrl('https://app.dev', ['https://a'])).toBe('https://app.dev');
   });
 });

@@ -374,4 +374,66 @@ ALTER TABLE incomes ALTER COLUMN condominium_id DROP DEFAULT;
 ALTER TABLE condo_settings ALTER COLUMN condominium_id DROP DEFAULT;
 `,
   },
+  {
+    id: '019_identity',
+    sql: `
+ALTER TABLE users ALTER COLUMN username DROP NOT NULL;
+ALTER TABLE users ADD COLUMN email TEXT;
+ALTER TABLE users ADD COLUMN name TEXT;
+ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE email IS NOT NULL;
+`,
+  },
+  {
+    id: '020_auth_tokens',
+    sql: `
+CREATE TABLE auth_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK (kind IN ('confirm_email', 'reset_password')),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_auth_tokens_user_kind ON auth_tokens (user_id, kind);
+`,
+  },
+  {
+    id: '021_session_version',
+    sql: `
+ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0;
+`,
+  },
+  {
+    id: '022_invitations',
+    sql: `
+CREATE TABLE invitations (
+  id TEXT PRIMARY KEY,
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  resident_id TEXT NOT NULL REFERENCES residents(id),
+  role TEXT NOT NULL CHECK (role IN ('morador')),
+  email TEXT,
+  token_hash TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL CHECK (status IN ('pendente', 'aceito', 'revogado')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  claimed_by TEXT REFERENCES users(id),
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_invitations_condo_resident ON invitations (condominium_id, resident_id);
+`,
+  },
+  {
+    id: '023_one_pending_invitation',
+    sql: `
+UPDATE invitations SET status = 'revogado'
+WHERE status = 'pendente' AND id NOT IN (
+  SELECT DISTINCT ON (resident_id) id FROM invitations
+  WHERE status = 'pendente' ORDER BY resident_id, created_at DESC
+);
+CREATE UNIQUE INDEX idx_invitations_one_pending ON invitations (resident_id) WHERE status = 'pendente';
+`,
+  },
 ];

@@ -134,12 +134,16 @@ export function Field({
   onChange,
   placeholder,
   type = 'text',
+  autoComplete,
+  readOnly = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  autoComplete?: string;
+  readOnly?: boolean;
 }) {
   return (
     <label style={{ display: 'block', marginBottom: 16 }}>
@@ -158,6 +162,8 @@ export function Field({
         type={type}
         value={value}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        readOnly={readOnly}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
         style={{
           width: '100%',
@@ -168,7 +174,7 @@ export function Field({
           fontFamily: "'Inter', sans-serif",
           fontSize: '1rem',
           color: 'var(--ink-900)',
-          background: 'var(--surface)',
+          background: readOnly ? 'var(--petrol-50)' : 'var(--surface)',
         }}
       />
     </label>
