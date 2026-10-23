@@ -36,7 +36,7 @@ export interface CondoRepository {
     residentId: string,
     exceptUserId: string,
   ): Promise<void>;
-  deactivateOtherSindicos(condominiumId: string, keepUserId: string): Promise<void>;
+  grantSindico(condominiumId: string, userId: string): Promise<void>;
   currentSindico(condominiumId: string): Promise<CondoSindico | null>;
   removeSindico(condominiumId: string): Promise<void>;
   addOrgMember(organizationId: string, userId: string, role: OrgRoleName): Promise<void>;

@@ -76,7 +76,7 @@ export type FakeCondos = Pick<
   | 'isOperational'
   | 'grant'
   | 'deactivateResidentGrants'
-  | 'deactivateOtherSindicos'
+  | 'grantSindico'
   | 'addOrgMember'
   | 'getOrganization'
 > & {
@@ -104,8 +104,9 @@ export function fakeCondos(condos: Condominium[], organizations: Organization[] 
     deactivateResidentGrants: async (condominiumId, residentId, exceptUserId) => {
       deactivations = [...deactivations, { condominiumId, residentId, exceptUserId }];
     },
-    deactivateOtherSindicos: async (condominiumId, keepUserId) => {
-      sindicoRetirements = [...sindicoRetirements, { condominiumId, keepUserId }];
+    grantSindico: async (condominiumId, userId) => {
+      grants = [...grants, { condominiumId, userId, role: 'sindico', residentId: null }];
+      sindicoRetirements = [...sindicoRetirements, { condominiumId, keepUserId: userId }];
     },
     addOrgMember: async (organizationId, userId, role) => {
       orgMembers = [...orgMembers, { organizationId, userId, role }];

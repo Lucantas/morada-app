@@ -9,7 +9,7 @@ export interface GrantInvitationDeps {
   invitations: InvitationTokenRepository;
   condos: Pick<
     CondoRepository,
-    'grant' | 'deactivateResidentGrants' | 'deactivateOtherSindicos' | 'addOrgMember'
+    'grant' | 'deactivateResidentGrants' | 'grantSindico' | 'addOrgMember'
   >;
 }
 
@@ -24,8 +24,7 @@ async function applyGrant(
   }
   const { condominiumId } = invitation;
   if (invitation.role === 'sindico') {
-    await condos.grant({ condominiumId, userId, role: 'sindico', residentId: null });
-    await condos.deactivateOtherSindicos(condominiumId, userId);
+    await condos.grantSindico(condominiumId, userId);
     return;
   }
   const { residentId } = invitation;

@@ -243,11 +243,25 @@ export class PostgresCondoRepository implements CondoRepository {
     );
   }
 
-  async deactivateOtherSindicos(condominiumId: string, keepUserId: string): Promise<void> {
+  async grantSindico(condominiumId: string, userId: string): Promise<void> {
+    const parsed = condoGrantSchema.parse({
+      condominiumId,
+      userId,
+      role: 'sindico',
+      residentId: null,
+    });
     await this.pool.query(
-      `UPDATE condo_roles SET active = FALSE
-       WHERE condominium_id = $1 AND role = 'sindico' AND user_id <> $2 AND active`,
-      [condominiumId, keepUserId],
+      `WITH granted AS (
+         INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+         VALUES ($1, $2, $3, 'sindico', NULL)
+         ON CONFLICT (condominium_id, user_id, role)
+         DO UPDATE SET active = TRUE, resident_id = NULL
+         RETURNING user_id
+       )
+       UPDATE condo_roles SET active = FALSE
+       WHERE condominium_id = $2 AND role = 'sindico' AND active
+         AND user_id <> (SELECT user_id FROM granted)`,
+      [randomUUID(), parsed.condominiumId, parsed.userId],
     );
   }
 

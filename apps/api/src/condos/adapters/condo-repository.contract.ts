@@ -577,16 +577,13 @@ export function runCondoRepositoryContract(
       expect(await repo.getById('condo-missing')).toBeNull();
     });
 
-    test('deactivateOtherSindicos keeps only the given user', async () => {
+    test('grantSindico leaves exactly one active sindico, the given user, in that condo only', async () => {
       const { repo, pool } = await makeRepo();
       await createTestCondo(pool, 'condo-a');
       await createTestCondo(pool, 'condo-b');
       for (const id of ['u-old', 'u-new', 'u-other']) await insertUser(pool, id);
-      const sindico = (condominiumId: string, userId: string) =>
-        repo.grant({ condominiumId, userId, role: 'sindico', residentId: null });
-      await sindico('condo-a', 'u-old');
-      await sindico('condo-a', 'u-new');
-      await sindico('condo-b', 'u-other');
+      await repo.grantSindico('condo-a', 'u-old');
+      await repo.grantSindico('condo-b', 'u-other');
       await repo.grant({
         condominiumId: 'condo-a',
         userId: 'u-old',
@@ -594,17 +591,66 @@ export function runCondoRepositoryContract(
         residentId: null,
       });
 
-      await repo.deactivateOtherSindicos('condo-a', 'u-new');
+      await repo.grantSindico('condo-a', 'u-new');
 
       const { rows } = await pool.query(
-        'SELECT condominium_id, user_id, role, active FROM condo_roles ORDER BY condominium_id, user_id, role',
+        'SELECT condominium_id, user_id, role, resident_id, active FROM condo_roles ORDER BY condominium_id, user_id, role',
       );
       expect(rows).toEqual([
-        { condominium_id: 'condo-a', user_id: 'u-new', role: 'sindico', active: true },
-        { condominium_id: 'condo-a', user_id: 'u-old', role: 'administrador', active: true },
-        { condominium_id: 'condo-a', user_id: 'u-old', role: 'sindico', active: false },
-        { condominium_id: 'condo-b', user_id: 'u-other', role: 'sindico', active: true },
+        {
+          condominium_id: 'condo-a',
+          user_id: 'u-new',
+          role: 'sindico',
+          resident_id: null,
+          active: true,
+        },
+        {
+          condominium_id: 'condo-a',
+          user_id: 'u-old',
+          role: 'administrador',
+          resident_id: null,
+          active: true,
+        },
+        {
+          condominium_id: 'condo-a',
+          user_id: 'u-old',
+          role: 'sindico',
+          resident_id: null,
+          active: false,
+        },
+        {
+          condominium_id: 'condo-b',
+          user_id: 'u-other',
+          role: 'sindico',
+          resident_id: null,
+          active: true,
+        },
       ]);
+    });
+
+    test('grantSindico reactivates a retired sindico and retires the replacement', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a');
+      for (const id of ['u-a', 'u-b']) await insertUser(pool, id);
+      await repo.grantSindico('condo-a', 'u-a');
+      await repo.grantSindico('condo-a', 'u-b');
+
+      await repo.grantSindico('condo-a', 'u-a');
+
+      expect((await repo.currentSindico('condo-a'))?.userId).toBe('u-a');
+      expect(await count(pool, "condo_roles WHERE role = 'sindico' AND active")).toBe(1);
+      expect(await count(pool, "condo_roles WHERE role = 'sindico'")).toBe(2);
+    });
+
+    test('grantSindico changes nothing when the statement fails', async () => {
+      const { repo, pool } = await makeRepo();
+      await createTestCondo(pool, 'condo-a');
+      await insertUser(pool, 'u-a');
+      await repo.grantSindico('condo-a', 'u-a');
+
+      await expect(repo.grantSindico('condo-a', 'u-ghost')).rejects.toBeDefined();
+
+      expect((await repo.currentSindico('condo-a'))?.userId).toBe('u-a');
     });
 
     test('currentSindico returns the active sindico of that condo only', async () => {
