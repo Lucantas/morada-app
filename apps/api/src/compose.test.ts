@@ -131,6 +131,56 @@ describe('Morada API', () => {
     expect(res.status).toBe(401);
   });
 
+  test('admin renames the condominium', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const renamed = await app.request(`${P}/info`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Residencial Ipê' }),
+    });
+    const read = await app.request(`${P}/info`, { headers });
+
+    expect(renamed.status).toBe(200);
+    expect(await renamed.json()).toEqual({ id: TEST_CONDO_ID, name: 'Residencial Ipê' });
+    expect(await read.json()).toEqual({ id: TEST_CONDO_ID, name: 'Residencial Ipê' });
+  });
+
+  test('renaming the condominium to a blank name answers 400', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+
+    const res = await app.request(`${P}/info`, {
+      method: 'PUT',
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: '   ' }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('resident reads but cannot rename the condominium (403)', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, residentCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/info`, { headers });
+    const rename = await app.request(`${P}/info`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Hack' }),
+    });
+
+    expect(read.status).toBe(200);
+    expect(rename.status).toBe(403);
+  });
+
   test('forbids a resident from admin-only resources', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);

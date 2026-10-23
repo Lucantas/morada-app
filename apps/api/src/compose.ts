@@ -4,7 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 
 import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
-import { meRoutes } from './condos/adapters/http/routes';
+import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
 import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
@@ -96,6 +96,8 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.use('*', authMiddleware);
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
+
+  api.route('/info', condoInfoRoutes(condos));
 
   // Admin-only: provision a resident login. Returns the generated temp password
   // once for the admin to relay; only the hash is ever stored.
