@@ -5,3 +5,11 @@ export class SettingsValidationError extends Error {
     this.name = 'SettingsValidationError';
   }
 }
+
+export class SettingsNotFoundError extends Error {
+  readonly status = 404;
+  constructor() {
+    super('Configurações não encontradas');
+    this.name = 'SettingsNotFoundError';
+  }
+}

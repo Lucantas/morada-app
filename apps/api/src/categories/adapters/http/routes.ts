@@ -6,14 +6,17 @@ import { getCategories } from '../../app/get-categories';
 import { saveCategories, type AccountsForReclassify } from '../../app/save-categories';
 import type { CategoryRepository } from '../../domain/category-repository';
 
-export function categoryRoutes(
-  repo: CategoryRepository,
-  scopeAccounts: Scoped<AccountsForReclassify>,
-): Hono<ApiEnv> {
+interface CategoryRoutesDeps {
+  categories: CategoryRepository;
+  accounts: AccountsForReclassify;
+}
+
+export function categoryRoutes(scope: Scoped<CategoryRoutesDeps>): Hono<ApiEnv> {
   const app = new Hono<ApiEnv>();
-  app.get('/', async (c) => c.json(await getCategories(repo)));
-  app.put('/', async (c) =>
-    c.json(await saveCategories(repo, scopeAccounts(c.get('condoId')), await c.req.json())),
-  );
+  app.get('/', async (c) => c.json(await getCategories(scope(c.get('condoId')).categories)));
+  app.put('/', async (c) => {
+    const { categories, accounts } = scope(c.get('condoId'));
+    return c.json(await saveCategories(categories, accounts, await c.req.json()));
+  });
   return app;
 }

@@ -18,7 +18,10 @@ function fakeRepo(value: DashboardSummary): DashboardRepository {
 describe('dashboardRoutes', () => {
   test('GET / returns 200 with the summary', async () => {
     const app = new Hono();
-    app.route('/', dashboardRoutes(fakeRepo(summary)));
+    app.route(
+      '/',
+      dashboardRoutes(() => ({ dashboard: fakeRepo(summary) })),
+    );
 
     const res = await app.request('/');
 

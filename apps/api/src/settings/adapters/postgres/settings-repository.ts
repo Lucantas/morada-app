@@ -1,9 +1,8 @@
 import type { Pool } from 'pg';
 
 import { condoSettingsSchema, type CondoSettings } from '../../domain/condo-settings';
+import { SettingsNotFoundError } from '../../domain/errors';
 import type { SettingsRepository } from '../../domain/settings-repository';
-
-const LEGACY_CONDOMINIUM_ID = 'condo-legacy';
 
 interface SettingsRow {
   monthly_fee_cents: number;
@@ -11,29 +10,33 @@ interface SettingsRow {
 }
 
 export class PostgresSettingsRepository implements SettingsRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly condominiumId: string,
+  ) {}
 
   async get(): Promise<CondoSettings> {
     const { rows } = await this.pool.query<SettingsRow>(
       'SELECT monthly_fee_cents, due_day FROM condo_settings WHERE condominium_id = $1',
-      [LEGACY_CONDOMINIUM_ID],
+      [this.condominiumId],
     );
     const row = rows[0];
+    if (!row) throw new SettingsNotFoundError();
     return condoSettingsSchema.parse({
-      monthlyFeeCents: row?.monthly_fee_cents ?? 15000,
-      dueDay: row?.due_day ?? 15,
+      monthlyFeeCents: row.monthly_fee_cents,
+      dueDay: row.due_day,
     });
   }
 
   async save(settings: CondoSettings): Promise<CondoSettings> {
     const parsed = condoSettingsSchema.parse(settings);
-    await this.pool.query(
-      `INSERT INTO condo_settings (condominium_id, monthly_fee_cents, due_day)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (condominium_id) DO UPDATE SET
-         monthly_fee_cents = EXCLUDED.monthly_fee_cents, due_day = EXCLUDED.due_day`,
-      [LEGACY_CONDOMINIUM_ID, parsed.monthlyFeeCents, parsed.dueDay],
+    const result = await this.pool.query(
+      `UPDATE condo_settings SET monthly_fee_cents = $2, due_day = $3
+       WHERE condominium_id = $1
+       RETURNING condominium_id`,
+      [this.condominiumId, parsed.monthlyFeeCents, parsed.dueDay],
     );
+    if (result.rows.length === 0) throw new SettingsNotFoundError();
     return parsed;
   }
 }

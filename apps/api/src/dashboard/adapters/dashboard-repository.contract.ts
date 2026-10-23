@@ -30,11 +30,11 @@ function monthYearRef(isoDate: string): string {
 
 export function runDashboardRepositoryContract(
   label: string,
-  setup: () => Promise<DashboardHarness>,
+  setup: (condominiumId: string) => Promise<DashboardHarness>,
 ): void {
   describe(label, () => {
     test('derives the balance live from paid accounts, paid receipts, and incomes', async () => {
-      const { dashboard, accounts, receipts, incomes } = await setup();
+      const { dashboard, accounts, receipts, incomes } = await setup('condo-a');
       const today = new Date().toISOString().slice(0, 10);
       const thisMonth = today.slice(0, 7);
       const previousMonth = previousMonthDate(today);
@@ -118,7 +118,7 @@ export function runDashboardRepositoryContract(
     });
 
     test('returns a zeroed summary for an empty ledger', async () => {
-      const { dashboard } = await setup();
+      const { dashboard } = await setup('condo-a');
       const summary = await dashboard.getSummary();
       expect(summary.balance).toEqual({ balanceCents: 0, incomeCents: 0, paidCents: 0 });
       expect(summary.recentPaid).toEqual([]);
@@ -126,7 +126,7 @@ export function runDashboardRepositoryContract(
     });
 
     test('an archived income is not counted in the summary', async () => {
-      const { dashboard, incomes } = await setup();
+      const { dashboard, incomes } = await setup('condo-a');
       const today = new Date().toISOString().slice(0, 10);
       const thisMonth = today.slice(0, 7);
       await incomes.save({
@@ -142,6 +142,45 @@ export function runDashboardRepositoryContract(
 
       expect(summary.balance.incomeCents).toBe(0);
       expect(summary.balance.balanceCents).toBe(0);
+    });
+
+    test("summary ignores other condos' receipts, accounts and incomes", async () => {
+      const a = await setup('condo-a');
+      const b = await setup('condo-b');
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      await b.accounts.save({
+        id: 'b-acc',
+        description: 'Água',
+        category: 'Utilidades',
+        date: `${thisMonth}-05`,
+        valueCents: 70000,
+        status: 'pago',
+      });
+      await b.receipts.save({
+        id: 'b-rc',
+        ref: '04/2026',
+        title: 'Taxa',
+        dueDate: `${thisMonth}-10`,
+        paidAt: `${thisMonth}-10`,
+        valueCents: 45000,
+        status: 'pago',
+        residentId: 'r-b',
+      });
+      await b.incomes.save({
+        id: 'b-in',
+        description: 'Salão',
+        source: 'Salão de festas',
+        date: `${thisMonth}-08`,
+        valueCents: 10000,
+      });
+
+      const summaryA = await a.dashboard.getSummary();
+      const summaryB = await b.dashboard.getSummary();
+
+      expect(summaryA.balance).toEqual({ balanceCents: 0, incomeCents: 0, paidCents: 0 });
+      expect(summaryA.recentPaid).toEqual([]);
+      expect(summaryB.balance.paidCents).toBe(70000);
+      expect(summaryB.recentPaid.map((p) => p.id)).toEqual(['b-acc']);
     });
   });
 }

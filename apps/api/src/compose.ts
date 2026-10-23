@@ -28,8 +28,6 @@ import { authRoutes } from './users/adapters/http/auth-routes';
 import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
-const UNSCOPED_CONDO_ID = 'condo-legacy';
-
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   const group = new Hono<ApiEnv>();
   group.use('*', requireRole(role));
@@ -39,7 +37,6 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 
 export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   const { users, condos } = repos;
-  const unscoped = repos.forCondo(UNSCOPED_CONDO_ID);
   const scoped =
     <T>(pick: (condoRepos: CondoRepositories) => T): Scoped<T> =>
     (condoId) =>
@@ -132,13 +129,13 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     '/categories',
     guarded(
       'admin',
-      categoryRoutes(
-        unscoped.categories,
-        scoped(({ accounts }) => accounts),
-      ),
+      categoryRoutes(scoped(({ categories, accounts }) => ({ categories, accounts }))),
     ),
   );
-  api.route('/settings', guarded('admin', settingsRoutes(unscoped.settings)));
+  api.route(
+    '/settings',
+    guarded('admin', settingsRoutes(scoped(({ settings }) => ({ settings })))),
+  );
 
   // Admin: apartment-scoped views — full receipt ledger and occupant history,
   // across every resident who has occupied the apartment (the resident-facing
@@ -152,14 +149,14 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route(
     '/receipts',
     receiptRoutes(
-      scoped(({ residents, receipts }) => ({
+      scoped(({ residents, receipts, settings }) => ({
         receipts,
         residents,
-        settings: unscoped.settings,
+        settings,
       })),
     ),
   );
-  api.route('/dashboard', dashboardRoutes(unscoped.dashboard));
+  api.route('/dashboard', dashboardRoutes(scoped(({ dashboard }) => ({ dashboard }))));
 
   // Notices: reads and per-resident dismiss are open to any authenticated user;
   // creating and deleting notices is admin-only (guarded inside noticeRoutes).

@@ -398,6 +398,92 @@ describe('Morada API', () => {
     expect((await other.threads.getById('th-foreign'))?.messages).toEqual([]);
   });
 
+  test('cross-condo settings are isolated', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3 });
+    const admin = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: admin.cookie,
+      'X-CSRF-Token': admin.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const read = await app.request(`${P}/settings`, { headers });
+    const update = await app.request(`${P}/settings`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
+    });
+
+    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+    expect(update.status).toBe(200);
+    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3 });
+    const own = await app.request(`${P}/settings`, { headers });
+    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10 });
+  });
+
+  test('cross-condo categories are isolated', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.categories.replaceAll(
+      [{ id: 'cat-foreign', name: 'Alheia', keywords: 'alheia', position: 0 }],
+      [],
+    );
+    await other.accounts.save({
+      id: 'ac-foreign',
+      description: 'Água alheia',
+      category: 'Outra',
+      date: '2026-07-05',
+      valueCents: 5000,
+      status: 'pendente',
+    });
+    const admin = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: admin.cookie,
+      'X-CSRF-Token': admin.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const list = await app.request(`${P}/categories`, { headers });
+    const put = await app.request(`${P}/categories`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify([{ name: 'Água', keywords: 'água' }]),
+    });
+
+    expect(await list.json()).toEqual([]);
+    expect(put.status).toBe(200);
+    expect(await other.categories.list()).toEqual([
+      { id: 'cat-foreign', name: 'Alheia', keywords: 'alheia', position: 0 },
+    ]);
+    expect((await other.accounts.getById('ac-foreign'))?.category).toBe('Outra');
+  });
+
+  test('dashboard summary counts only the current condo', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    const month = new Date().toISOString().slice(0, 7);
+    await other.incomes.save({
+      id: 'in-foreign',
+      description: 'Aluguel salão',
+      source: 'Apto 9',
+      date: `${month}-05`,
+      valueCents: 777700,
+    });
+    const admin = await authFor(app, adminCredentials);
+    const headers = { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf };
+
+    const res = await app.request(`${P}/dashboard`, { headers });
+
+    const body = (await res.json()) as { balance: { incomeCents: number } };
+    expect(body.balance.incomeCents).not.toBe(777700);
+    expect(body.balance.incomeCents).toBeLessThan(777700);
+  });
+
   test('cross-condo incomes access answers 404', async () => {
     const app = await makeApp();
     const other = await seedForeignLedger();

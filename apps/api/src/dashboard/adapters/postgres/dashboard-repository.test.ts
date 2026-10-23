@@ -3,6 +3,7 @@ import { PostgresIncomeRepository } from '../../../income/adapters/postgres/inco
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import { PostgresReceiptRepository } from '../../../receipts/adapters/postgres/receipt-repository';
+import { createTestCondo } from '../../../test-support/condos';
 import { resetPg } from '../../../test-support/pg';
 import { runDashboardRepositoryContract } from '../dashboard-repository.contract';
 
@@ -18,12 +19,17 @@ afterAll(async () => {
   await pool.end();
 });
 
-runDashboardRepositoryContract('PostgresDashboardRepository', async () => {
-  await resetPg(pool);
-  return {
-    dashboard: new PostgresDashboardRepository(pool),
-    accounts: new PostgresAccountRepository(pool, 'condo-legacy', null),
-    receipts: new PostgresReceiptRepository(pool, 'condo-legacy', null),
-    incomes: new PostgresIncomeRepository(pool, 'condo-legacy', null),
-  };
+describe('PostgresDashboardRepository — contract', () => {
+  beforeEach(async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+  });
+
+  runDashboardRepositoryContract('PostgresDashboardRepository', async (condominiumId) => ({
+    dashboard: new PostgresDashboardRepository(pool, condominiumId),
+    accounts: new PostgresAccountRepository(pool, condominiumId, null),
+    receipts: new PostgresReceiptRepository(pool, condominiumId, null),
+    incomes: new PostgresIncomeRepository(pool, condominiumId, null),
+  }));
 });
