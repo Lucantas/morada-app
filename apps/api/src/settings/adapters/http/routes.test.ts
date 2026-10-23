@@ -21,7 +21,10 @@ function makeRepo(initial: CondoSettings): SettingsRepository {
 function mount(repo: SettingsRepository) {
   const app = new Hono<ApiEnv>();
   app.onError(onError);
-  app.route('/settings', settingsRoutes(repo));
+  app.route(
+    '/settings',
+    settingsRoutes(() => ({ settings: repo })),
+  );
   return app;
 }
 

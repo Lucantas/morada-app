@@ -1,6 +1,7 @@
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
-import { insertRows, resetPg } from '../../../test-support/pg';
+import { createTestCondo } from '../../../test-support/condos';
+import { resetPg } from '../../../test-support/pg';
 import { runSettingsRepositoryContract } from '../settings-repository.contract';
 
 import { PostgresSettingsRepository } from './settings-repository';
@@ -15,13 +16,15 @@ afterAll(async () => {
   await pool.end();
 });
 
-runSettingsRepositoryContract('PostgresSettingsRepository', async () => {
-  await resetPg(pool);
-  await insertRows(
-    pool,
-    'condo_settings',
-    ['condominium_id', 'monthly_fee_cents', 'due_day'],
-    [{ condominium_id: 'condo-legacy', monthly_fee_cents: 15000, due_day: 15 }],
+describe('PostgresSettingsRepository — contract', () => {
+  beforeEach(async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+  });
+
+  runSettingsRepositoryContract(
+    'PostgresSettingsRepository',
+    async (condominiumId) => new PostgresSettingsRepository(pool, condominiumId),
   );
-  return new PostgresSettingsRepository(pool);
 });

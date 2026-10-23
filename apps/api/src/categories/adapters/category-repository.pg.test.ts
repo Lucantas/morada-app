@@ -1,5 +1,6 @@
 import { migrate } from '../../platform/postgres/migrate';
 import { createPool } from '../../platform/postgres/pool';
+import { createTestCondo } from '../../test-support/condos';
 import { insertRows, resetPg } from '../../test-support/pg';
 import { runCategoryRepositoryContract } from './category-repository.contract';
 
@@ -15,30 +16,52 @@ afterAll(async () => {
   await pool.end();
 });
 
-runCategoryRepositoryContract('PostgresCategoryRepository', async () => {
-  await resetPg(pool);
-  await insertRows(
-    pool,
-    'categories',
-    ['id', 'name', 'keywords', 'position'],
-    [
-      { id: 'cat-agua', name: 'Água', keywords: 'água, agua, saneamento, esgoto', position: 0 },
-      { id: 'cat-energia', name: 'Energia', keywords: 'energia, luz, elétr, eletr', position: 1 },
-      {
-        id: 'cat-servicos',
-        name: 'Serviços',
-        keywords: 'limpeza, internet, portaria, serviço, servico, segurança',
-        position: 2,
-      },
-      {
-        id: 'cat-manutencao',
-        name: 'Manutenção',
-        keywords: 'manutenção, manutencao, reparo, elevador, conserto, bomba',
-        position: 3,
-      },
-    ],
+describe('PostgresCategoryRepository — contract', () => {
+  beforeEach(async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+    await insertRows(
+      pool,
+      'categories',
+      ['id', 'name', 'keywords', 'position', 'condominium_id'],
+      [
+        {
+          id: 'cat-agua',
+          name: 'Água',
+          keywords: 'água, agua, saneamento, esgoto',
+          position: 0,
+          condominium_id: 'condo-a',
+        },
+        {
+          id: 'cat-energia',
+          name: 'Energia',
+          keywords: 'energia, luz, elétr, eletr',
+          position: 1,
+          condominium_id: 'condo-a',
+        },
+        {
+          id: 'cat-servicos',
+          name: 'Serviços',
+          keywords: 'limpeza, internet, portaria, serviço, servico, segurança',
+          position: 2,
+          condominium_id: 'condo-a',
+        },
+        {
+          id: 'cat-manutencao',
+          name: 'Manutenção',
+          keywords: 'manutenção, manutencao, reparo, elevador, conserto, bomba',
+          position: 3,
+          condominium_id: 'condo-a',
+        },
+      ],
+    );
+  });
+
+  runCategoryRepositoryContract(
+    'PostgresCategoryRepository',
+    async (condominiumId) => new PostgresCategoryRepository(pool, condominiumId),
   );
-  return new PostgresCategoryRepository(pool);
 });
 
 describe('PostgresCategoryRepository.replaceAll atomicity', () => {
@@ -59,7 +82,7 @@ describe('PostgresCategoryRepository.replaceAll atomicity', () => {
         },
       ],
     );
-    const repo = new PostgresCategoryRepository(pool);
+    const repo = new PostgresCategoryRepository(pool, 'condo-legacy');
     const validCategory = { id: 'cat-a', name: 'A', keywords: 'a', position: 0 };
 
     await expect(
@@ -71,5 +94,36 @@ describe('PostgresCategoryRepository.replaceAll atomicity', () => {
 
     const { rows } = await pool.query('SELECT category FROM accounts WHERE id = $1', ['acc-1']);
     expect(rows[0].category).not.toBe('NovaCat');
+  });
+
+  test("replaceAll only reclassifies the condo's own accounts", async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+    const columns = ['id', 'description', 'category', 'date', 'value_cents', 'status'];
+    const account = { description: 'Conta', category: 'Antiga', date: '2026-07-01' };
+    await insertRows(
+      pool,
+      'accounts',
+      [...columns, 'condominium_id'],
+      [
+        { ...account, id: 'acc-a', value_cents: 1, status: 'pendente', condominium_id: 'condo-a' },
+        { ...account, id: 'acc-b', value_cents: 1, status: 'pendente', condominium_id: 'condo-b' },
+      ],
+    );
+
+    await new PostgresCategoryRepository(pool, 'condo-a').replaceAll(
+      [{ id: 'cat-a', name: 'A', keywords: 'a', position: 0 }],
+      [
+        { id: 'acc-a', category: 'Nova' },
+        { id: 'acc-b', category: 'Nova' },
+      ],
+    );
+
+    const { rows } = await pool.query('SELECT id, category FROM accounts ORDER BY id');
+    expect(rows).toEqual([
+      { id: 'acc-a', category: 'Nova' },
+      { id: 'acc-b', category: 'Antiga' },
+    ]);
   });
 });
