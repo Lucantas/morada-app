@@ -115,7 +115,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route(
     '/residents',
     residentRoutes(
-      scoped(({ residents }) => ({ residents, receipts: unscoped.receipts, users })),
+      scoped(({ residents, receipts }) => ({ residents, receipts, users })),
       hasher,
     ),
   );
@@ -138,7 +138,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // across every resident who has occupied the apartment (the resident-facing
   // view stays scoped to their own receipts).
   const apartments = new Hono<ApiEnv>();
-  apartments.route('/', apartmentReceiptRoutes({ receipts: unscoped.receipts }));
+  apartments.route('/', apartmentReceiptRoutes(scoped(({ receipts }) => ({ receipts }))));
   apartments.route('/', apartmentResidentRoutes(scoped(({ residents }) => ({ residents }))));
   api.route('/apartments', apartments);
 
@@ -146,8 +146,8 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route(
     '/receipts',
     receiptRoutes(
-      scoped(({ residents }) => ({
-        receipts: unscoped.receipts,
+      scoped(({ residents, receipts }) => ({
+        receipts,
         residents,
         settings: unscoped.settings,
       })),

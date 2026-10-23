@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 
-import { MonthlyReceiptExistsError } from '../../domain/errors';
+import { MonthlyReceiptExistsError, ReceiptNotFoundError } from '../../domain/errors';
 import { decodeDataUrl, type ProofBytes, type ProofStorage } from '../../domain/proof-storage';
 import { receiptSchema, type Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
@@ -8,7 +8,7 @@ import type { ReceiptRepository } from '../../domain/receipt-repository';
 const DATA_URL_PATTERN = /^data:[^;]+;base64,/;
 
 const INSERT_COLUMNS =
-  'id, ref, title, due_date, paid_at, value_cents, status, method, resident_id, apartment_id, submitted_at, proof_data_url, proof_key';
+  'id, ref, title, due_date, paid_at, value_cents, status, method, resident_id, apartment_id, submitted_at, proof_data_url, proof_key, condominium_id';
 // DATE columns come back as YYYY-MM-DD strings (::text) rather than JS Date objects.
 // proof_data_url/proof_key are intentionally excluded here — reads only need
 // whether a proof exists (has_proof); the bytes are served via getProof.
@@ -55,44 +55,46 @@ function toReceipt(row: ReceiptRow): Receipt {
 export class PostgresReceiptRepository implements ReceiptRepository {
   constructor(
     private readonly pool: Pool,
+    private readonly condominiumId: string,
     private readonly storage: ProofStorage | null,
   ) {}
 
   async list(): Promise<Receipt[]> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE visible = true`,
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE visible = true AND condominium_id = $1`,
+      [this.condominiumId],
     );
     return rows.map(toReceipt);
   }
 
   async listByResident(residentId: string): Promise<Receipt[]> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE resident_id = $1 AND visible = true`,
-      [residentId],
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE resident_id = $1 AND visible = true AND condominium_id = $2`,
+      [residentId, this.condominiumId],
     );
     return rows.map(toReceipt);
   }
 
   async listByApartment(apartmentId: string): Promise<Receipt[]> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE apartment_id = $1 AND visible = true`,
-      [apartmentId],
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE apartment_id = $1 AND visible = true AND condominium_id = $2`,
+      [apartmentId, this.condominiumId],
     );
     return rows.map(toReceipt);
   }
 
   async getById(id: string): Promise<Receipt | null> {
     const { rows } = await this.pool.query<ReceiptRow>(
-      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE id = $1 AND visible = true`,
-      [id],
+      `SELECT ${SELECT_COLUMNS} FROM receipts WHERE id = $1 AND visible = true AND condominium_id = $2`,
+      [id, this.condominiumId],
     );
     return rows[0] ? toReceipt(rows[0]) : null;
   }
 
   async getProof(id: string): Promise<ProofBytes | null> {
     const { rows } = await this.pool.query<ProofRow>(
-      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1 AND visible = true',
-      [id],
+      'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1 AND visible = true AND condominium_id = $2',
+      [id, this.condominiumId],
     );
     const row = rows[0];
     if (!row) return null;
@@ -108,7 +110,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
     let proofKey: string | null = null;
     let proofDataUrl: string | null = null;
     if (isFreshUpload && this.storage) {
-      proofKey = `receipts/${receipt.id}`;
+      proofKey = `condos/${this.condominiumId}/receipts/${receipt.id}`;
       await this.storage.put(proofKey, receipt.proofDataUrl as string);
     } else if (touchesProof) {
       proofDataUrl = receipt.proofDataUrl ?? null;
@@ -126,13 +128,14 @@ export class PostgresReceiptRepository implements ReceiptRepository {
     try {
       result = await this.pool.query<{ has_proof: boolean }>(
         `INSERT INTO receipts (${INSERT_COLUMNS})
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          ON CONFLICT (id) DO UPDATE SET
            ref = EXCLUDED.ref, title = EXCLUDED.title, due_date = EXCLUDED.due_date,
            paid_at = EXCLUDED.paid_at, value_cents = EXCLUDED.value_cents, status = EXCLUDED.status,
            method = EXCLUDED.method, resident_id = EXCLUDED.resident_id,
            apartment_id = EXCLUDED.apartment_id, submitted_at = EXCLUDED.submitted_at
            ${proofSetClause ? `, ${proofSetClause}` : ''}
+         WHERE receipts.condominium_id = EXCLUDED.condominium_id
          RETURNING (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof`,
         [
           receipt.id,
@@ -148,6 +151,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
           receipt.submittedAt ?? null,
           proofDataUrl,
           proofKey,
+          this.condominiumId,
         ],
       );
     } catch (error) {
@@ -162,14 +166,19 @@ export class PostgresReceiptRepository implements ReceiptRepository {
       }
       throw error;
     }
+    const saved = result.rows[0];
+    if (!saved) throw new ReceiptNotFoundError(receipt.id);
     return receiptSchema.parse({
       ...receipt,
       proofDataUrl: undefined,
-      hasProof: result.rows[0]?.has_proof ?? false,
+      hasProof: saved.has_proof,
     });
   }
 
   async archive(id: string): Promise<void> {
-    await this.pool.query('UPDATE receipts SET visible = false WHERE id = $1', [id]);
+    await this.pool.query(
+      'UPDATE receipts SET visible = false WHERE id = $1 AND condominium_id = $2',
+      [id, this.condominiumId],
+    );
   }
 }
