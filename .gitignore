@@ -8,3 +8,4 @@ coverage/
 backups/
 apps/web/playwright-report/
 apps/web/test-results/
+.superpowers/
