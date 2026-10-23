@@ -23,9 +23,8 @@ type App = Awaited<ReturnType<typeof buildApp>>;
 // (e.g. one per credential) against the shared Postgres without id collisions.
 async function makeApp(): Promise<App> {
   await resetPg(pool);
-  const app = await buildApp(makePostgresRepositories(pool));
   await seedFixtures(pool);
-  return app;
+  return buildApp(makePostgresRepositories(pool));
 }
 
 async function login(app: App, username: string, password: string): Promise<Response> {
