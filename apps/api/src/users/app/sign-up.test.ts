@@ -104,6 +104,7 @@ describe('signUp', () => {
   test('an unverified e-mail takes the new credentials, ends sessions and gets a fresh link', async () => {
     const unverified: User = { ...existing, emailVerifiedAt: null, sessionVersion: 4 };
     const { users, email, tokens, deps } = setup([unverified]);
+    const atomic = jest.spyOn(users, 'updateCredentialsAndBump');
     await tokens.issue({
       userId: 'u-ana',
       kind: 'confirm_email',
@@ -121,6 +122,11 @@ describe('signUp', () => {
         sessionVersion: 5,
       },
     ]);
+    expect(atomic).toHaveBeenCalledTimes(1);
+    expect(atomic).toHaveBeenCalledWith('u-ana', {
+      name: 'Ana Real',
+      passwordHash: 'hash:senha-nova-1',
+    });
     expect(await tokens.consume(hashToken('old-link'), 'confirm_email', NOW)).toBeNull();
     const message = email.lastTo('ana@x.com');
     expect(message?.subject).toBe('Confirme seu e-mail no Morada');

@@ -129,24 +129,15 @@ describe('resetPassword', () => {
     expect((await resetPassword(deps, { token, password: 'nova-senha-1' })).sessionVersion).toBe(3);
   });
 
-  test('ends old sessions before replacing the password', async () => {
+  test('replaces the hash and ends sessions in a single atomic call', async () => {
     const { users, tokens, deps } = setup();
     const token = await issue(tokens);
-    const failing = {
-      ...deps,
-      users: {
-        ...users,
-        setPasswordHash: async () => {
-          throw new Error('db down');
-        },
-      },
-    };
+    const atomic = jest.spyOn(users, 'setPasswordHashAndBump');
 
-    await expect(resetPassword(failing, { token, password: 'nova-senha-1' })).rejects.toThrow(
-      'db down',
-    );
+    await resetPassword(deps, { token, password: 'nova-senha-1' });
 
-    expect((await users.findById('u-ana'))?.sessionVersion).toBe(3);
+    expect(atomic).toHaveBeenCalledTimes(1);
+    expect(atomic).toHaveBeenCalledWith('u-ana', 'hash:nova-senha-1');
   });
 
   test('a token whose user is gone is invalid', async () => {

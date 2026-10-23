@@ -127,21 +127,27 @@ describe('confirmEmail', () => {
     );
   });
 
-  test('ends old sessions before marking the e-mail verified', async () => {
+  test('verifies and ends sessions in one call guarded by the checked hash', async () => {
     const { users, token, deps } = await setup();
-    const failing = {
-      ...deps,
-      users: {
-        ...users,
-        markEmailVerified: async () => {
-          throw new Error('db down');
-        },
-      },
-    };
+    const atomic = jest.spyOn(users, 'markEmailVerifiedAndBump');
 
-    await expect(confirmEmail(failing, { token, password: PASSWORD })).rejects.toThrow('db down');
+    await confirmEmail(deps, { token, password: PASSWORD });
 
-    expect((await users.findById('u-ana'))?.sessionVersion).toBe(1);
+    expect(atomic).toHaveBeenCalledTimes(1);
+    expect(atomic).toHaveBeenCalledWith('u-ana', NOW, `hash:${PASSWORD}`);
+  });
+
+  test('a takeover racing the confirmation leaves the e-mail unverified', async () => {
+    const { users, token, deps, confirmed } = await setup();
+    await users.updateCredentialsAndBump('u-ana', { name: 'Intruso', passwordHash: 'hash:x' });
+    const stale = { ...deps, users: { ...users, findById: async () => ana } };
+
+    await expect(confirmEmail(stale, { token, password: PASSWORD })).rejects.toBeInstanceOf(
+      InvalidCredentialsError,
+    );
+
+    expect((await users.findById('u-ana'))?.emailVerifiedAt).toBeNull();
+    expect(confirmed).toEqual([]);
   });
 
   test('an already verified e-mail keeps its date and skips the hook', async () => {

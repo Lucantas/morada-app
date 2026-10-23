@@ -96,16 +96,29 @@ export class PostgresUserRepository implements UserRepository {
     await this.pool.query('UPDATE users SET email_verified_at = $2 WHERE id = $1', [id, at]);
   }
 
-  async setPasswordHash(id: string, passwordHash: string): Promise<void> {
-    await this.pool.query('UPDATE users SET password_hash = $2 WHERE id = $1', [id, passwordHash]);
+  async markEmailVerifiedAndBump(
+    id: string,
+    at: Date,
+    expectedPasswordHash: string,
+  ): Promise<number | null> {
+    const { rows } = await this.pool.query<{ session_version: number }>(
+      `UPDATE users SET email_verified_at = $2, session_version = session_version + 1
+       WHERE id = $1 AND password_hash = $3
+       RETURNING session_version`,
+      [id, at, expectedPasswordHash],
+    );
+    return rows[0]?.session_version ?? null;
   }
 
-  async updateCredentials(
+  setPasswordHashAndBump(id: string, passwordHash: string): Promise<number> {
+    return this.bumpWith(id, 'password_hash = $2', [passwordHash]);
+  }
+
+  updateCredentialsAndBump(
     id: string,
     credentials: { name: string; passwordHash: string },
-  ): Promise<void> {
-    await this.pool.query('UPDATE users SET name = $2, password_hash = $3 WHERE id = $1', [
-      id,
+  ): Promise<number> {
+    return this.bumpWith(id, 'name = $2, password_hash = $3', [
       credentials.name,
       credentials.passwordHash,
     ]);
@@ -119,10 +132,11 @@ export class PostgresUserRepository implements UserRepository {
     return rows[0]?.session_version ?? null;
   }
 
-  async bumpSessionVersion(id: string): Promise<number> {
+  private async bumpWith(id: string, assignments: string, values: string[]): Promise<number> {
     const { rows } = await this.pool.query<{ session_version: number }>(
-      'UPDATE users SET session_version = session_version + 1 WHERE id = $1 RETURNING session_version',
-      [id],
+      `UPDATE users SET ${assignments}, session_version = session_version + 1
+       WHERE id = $1 RETURNING session_version`,
+      [id, ...values],
     );
     const bumped = rows[0];
     if (!bumped) throw new Error(`User not found: ${id}`);

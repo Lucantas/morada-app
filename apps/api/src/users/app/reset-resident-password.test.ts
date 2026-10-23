@@ -1,3 +1,4 @@
+import { inMemoryUsers } from '../../test-support/in-memory-users';
 import { ResidentLoginNotFoundError, UserValidationError } from '../domain/errors';
 import type { PasswordHasher } from '../domain/password-hasher';
 import type { User } from '../domain/user';
@@ -6,29 +7,7 @@ import type { UserRepository } from '../domain/user-repository';
 import { resetResidentPassword } from './reset-resident-password';
 
 function fakeRepo(users: User[] = []): UserRepository {
-  let list = [...users];
-  return {
-    findById: async (id) => list.find((u) => u.id === id) ?? null,
-    findByEmail: async (email) => list.find((u) => u.email === email) ?? null,
-    existsByEmail: async (email) => list.some((u) => u.email === email),
-    markEmailVerified: async () => undefined,
-    setPasswordHash: async () => undefined,
-    updateCredentials: async () => undefined,
-    sessionVersionOf: async (id) => list.find((u) => u.id === id)?.sessionVersion ?? null,
-    bumpSessionVersion: async (id) => {
-      list = list.map((u) => (u.id === id ? { ...u, sessionVersion: u.sessionVersion + 1 } : u));
-      return list.find((u) => u.id === id)?.sessionVersion ?? 0;
-    },
-    findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
-    findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
-    existsByUsername: async (username) => list.some((u) => u.username === username),
-    existsByResidentId: async (residentId) => list.some((u) => u.residentId === residentId),
-    hasAny: async () => list.length > 0,
-    save: async (u) => {
-      list = [...list.filter((existing) => existing.id !== u.id), u];
-      return u;
-    },
-  };
+  return inMemoryUsers(users);
 }
 
 const hasher: PasswordHasher = {
@@ -37,29 +16,28 @@ const hasher: PasswordHasher = {
 };
 
 describe('resetResidentPassword', () => {
-  test('ends the existing sessions of the resident', async () => {
-    const bumpSessionVersion = jest.fn(async () => 7);
-    const repo: UserRepository = {
-      ...fakeRepo([
-        {
-          id: 'u-1',
-          username: 'maria302',
-          passwordHash: 'hash:old-secret',
-          role: 'resident',
-          residentId: 'r-1',
-          email: null,
-          name: null,
-          emailVerifiedAt: null,
-          sessionVersion: 6,
-        },
-      ]),
-      bumpSessionVersion,
-    };
+  test('replaces the hash and ends sessions in a single atomic call', async () => {
+    const repo = fakeRepo([
+      {
+        id: 'u-1',
+        username: 'maria302',
+        passwordHash: 'hash:old-secret',
+        role: 'resident',
+        residentId: 'r-1',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
+        sessionVersion: 6,
+      },
+    ]);
+    const atomic = jest.spyOn(repo, 'setPasswordHashAndBump');
 
     const user = await resetResidentPassword(repo, hasher, 'r-1', 'nova-s3nha');
 
-    expect(bumpSessionVersion).toHaveBeenCalledWith('u-1');
+    expect(atomic).toHaveBeenCalledTimes(1);
+    expect(atomic).toHaveBeenCalledWith('u-1', 'hash:nova-s3nha');
     expect(user.sessionVersion).toBe(7);
+    expect(await repo.findById('u-1')).toEqual(user);
   });
 
   test('resets the hash for an existing resident login, keeping identity fields', async () => {

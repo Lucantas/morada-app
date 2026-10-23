@@ -148,40 +148,88 @@ export function runUserRepositoryContract(
       expect((await repo.findById('u-ana'))?.emailVerifiedAt).toEqual(at);
     });
 
-    test('setPasswordHash replaces the hash', async () => {
+    test('setPasswordHashAndBump replaces the hash and bumps the version in one step', async () => {
       const repo = await makeRepo();
       await repo.save(ana);
-      await repo.setPasswordHash('u-ana', 'hash-new');
-      expect((await repo.findById('u-ana'))?.passwordHash).toBe('hash-new');
+
+      expect(await repo.setPasswordHashAndBump('u-ana', 'hash-new')).toBe(1);
+      expect(await repo.setPasswordHashAndBump('u-ana', 'hash-newer')).toBe(2);
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        passwordHash: 'hash-newer',
+        sessionVersion: 2,
+      });
     });
 
-    test('bumpSessionVersion increments and returns the stored version', async () => {
+    test('updateCredentialsAndBump replaces name and hash and bumps the version', async () => {
       const repo = await makeRepo();
       await repo.save(ana);
 
-      expect(await repo.bumpSessionVersion('u-ana')).toBe(1);
-      expect(await repo.bumpSessionVersion('u-ana')).toBe(2);
-      expect((await repo.findById('u-ana'))?.sessionVersion).toBe(2);
+      const version = await repo.updateCredentialsAndBump('u-ana', {
+        name: 'Outra',
+        passwordHash: 'hash-other',
+      });
+
+      expect(version).toBe(1);
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        name: 'Outra',
+        passwordHash: 'hash-other',
+        sessionVersion: 1,
+      });
+    });
+
+    test('markEmailVerifiedAndBump verifies and bumps when the hash still matches', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      const at = new Date('2026-10-23T12:00:00.000Z');
+
+      expect(await repo.markEmailVerifiedAndBump('u-ana', at, 'hash-ana')).toBe(1);
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        emailVerifiedAt: at,
+        sessionVersion: 1,
+      });
+    });
+
+    test('markEmailVerifiedAndBump changes nothing when the hash was replaced', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      await repo.setPasswordHashAndBump('u-ana', 'hash-intruder');
+
+      const result = await repo.markEmailVerifiedAndBump('u-ana', new Date(), 'hash-ana');
+
+      expect(result).toBeNull();
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        passwordHash: 'hash-intruder',
+        sessionVersion: 1,
+      });
+    });
+
+    test('the atomic updates reject or skip an unknown user', async () => {
+      const repo = await makeRepo();
+
+      await expect(repo.setPasswordHashAndBump('u-ghost', 'h')).rejects.toThrow();
+      await expect(
+        repo.updateCredentialsAndBump('u-ghost', { name: 'X', passwordHash: 'h' }),
+      ).rejects.toThrow();
+      expect(await repo.markEmailVerifiedAndBump('u-ghost', new Date(), 'h')).toBeNull();
     });
 
     test('sessionVersionOf reads the stored version, or null for an unknown user', async () => {
       const repo = await makeRepo();
       await repo.save(ana);
-      await repo.bumpSessionVersion('u-ana');
+      await repo.setPasswordHashAndBump('u-ana', 'hash-new');
 
       expect(await repo.sessionVersionOf('u-ana')).toBe(1);
       expect(await repo.sessionVersionOf('u-ghost')).toBeNull();
     });
 
-    test('bumpSessionVersion rejects an unknown user', async () => {
-      const repo = await makeRepo();
-      await expect(repo.bumpSessionVersion('u-ghost')).rejects.toThrow();
-    });
-
     test('save never rolls back the session version', async () => {
       const repo = await makeRepo();
       await repo.save(ana);
-      await repo.bumpSessionVersion('u-ana');
+      await repo.setPasswordHashAndBump('u-ana', 'hash-ana');
 
       await repo.save({ ...ana, passwordHash: 'hash-rotated' });
 
@@ -189,19 +237,6 @@ export function runUserRepositoryContract(
         ...ana,
         passwordHash: 'hash-rotated',
         sessionVersion: 1,
-      });
-    });
-
-    test('updateCredentials replaces the name and the hash', async () => {
-      const repo = await makeRepo();
-      await repo.save(ana);
-
-      await repo.updateCredentials('u-ana', { name: 'Outra', passwordHash: 'hash-other' });
-
-      expect(await repo.findById('u-ana')).toEqual({
-        ...ana,
-        name: 'Outra',
-        passwordHash: 'hash-other',
       });
     });
 

@@ -5,6 +5,15 @@ import type { UserRepository } from '../users/domain/user-repository';
 
 export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () => User[] } {
   let list = [...initial];
+  const existing = (id: string): User => {
+    const found = list.find((u) => u.id === id);
+    if (!found) throw new Error(`User not found: ${id}`);
+    return found;
+  };
+  const replace = (user: User): number => {
+    list = list.map((u) => (u.id === user.id ? user : u));
+    return user.sessionVersion;
+  };
   return {
     all: () => list,
     findById: async (id) => list.find((u) => u.id === id) ?? null,
@@ -18,20 +27,21 @@ export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () 
     markEmailVerified: async (id, at) => {
       list = list.map((u) => (u.id === id ? { ...u, emailVerifiedAt: at } : u));
     },
-    setPasswordHash: async (id, passwordHash) => {
-      list = list.map((u) => (u.id === id ? { ...u, passwordHash } : u));
+    markEmailVerifiedAndBump: async (id, at, expectedPasswordHash) => {
+      const found = list.find((u) => u.id === id && u.passwordHash === expectedPasswordHash);
+      if (!found) return null;
+      return replace({ ...found, emailVerifiedAt: at, sessionVersion: found.sessionVersion + 1 });
     },
-    updateCredentials: async (id, { name, passwordHash }) => {
-      list = list.map((u) => (u.id === id ? { ...u, name, passwordHash } : u));
-    },
+    setPasswordHashAndBump: async (id, passwordHash) =>
+      replace({ ...existing(id), passwordHash, sessionVersion: existing(id).sessionVersion + 1 }),
+    updateCredentialsAndBump: async (id, { name, passwordHash }) =>
+      replace({
+        ...existing(id),
+        name,
+        passwordHash,
+        sessionVersion: existing(id).sessionVersion + 1,
+      }),
     sessionVersionOf: async (id) => list.find((u) => u.id === id)?.sessionVersion ?? null,
-    bumpSessionVersion: async (id) => {
-      const found = list.find((u) => u.id === id);
-      if (!found) throw new Error(`User not found: ${id}`);
-      const sessionVersion = found.sessionVersion + 1;
-      list = list.map((u) => (u.id === id ? { ...u, sessionVersion } : u));
-      return sessionVersion;
-    },
     save: async (user) => {
       list = [...list.filter((existing) => existing.id !== user.id), user];
       return user;

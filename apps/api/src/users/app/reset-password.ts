@@ -29,9 +29,8 @@ export async function resetPassword(
   const user = await deps.users.findById(consumed.userId);
   if (!user) throw new InvalidLinkError();
 
-  const sessionVersion = await deps.users.bumpSessionVersion(user.id);
   const passwordHash = await deps.hasher.hash(password);
-  await deps.users.setPasswordHash(user.id, passwordHash);
+  const sessionVersion = await deps.users.setPasswordHashAndBump(user.id, passwordHash);
   await deps.tokens.revokeAll(user.id, 'reset_password', now);
   const newlyVerified = !isEmailVerified(user);
   if (newlyVerified) await deps.users.markEmailVerified(user.id, now);

@@ -10,9 +10,16 @@ export interface UserRepository {
   existsByResidentId(residentId: string): Promise<boolean>;
   hasAny(): Promise<boolean>;
   markEmailVerified(id: string, at: Date): Promise<void>;
-  setPasswordHash(id: string, passwordHash: string): Promise<void>;
-  updateCredentials(id: string, credentials: { name: string; passwordHash: string }): Promise<void>;
+  markEmailVerifiedAndBump(
+    id: string,
+    at: Date,
+    expectedPasswordHash: string,
+  ): Promise<number | null>;
+  setPasswordHashAndBump(id: string, passwordHash: string): Promise<number>;
+  updateCredentialsAndBump(
+    id: string,
+    credentials: { name: string; passwordHash: string },
+  ): Promise<number>;
   sessionVersionOf(id: string): Promise<number | null>;
-  bumpSessionVersion(id: string): Promise<number>;
   save(user: User): Promise<User>;
 }

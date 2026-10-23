@@ -20,10 +20,10 @@ function fakeRepo(users: User[] = []): UserRepository {
     findByEmail: async (email) => [...map.values()].find((u) => u.email === email) ?? null,
     existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
     markEmailVerified: async () => undefined,
-    setPasswordHash: async () => undefined,
-    updateCredentials: async () => undefined,
+    markEmailVerifiedAndBump: async () => 1,
+    setPasswordHashAndBump: async () => 1,
+    updateCredentialsAndBump: async () => 1,
     sessionVersionOf: async () => 0,
-    bumpSessionVersion: async () => 1,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
@@ -174,10 +174,10 @@ describe('seedAdmin', () => {
       findByEmail: async () => null,
       existsByEmail: async () => false,
       markEmailVerified: async () => undefined,
-      setPasswordHash: async () => undefined,
-      updateCredentials: async () => undefined,
+      markEmailVerifiedAndBump: async () => 1,
+      setPasswordHashAndBump: async () => 1,
+      updateCredentialsAndBump: async () => 1,
       sessionVersionOf: async () => 0,
-      bumpSessionVersion: async () => 1,
       findByUsername: async (username) =>
         username === existingResident.username ? existingResident : null,
       findByResidentId: async (residentId) =>

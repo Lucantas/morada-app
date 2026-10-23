@@ -32,8 +32,8 @@ export async function confirmEmail(
   if (consumed?.userId !== user.id) throw new InvalidLinkError();
   if (user.emailVerifiedAt !== null) return user;
 
-  const sessionVersion = await deps.users.bumpSessionVersion(user.id);
-  await deps.users.markEmailVerified(user.id, now);
+  const sessionVersion = await deps.users.markEmailVerifiedAndBump(user.id, now, user.passwordHash);
+  if (sessionVersion === null) throw new InvalidCredentialsError();
   await deps.afterEmailConfirmed(user.id);
   return { ...user, emailVerifiedAt: now, sessionVersion };
 }
