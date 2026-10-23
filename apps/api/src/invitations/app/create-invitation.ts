@@ -5,6 +5,7 @@ import {
   type EmailMessage,
   type EmailSender,
 } from '../../platform/email/email-sender';
+import { logServerError } from '../../platform/http-error';
 import { generateToken, hashToken } from '../../platform/tokens';
 import type { ResidentRepository } from '../../residents/domain/resident-repository';
 import { normalizeEmail, emailSchema } from '../../users/domain/email';
@@ -41,6 +42,7 @@ async function trySend(email: EmailSender, message: EmailMessage): Promise<boole
     await email.send(message);
     return true;
   } catch (error) {
+    if (error instanceof EmailDeliveryError) logServerError('E-mail delivery failed:', error);
     if (error instanceof EmailUnavailableError || error instanceof EmailDeliveryError) return false;
     throw error;
   }

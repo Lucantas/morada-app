@@ -1,19 +1,34 @@
 import { EmailDeliveryError, type EmailMessage, type EmailSender } from './email-sender';
 
+export const EMAIL_SEND_TIMEOUT_MS = 10_000;
+
 export interface CloudflareEmailConfig {
   accountId: string;
   apiToken: string;
   from: string;
   fetchFn?: typeof fetch;
+  timeoutMs?: number;
 }
 
 const SENDER_NAME = 'Morada';
 
+function isTimeout(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'TimeoutError'
+  );
+}
+
 export class CloudflareEmailSender implements EmailSender {
   private readonly fetchFn: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(private readonly cfg: CloudflareEmailConfig) {
     this.fetchFn = cfg.fetchFn ?? fetch;
+    this.timeoutMs = cfg.timeoutMs ?? EMAIL_SEND_TIMEOUT_MS;
+  }
+
+  isAvailable(): boolean {
+    return true;
   }
 
   async send(message: EmailMessage): Promise<void> {
@@ -33,10 +48,11 @@ export class CloudflareEmailSender implements EmailSender {
           html: message.html,
           text: message.text,
         }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
-    } catch {
-      throw new EmailDeliveryError();
+    } catch (error) {
+      throw new EmailDeliveryError(isTimeout(error) ? 'timeout' : 'network');
     }
-    if (!response.ok) throw new EmailDeliveryError();
+    if (!response.ok) throw new EmailDeliveryError(response.status);
   }
 }

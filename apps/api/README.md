@@ -13,7 +13,9 @@ make api-test       # pnpm --filter @morada/api test:coverage  (gate = 80%)
 Env: `PORT`, `JWT_SECRET` (required in production — startup fails without it),
 `DATABASE_URL` (Postgres; defaults to the local docker DB), `WEB_ORIGIN` (CORS,
 default Vite dev origin), `APP_URL` (base of e-mailed links, default the first
-`WEB_ORIGIN`), `BCRYPT_COST` (default 12).
+`WEB_ORIGIN`), `BCRYPT_COST` (default 12), `PROXY_SECRET` (optional; when set, the
+client IP forwarded by the Pages worker in `X-Morada-Client-IP` is trusted only with
+a matching `X-Morada-Proxy-Secret`).
 
 ## Auth model
 
@@ -30,8 +32,8 @@ default Vite dev origin), `APP_URL` (base of e-mailed links, default the first
   admin reset (`POST /api/residents/:id/login/reset`).
 - `authMiddleware(resolveSessionVersion)` is a factory: it verifies the session JWT
   and rejects it (401) unless its `sv` claim matches the user's stored
-  `session_version` (bumped on password reset, e-mail confirmation and admin
-  password reset). `compose.ts` wires it once with the user lookup; `requireRole`
+  `session_version` (bumped on password reset, e-mail confirmation, admin
+  password reset and logout). `compose.ts` wires it once with the user lookup; `requireRole`
   guards admin routes.
 - Authorization: residents/accounts/invitations are **admin-only**;
   receipts/dashboard are any authenticated user; notices are read-any /

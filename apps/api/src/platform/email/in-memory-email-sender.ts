@@ -12,6 +12,10 @@ export class InMemoryEmailSender implements EmailSender {
     return Promise.resolve();
   }
 
+  isAvailable(): boolean {
+    return true;
+  }
+
   lastTo(to: string): EmailMessage | undefined {
     return this.messages.filter((m) => m.to === to).at(-1);
   }

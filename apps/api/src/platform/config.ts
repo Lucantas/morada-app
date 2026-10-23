@@ -33,6 +33,11 @@ export function parseAppUrl(raw: string | undefined, webOrigins: string[]): stri
   return url.replace(/\/+$/, '');
 }
 
+export function parseProxySecret(raw: string | undefined): string | null {
+  const secret = raw?.trim() ?? '';
+  return secret === '' ? null : secret;
+}
+
 export function parseWebOrigins(raw: string | undefined, isProd: boolean): string[] {
   const origins = (raw ?? '')
     .split(',')
@@ -72,4 +77,5 @@ export const config = {
   isProduction,
   r2: parseR2Config(process.env),
   email: parseEmailConfig(process.env),
+  proxySecret: parseProxySecret(process.env.PROXY_SECRET),
 };

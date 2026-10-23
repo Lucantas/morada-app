@@ -40,6 +40,7 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 }
 
 const SIGNUP_LIMIT = { maxAttempts: 10, windowMs: 3_600_000, lockoutMs: 3_600_000 };
+const INVITATION_CREATE_LIMIT = { maxAttempts: 30, windowMs: 3_600_000, lockoutMs: 3_600_000 };
 
 export interface AppOptions {
   email?: EmailSender;
@@ -96,6 +97,8 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   const auth = authMiddleware((userId) => users.sessionVersionOf(userId));
   const loginLimiter = createRateLimiter();
   const signupLimiter = createRateLimiter(SIGNUP_LIMIT);
+  const invitationLimiter = createRateLimiter(SIGNUP_LIMIT);
+  const invitationCreateLimiter = createRateLimiter(INVITATION_CREATE_LIMIT);
   const condosFor = (userId: string) => listMyCondos(condos, userId);
   const invitationAccess = {
     invitations: repos.invitationTokens,
@@ -133,7 +136,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       appUrl: config.appUrl,
       activateClaimed,
       condosFor,
-      limiter: signupLimiter,
+      limiter: invitationLimiter,
     }),
   );
   app.route('/me', meRoutes({ auth, condos, users }));
@@ -159,7 +162,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     '/residents',
     invitationRoutes(
       scoped(({ residents, invitations }) => ({ residents, invitations })),
-      { condos, email, appUrl: config.appUrl, now },
+      { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
     ),
   );
 

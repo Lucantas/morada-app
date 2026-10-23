@@ -50,14 +50,6 @@ export function runUserRepositoryContract(
       expect(await repo.existsByUsername('maria302')).toBe(true);
     });
 
-    test('existsByResidentId reflects the linked resident', async () => {
-      const repo = await makeRepo();
-      expect(await repo.existsByResidentId('r-1')).toBe(false);
-      await repo.save(maria);
-      expect(await repo.existsByResidentId('r-1')).toBe(true);
-      expect(await repo.existsByResidentId('r-2')).toBe(false);
-    });
-
     test('hasAny reflects whether the store is populated', async () => {
       const repo = await makeRepo();
       expect(await repo.hasAny()).toBe(false);
@@ -221,6 +213,17 @@ export function runUserRepositoryContract(
       const repo = await makeRepo();
       await repo.save(ana);
       await repo.setPasswordHashAndBump('u-ana', 'hash-new');
+
+      expect(await repo.sessionVersionOf('u-ana')).toBe(1);
+      expect(await repo.sessionVersionOf('u-ghost')).toBeNull();
+    });
+
+    test('bumpSessionVersion increments the version and ignores an unknown user', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+
+      await repo.bumpSessionVersion('u-ana');
+      await repo.bumpSessionVersion('u-ghost');
 
       expect(await repo.sessionVersionOf('u-ana')).toBe(1);
       expect(await repo.sessionVersionOf('u-ghost')).toBeNull();

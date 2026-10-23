@@ -7,7 +7,6 @@ export interface UserRepository {
   findByResidentId(residentId: string): Promise<User | null>;
   existsByEmail(email: string): Promise<boolean>;
   existsByUsername(username: string): Promise<boolean>;
-  existsByResidentId(residentId: string): Promise<boolean>;
   hasAny(): Promise<boolean>;
   markEmailVerified(id: string, at: Date): Promise<void>;
   markEmailVerifiedAndBump(
@@ -20,6 +19,7 @@ export interface UserRepository {
     id: string,
     credentials: { name: string; passwordHash: string },
   ): Promise<number>;
+  bumpSessionVersion(id: string): Promise<void>;
   sessionVersionOf(id: string): Promise<number | null>;
   save(user: User): Promise<User>;
 }

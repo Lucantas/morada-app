@@ -80,13 +80,6 @@ export class PostgresUserRepository implements UserRepository {
     return (rowCount ?? 0) > 0;
   }
 
-  async existsByResidentId(residentId: string): Promise<boolean> {
-    const { rowCount } = await this.pool.query('SELECT 1 FROM users WHERE resident_id = $1', [
-      residentId,
-    ]);
-    return (rowCount ?? 0) > 0;
-  }
-
   async hasAny(): Promise<boolean> {
     const { rowCount } = await this.pool.query('SELECT 1 FROM users LIMIT 1');
     return (rowCount ?? 0) > 0;
@@ -121,6 +114,12 @@ export class PostgresUserRepository implements UserRepository {
     return this.bumpWith(id, 'name = $2, password_hash = $3', [
       credentials.name,
       credentials.passwordHash,
+    ]);
+  }
+
+  async bumpSessionVersion(id: string): Promise<void> {
+    await this.pool.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [
+      id,
     ]);
   }
 

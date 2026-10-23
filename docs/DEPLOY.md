@@ -99,8 +99,40 @@ fly secrets set --app morada-api --stage \
 
 `APP_URL` is the base of every e-mailed link and defaults to the first `WEB_ORIGIN`.
 Without the three e-mail secrets the API still starts: sign-up and "esqueci a senha"
-answer 503 `"Envio de e-mail indisponível"`, while invitations are still created
-(`emailSent: false`) and shared by WhatsApp or copied link.
+answer 503 `"Envio de e-mail indisponível"`. Invitations are still created
+(`emailSent: false`) and can be shared by WhatsApp or copied link, but only an
+invitation **with** an e-mail can be accepted that way (the invite proves the
+address). A link-only invitation (no e-mail) needs a confirmation e-mail, so with
+e-mail sending off its acceptance answers 503 and creates no account; an already
+confirmed account can still accept it.
+
+Delivery failures (an upstream HTTP status, a network error or the 10 s timeout) are
+logged server-side as `E-mail delivery failed:` with the upstream status, never the
+token or the message body. Check `fly logs --app morada-api` when an admin reports
+`emailSent: false`.
+
+#### Client IP behind the Pages proxy (`PROXY_SECRET`)
+
+Production traffic reaches Fly through the Pages worker (`apps/web/public/_worker.js`),
+so `Fly-Client-IP` is the worker's egress IP. The worker forwards the real client IP
+(`CF-Connecting-IP`) as `X-Morada-Client-IP` plus a shared secret in
+`X-Morada-Proxy-Secret`, and strips both headers from the incoming request. The API
+trusts `X-Morada-Client-IP` only when that secret matches `PROXY_SECRET`; otherwise
+it falls back to `Fly-Client-IP`, then `X-Forwarded-For`. Without it every IP-keyed
+rate limit (login, sign-up, forgot, invitations) collapses into one shared key.
+
+Before (or at) the merge, generate one random value and set it in both places:
+
+```bash
+PROXY_SECRET="$(openssl rand -base64 48)"
+fly secrets set --app morada-api --stage PROXY_SECRET="$PROXY_SECRET"
+printf '%s' "$PROXY_SECRET" | pnpm dlx wrangler@4 pages secret put PROXY_SECRET \
+  --project-name=morada
+```
+
+The Pages variable must be set for the **production** environment (the
+`wrangler pages secret put` default; in the dashboard: Settings → Variables and
+Secrets → Production) and takes effect on the next Pages deploy.
 
 #### Owner e-mail (legacy admin)
 

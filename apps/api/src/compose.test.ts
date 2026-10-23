@@ -1048,6 +1048,33 @@ describe('Morada API — real credentials', () => {
     expect(cleared).toMatch(/Max-Age=0/i);
   });
 
+  test('logout ends the session server-side, so a copied cookie stops working', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+
+    await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+    });
+    const replay = await app.request('/me', { headers: { Cookie: auth.cookie } });
+
+    expect(replay.status).toBe(401);
+    expect(await count("users WHERE id = 'u-admin' AND session_version = 1")).toBe(1);
+  });
+
+  test('logout with an invalid session still answers 204 and bumps nothing', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+
+    const out = await app.request('/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: `session=garbage; csrf=${auth.csrf}`, 'X-CSRF-Token': auth.csrf },
+    });
+
+    expect(out.status).toBe(204);
+    expect(await count('users WHERE session_version <> 0')).toBe(0);
+  });
+
   test('logout without a CSRF token is rejected', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
@@ -2384,15 +2411,52 @@ describe('Resident invitations', () => {
     expect(rows).toEqual([{ status: 'pendente', email: 'a@x.com' }]);
   });
 
-  test('a failed delivery still answers 201 with emailSent false', async () => {
-    const failing: EmailSender = { send: () => Promise.reject(new EmailDeliveryError()) };
+  test('a failed delivery still answers 201 with emailSent false and is logged', async () => {
+    const failure = new EmailDeliveryError(500);
+    const failing: EmailSender = {
+      send: () => Promise.reject(failure),
+      isAvailable: () => true,
+    };
     const app = await makeApp({ email: failing });
     const headers = await adminSession(app);
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const res = await post(app, '/residents/r-1/invitation', headers);
 
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({ email: 'maria@email.com', emailSent: false });
+    expect(logged).toHaveBeenCalledWith('E-mail delivery failed:', failure);
+    logged.mockRestore();
+  });
+
+  test('a malformed JSON body answers 400 and writes nothing', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers,
+      body: '{nope',
+    });
+
+    expect(res.status).toBe(400);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('the 31st invitation one admin creates within an hour is rate limited', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 30; i += 1) {
+      statuses.push((await post(app, '/residents/r-1/invitation', headers, {})).status);
+    }
+    const blocked = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(statuses).toEqual(Array(30).fill(201));
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: 'Muitas tentativas, tente mais tarde' });
+    expect(await count('invitations')).toBe(30);
   });
 
   test('GET returns null, then the status without the link or token', async () => {
@@ -2780,7 +2844,7 @@ describe('Accepting an invitation', () => {
     expect([existing.status, missing.status]).toEqual([400, 400]);
   });
 
-  test('preview and accept share the sign-up limiter', async () => {
+  test('preview and accept share their own limiter, apart from sign-up', async () => {
     const app = await makeApp({ email: new InMemoryEmailSender() });
     const token = await invite(app);
 
@@ -2795,6 +2859,64 @@ describe('Accepting an invitation', () => {
 
     expect(statuses).toEqual(Array(10).fill(200));
     expect(blocked.status).toBe(429);
-    expect(signup.status).toBe(429);
+    expect(signup.status).toBe(202);
+  });
+
+  test('sign-up attempts do not consume the invitation limiter', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    for (let i = 0; i < 10; i += 1) {
+      await app.request('/auth/password/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '6.6.6.6' },
+        body: JSON.stringify({ email: `x${i}@x.com` }),
+      });
+    }
+
+    expect((await preview(app, token, '6.6.6.6')).status).toBe(200);
+  });
+
+  test('with e-mail off, a link-only invite answers 503 and creates no account', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, { ...newAccount, email: 'nova@x.com' });
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'Envio de e-mail indisponível' });
+    expect(await count("users WHERE email = 'nova@x.com'")).toBe(0);
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('with e-mail off, an unconfirmed account cannot claim a link-only invite', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, {
+      email: 'ana@x.com',
+      password: 'senha-da-ana',
+      name: 'Ana',
+    });
+
+    expect(res.status).toBe(503);
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+  });
+
+  test('with e-mail off, a verified account still accepts a link-only invite', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    await pool.query("UPDATE users SET email_verified_at = now() WHERE email = 'ana@x.com'");
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, {
+      email: 'ana@x.com',
+      password: 'senha-da-ana',
+      name: 'Ana',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
   });
 });

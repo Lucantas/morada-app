@@ -1,6 +1,12 @@
 import type { ErrorHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
+import { EmailDeliveryError } from './email/email-sender';
+
+export function logServerError(label: string, error: unknown): void {
+  console.error(label, error);
+}
+
 /**
  * Domain/app errors carry a numeric `status` (e.g. 404, 400). Everything else is
  * a 500. Nothing is swallowed — the message is returned as an explicit error body.
@@ -11,10 +17,11 @@ export const onError: ErrorHandler = (err, c) => {
   }
   const raw = (err as { status?: unknown }).status;
   if (typeof raw === 'number' && raw >= 400 && raw < 600) {
+    if (err instanceof EmailDeliveryError) logServerError('E-mail delivery failed:', err);
     // Typed app errors carry a safe, user-facing message.
     return c.json({ error: err.message }, raw as ContentfulStatusCode);
   }
   // Unexpected error: don't leak internals (SQL text, stack, driver messages).
-  console.error('Unhandled error:', err);
+  logServerError('Unhandled error:', err);
   return c.json({ error: 'Erro interno' }, 500);
 };

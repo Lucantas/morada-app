@@ -28,8 +28,7 @@ function fakeRepo(users: User[] = []): UserRepository {
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => map.has(username),
-    existsByResidentId: async (residentId) =>
-      [...map.values()].some((u) => u.residentId === residentId),
+    bumpSessionVersion: async () => undefined,
     hasAny: async () => map.size > 0,
     save: async (u) => {
       map.set(u.username, u);
@@ -186,7 +185,7 @@ describe('seedAdmin', () => {
       findByResidentId: async (residentId) =>
         residentId === existingResident.residentId ? existingResident : null,
       existsByUsername: async (username) => username === existingResident.username,
-      existsByResidentId: async (residentId) => residentId === existingResident.residentId,
+      bumpSessionVersion: async () => undefined,
       hasAny: async () => true,
       save: saveSpy,
     };

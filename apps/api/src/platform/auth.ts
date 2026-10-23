@@ -33,17 +33,24 @@ async function sessionClaims(token: string): Promise<{ uid: string; sv: number }
   }
 }
 
+export async function currentSessionUser(
+  token: string,
+  resolveSessionVersion: SessionVersionResolver,
+): Promise<string | null> {
+  const claims = await sessionClaims(token);
+  if (!claims || (await resolveSessionVersion(claims.uid)) !== claims.sv) return null;
+  return claims.uid;
+}
+
 export function authMiddleware(
   resolveSessionVersion: SessionVersionResolver,
 ): MiddlewareHandler<ApiEnv> {
   return async (c, next) => {
     const token = getCookie(c, SESSION_COOKIE);
     if (!token) return c.json({ error: 'Não autenticado' }, 401);
-    const claims = await sessionClaims(token);
-    if (!claims || (await resolveSessionVersion(claims.uid)) !== claims.sv) {
-      return c.json({ error: 'Sessão inválida' }, 401);
-    }
-    c.set('uid', claims.uid);
+    const uid = await currentSessionUser(token, resolveSessionVersion);
+    if (uid === null) return c.json({ error: 'Sessão inválida' }, 401);
+    c.set('uid', uid);
     await next();
   };
 }

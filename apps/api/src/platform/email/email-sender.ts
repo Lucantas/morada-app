@@ -7,7 +7,10 @@ export interface EmailMessage {
 
 export interface EmailSender {
   send(message: EmailMessage): Promise<void>;
+  isAvailable(): boolean;
 }
+
+export type UpstreamFailure = number | 'network' | 'timeout';
 
 export class EmailUnavailableError extends Error {
   readonly status = 503;
@@ -19,7 +22,7 @@ export class EmailUnavailableError extends Error {
 
 export class EmailDeliveryError extends Error {
   readonly status = 502;
-  constructor() {
+  constructor(readonly upstreamStatus: UpstreamFailure) {
     super('Não foi possível enviar o e-mail');
     this.name = 'EmailDeliveryError';
   }
@@ -28,5 +31,9 @@ export class EmailDeliveryError extends Error {
 export class DisabledEmailSender implements EmailSender {
   send(): Promise<void> {
     return Promise.reject(new EmailUnavailableError());
+  }
+
+  isAvailable(): boolean {
+    return false;
   }
 }

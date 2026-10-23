@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-import type { EmailSender } from '../../platform/email/email-sender';
+import { EmailUnavailableError, type EmailSender } from '../../platform/email/email-sender';
 import { issueConfirmation } from '../../users/app/issue-confirmation';
 import type { AuthTokenRepository } from '../../users/domain/auth-token-repository';
 import { emailSchema } from '../../users/domain/email';
@@ -62,6 +62,10 @@ async function sendConfirmation(deps: AcceptInvitationDeps, user: { id: string; 
   await issueConfirmation(deps, user);
 }
 
+function ensureConfirmationSendable(deps: AcceptInvitationDeps): void {
+  if (!deps.email.isAvailable()) throw new EmailUnavailableError();
+}
+
 async function verifyByInvitation(deps: AcceptInvitationDeps, user: User): Promise<User> {
   const now = deps.now();
   const sessionVersion = await deps.users.markEmailVerifiedAndBump(user.id, now, user.passwordHash);
@@ -77,6 +81,9 @@ async function acceptAsExisting(
 ): Promise<User> {
   if (!(await deps.hasher.verify(password, user.passwordHash))) {
     throw new InvalidCredentialsError();
+  }
+  if (user.emailVerifiedAt === null && invitation.email === null) {
+    ensureConfirmationSendable(deps);
   }
   await claimFor(deps, invitation, user.id);
 
@@ -111,6 +118,7 @@ async function acceptAsNew(
 ): Promise<User> {
   if (invitation.claimedBy !== null) throw new InvalidInvitationError();
   const { password, name } = newAccountSchema.parse(body);
+  if (invitation.email === null) ensureConfirmationSendable(deps);
   const now = deps.now();
   const user: User = {
     id: randomUUID(),

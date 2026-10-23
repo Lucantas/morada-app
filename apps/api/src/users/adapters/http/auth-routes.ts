@@ -1,8 +1,8 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
-import { deleteCookie } from 'hono/cookie';
+import { deleteCookie, getCookie } from 'hono/cookie';
 import { z } from 'zod';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { currentSessionUser, type ApiEnv } from '../../../platform/auth';
 import type { CondoSummary } from '../../../condos/app/condo-access-views';
 import { config } from '../../../platform/config';
 import { CSRF_COOKIE, SESSION_COOKIE, clearCookieOptions } from '../../../platform/cookies';
@@ -52,6 +52,12 @@ function tokenFrom(body: unknown): string {
 
 function readJson(c: Context<ApiEnv>): Promise<unknown> {
   return c.req.json().catch(() => undefined);
+}
+
+async function endServerSession(users: UserRepository, token: string | undefined): Promise<void> {
+  if (!token) return;
+  const uid = await currentSessionUser(token, (id) => users.sessionVersionOf(id));
+  if (uid !== null) await users.bumpSessionVersion(uid);
 }
 
 export function authRoutes(deps: {
@@ -182,7 +188,8 @@ export function authRoutes(deps: {
     return c.body(null, 204);
   });
 
-  app.post('/logout', csrfMiddleware, (c) => {
+  app.post('/logout', csrfMiddleware, async (c) => {
+    await endServerSession(deps.users, getCookie(c, SESSION_COOKIE));
     deleteCookie(c, SESSION_COOKIE, clearCookieOptions(config.isProduction));
     deleteCookie(c, CSRF_COOKIE, clearCookieOptions(config.isProduction));
     return c.body(null, 204);

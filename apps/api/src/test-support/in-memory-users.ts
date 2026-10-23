@@ -22,7 +22,6 @@ export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () 
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByEmail: async (email) => list.some((u) => u.email === email),
     existsByUsername: async (username) => list.some((u) => u.username === username),
-    existsByResidentId: async (residentId) => list.some((u) => u.residentId === residentId),
     hasAny: async () => list.length > 0,
     markEmailVerified: async (id, at) => {
       list = list.map((u) => (u.id === id ? { ...u, emailVerifiedAt: at } : u));
@@ -41,6 +40,9 @@ export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () 
         passwordHash,
         sessionVersion: existing(id).sessionVersion + 1,
       }),
+    bumpSessionVersion: async (id) => {
+      list = list.map((u) => (u.id === id ? { ...u, sessionVersion: u.sessionVersion + 1 } : u));
+    },
     sessionVersionOf: async (id) => list.find((u) => u.id === id)?.sessionVersion ?? null,
     save: async (user) => {
       list = [...list.filter((existing) => existing.id !== user.id), user];

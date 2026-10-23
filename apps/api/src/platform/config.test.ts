@@ -1,4 +1,21 @@
-import { parseWebOrigins, parseR2Config, parseEmailConfig, parseAppUrl } from './config';
+import {
+  parseWebOrigins,
+  parseR2Config,
+  parseEmailConfig,
+  parseAppUrl,
+  parseProxySecret,
+} from './config';
+
+describe('parseProxySecret', () => {
+  test('keeps a configured secret, trimmed', () => {
+    expect(parseProxySecret('  s3gredo ')).toBe('s3gredo');
+  });
+
+  test('is null when unset or blank', () => {
+    expect(parseProxySecret(undefined)).toBeNull();
+    expect(parseProxySecret('   ')).toBeNull();
+  });
+});
 
 describe('parseWebOrigins', () => {
   test('splits a comma-separated list and trims blanks', () => {
