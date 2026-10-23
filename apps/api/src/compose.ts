@@ -123,14 +123,20 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // Account proof download: any authenticated user (admin or resident) — condo
   // expense proofs are shared building information. Mounted before the
   // admin-only CRUD below so it isn't caught by the admin guard.
-  api.route('/accounts', accountProofRoutes(unscoped.accounts));
+  api.route('/accounts', accountProofRoutes(scoped(({ accounts }) => ({ accounts }))));
 
   // Admin-only resources.
-  api.route('/accounts', guarded('admin', accountRoutes(unscoped.accounts)));
-  api.route('/incomes', guarded('admin', incomeRoutes(unscoped.incomes)));
+  api.route('/accounts', guarded('admin', accountRoutes(scoped(({ accounts }) => ({ accounts })))));
+  api.route('/incomes', guarded('admin', incomeRoutes(scoped(({ incomes }) => ({ incomes })))));
   api.route(
     '/categories',
-    guarded('admin', categoryRoutes(unscoped.categories, { list: () => unscoped.accounts.list() })),
+    guarded(
+      'admin',
+      categoryRoutes(
+        unscoped.categories,
+        scoped(({ accounts }) => accounts),
+      ),
+    ),
   );
   api.route('/settings', guarded('admin', settingsRoutes(unscoped.settings)));
 

@@ -1,6 +1,8 @@
+import { IncomeNotFoundError } from '../../domain/errors';
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import type { ProofBytes, ProofStorage } from '../../../receipts/domain/proof-storage';
+import { createTestCondo } from '../../../test-support/condos';
 import { resetPg } from '../../../test-support/pg';
 import { runIncomeRepositoryContract } from '../income-repository.contract';
 
@@ -38,15 +40,25 @@ afterAll(async () => {
   await pool.end();
 });
 
-runIncomeRepositoryContract('PostgresIncomeRepository', async () => {
-  await resetPg(pool);
-  return new PostgresIncomeRepository(pool, null);
+const LEGACY = 'condo-legacy';
+
+describe('PostgresIncomeRepository — contract', () => {
+  beforeEach(async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+  });
+
+  runIncomeRepositoryContract(
+    'PostgresIncomeRepository',
+    async (condominiumId) => new PostgresIncomeRepository(pool, condominiumId, null),
+  );
 });
 
 describe('PostgresIncomeRepository archive', () => {
   test('archive hides the income from list and getById but keeps the row', async () => {
     await resetPg(pool);
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
     const saved = await repo.save({
       id: 'i-1',
       description: 'Aluguel salão de festas',
@@ -81,19 +93,19 @@ describe('PostgresIncomeRepository — proof offload/serve', () => {
 
   test('save offloads a fresh data URL to storage, persisting proof_key (not the base64) and hasProof: true', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresIncomeRepository(pool, storage);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, storage);
 
     const saved = await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     expect(saved.hasProof).toBe(true);
     expect(saved.proofDataUrl).toBeUndefined();
-    expect(storage.has('incomes/i-1')).toBe(true);
+    expect(storage.has(`condos/${LEGACY}/incomes/i-1`)).toBe(true);
 
     const { rows } = await pool.query(
       'SELECT proof_key, proof_data_url FROM incomes WHERE id = $1',
       ['i-1'],
     );
-    expect(rows[0].proof_key).toBe('incomes/i-1');
+    expect(rows[0].proof_key).toBe(`condos/${LEGACY}/incomes/i-1`);
     expect(rows[0].proof_data_url).toBeNull();
 
     const fetched = await repo.getById('i-1');
@@ -102,7 +114,7 @@ describe('PostgresIncomeRepository — proof offload/serve', () => {
   });
 
   test('save falls back to storing the base64 inline when storage is null, still reporting hasProof: true', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
 
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
@@ -120,7 +132,7 @@ describe('PostgresIncomeRepository — proof offload/serve', () => {
 
   test('getProof returns bytes from storage when proof_key is set', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresIncomeRepository(pool, storage);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const proof = await repo.getProof('i-1');
@@ -130,7 +142,7 @@ describe('PostgresIncomeRepository — proof offload/serve', () => {
   });
 
   test('getProof decodes legacy base64 when only proof_data_url is set', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const proof = await repo.getProof('i-1');
@@ -140,20 +152,20 @@ describe('PostgresIncomeRepository — proof offload/serve', () => {
   });
 
   test('getProof returns null when the income has no proof', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
     await repo.save({ ...BASE_INCOME, proofDataUrl: undefined });
 
     expect(await repo.getProof('i-1')).toBeNull();
   });
 
   test('getProof returns null for an unknown id', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
     expect(await repo.getProof('nope')).toBeNull();
   });
 
   test('list carries hasProof, never proofDataUrl', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresIncomeRepository(pool, storage);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const items = await repo.list();
@@ -180,7 +192,7 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
   });
 
   test('updateIncome-style re-save (proofDataUrl: undefined, base64 fallback mode) preserves the existing proof', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -205,7 +217,7 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
 
   test('updateIncome-style re-save (proofDataUrl: undefined, storage mode) preserves the existing proof_key', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresIncomeRepository(pool, storage);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -220,7 +232,7 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
       'SELECT proof_key, proof_data_url FROM incomes WHERE id = $1',
       ['i-1'],
     );
-    expect(rows[0].proof_key).toBe('incomes/i-1');
+    expect(rows[0].proof_key).toBe(`condos/${LEGACY}/incomes/i-1`);
     expect(rows[0].proof_data_url).toBeNull();
 
     const proof = await repo.getProof('i-1');
@@ -230,7 +242,7 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
 
   test('save with proofDataUrl: null explicitly clears the proof', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresIncomeRepository(pool, storage);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE_INCOME, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -251,7 +263,7 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
   });
 
   test('brand-new insert with proofDataUrl: undefined succeeds with hasProof: false', async () => {
-    const repo = new PostgresIncomeRepository(pool, null);
+    const repo = new PostgresIncomeRepository(pool, LEGACY, null);
 
     const saved = await repo.save({
       id: 'i-new',
@@ -264,5 +276,28 @@ describe('PostgresIncomeRepository — proof preservation on proof-less re-save 
 
     expect(saved.hasProof).toBe(false);
     expect(await repo.getProof('i-new')).toBeNull();
+  });
+});
+
+describe('PostgresIncomeRepository — foreign upload', () => {
+  test("rejects an upload over another condo's row without storing the proof", async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+    const storage = new FakeProofStorage();
+    const entity = {
+      id: 'i-x',
+      description: 'Aluguel',
+      source: 'Apto 1',
+      date: '2026-04-05',
+      valueCents: 1000,
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    };
+    await new PostgresIncomeRepository(pool, 'condo-a', storage).save(entity);
+
+    const attempt = new PostgresIncomeRepository(pool, 'condo-b', storage).save({ ...entity });
+
+    await expect(attempt).rejects.toThrow(IncomeNotFoundError);
+    expect(storage.has('condos/condo-b/incomes/i-x')).toBe(false);
   });
 });

@@ -264,6 +264,90 @@ describe('Morada API', () => {
     expect(res.status).toBe(404);
   });
 
+  async function seedForeignLedger(): Promise<
+    ReturnType<ReturnType<typeof makePostgresRepositories>['forCondo']>
+  > {
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.accounts.save({
+      id: 'ac-foreign',
+      description: 'Energia',
+      category: 'Utilidades',
+      date: '2026-07-05',
+      valueCents: 5000,
+      status: 'pendente',
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+    await other.incomes.save({
+      id: 'in-foreign',
+      description: 'Aluguel salão',
+      source: 'Apto 9',
+      date: '2026-07-05',
+      valueCents: 15000,
+    });
+    return other;
+  }
+
+  test('cross-condo accounts access answers 404', async () => {
+    const app = await makeApp();
+    const other = await seedForeignLedger();
+    const auth = await authFor(app, adminCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/accounts/ac-foreign`, { headers });
+    const list = await app.request(`${P}/accounts`, { headers });
+    const update = await app.request(`${P}/accounts/ac-foreign`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Hack',
+        category: 'Utilidades',
+        date: '2026-07-05',
+        valueCents: 1,
+        status: 'pago',
+      }),
+    });
+
+    expect(read.status).toBe(404);
+    expect(((await list.json()) as { id: string }[]).map((a) => a.id)).not.toContain('ac-foreign');
+    expect(update.status).toBe(404);
+    expect((await other.accounts.getById('ac-foreign'))?.description).toBe('Energia');
+  });
+
+  test('account proof of another condo answers 404', async () => {
+    const app = await makeApp();
+    await seedForeignLedger();
+    const auth = await authFor(app, adminCredentials);
+
+    const res = await app.request(`${P}/accounts/ac-foreign/proof`, {
+      headers: { Cookie: auth.cookie },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('cross-condo incomes access answers 404', async () => {
+    const app = await makeApp();
+    const other = await seedForeignLedger();
+    const auth = await authFor(app, adminCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const list = await app.request(`${P}/incomes`, { headers });
+    const proof = await app.request(`${P}/incomes/in-foreign/proof`, { headers });
+    const update = await app.request(`${P}/incomes/in-foreign`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ valueCents: 1 }),
+    });
+    const archive = await app.request(`${P}/incomes/in-foreign`, { method: 'DELETE', headers });
+
+    expect(((await list.json()) as { id: string }[]).map((i) => i.id)).not.toContain('in-foreign');
+    expect(proof.status).toBe(404);
+    expect(update.status).toBe(404);
+    expect(archive.status).toBe(404);
+    expect((await other.incomes.getById('in-foreign'))?.valueCents).toBe(15000);
+  });
+
   test('an admin overrides and then clears a resident status', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
