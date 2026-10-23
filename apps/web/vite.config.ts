@@ -17,6 +17,7 @@ export default defineConfig({
     proxy: {
       '/api': apiProxyTarget,
       '/auth': apiProxyTarget,
+      '/me': apiProxyTarget,
     },
   },
 });

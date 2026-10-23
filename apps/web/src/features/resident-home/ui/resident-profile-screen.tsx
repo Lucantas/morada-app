@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -14,9 +15,10 @@ type Props = {
 };
 
 export function ResidentProfileScreen({ resident, onSignOut, bottomNav }: Props) {
+  const condoName = useCondoName();
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Perfil" />
+      <TopBar eyebrow={condoName} title="Perfil" />
       <ScreenBody>
         <SurfaceCard style={{ padding: '18px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -41,7 +43,7 @@ export function ResidentProfileScreen({ resident, onSignOut, bottomNav }: Props)
                 {resident.name}
               </div>
               <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
-                {resident.apt} · Bloco 2
+                {resident.apt} · {condoName}
               </div>
             </div>
           </div>

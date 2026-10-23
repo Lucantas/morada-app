@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { EmptyState } from '@/shared/ui/empty-state';
@@ -36,13 +37,14 @@ type Props = {
 };
 
 export function ReceiptsScreen({ repository, resident, onPay, bottomNav }: Props) {
+  const condoName = useCondoName();
   const receipts = useReceipts(repository);
   const firstName = resident.name.trim().split(/\s+/)[0] ?? resident.name;
 
   return (
     <Screen>
       <TopBar
-        eyebrow={`Olá, ${firstName} · ${resident.apt} · Bloco 2`}
+        eyebrow={`Olá, ${firstName} · ${resident.apt} · ${condoName}`}
         title="Meus recibos"
         right={
           <span
@@ -134,8 +136,12 @@ function ReceiptsContent({
   );
 }
 
-function downloadProof(receipt: Receipt, resident: { name: string; apt: string }): void {
-  const blob = new Blob([buildReceiptProof(receipt, resident)], {
+function downloadProof(
+  receipt: Receipt,
+  resident: { name: string; apt: string },
+  condoName: string,
+): void {
+  const blob = new Blob([buildReceiptProof(receipt, resident, condoName)], {
     type: 'text/html;charset=utf-8',
   });
   const url = URL.createObjectURL(blob);
@@ -157,6 +163,7 @@ function ReceiptTicket({
   resident: { name: string; apt: string };
   onPay: (id: string) => void;
 }) {
+  const condoName = useCondoName();
   const view = receiptStatusView(receipt.status);
   return (
     <SurfaceCard style={{ overflow: 'hidden' }}>
@@ -212,7 +219,7 @@ function ReceiptTicket({
             </div>
             <button
               type="button"
-              onClick={() => downloadProof(receipt, resident)}
+              onClick={() => downloadProof(receipt, resident, condoName)}
               style={{
                 marginTop: 10,
                 display: 'inline-flex',

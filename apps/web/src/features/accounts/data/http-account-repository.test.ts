@@ -15,6 +15,15 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
 }
 
 describe('HttpAccountRepository', () => {
+  test('list keeps the due date of an account', async () => {
+    const account = buildAccount({ id: 'a-1', dueDate: '2026-05-10' });
+    const api = fakeApi({ get: jest.fn().mockResolvedValue([account]) });
+
+    const [first] = await new HttpAccountRepository(api).list();
+
+    expect(first?.dueDate).toBe('2026-05-10');
+  });
+
   test('list parses the GET /api/accounts response', async () => {
     const account = buildAccount({ id: 'a-1' });
     const api = fakeApi({ get: jest.fn().mockResolvedValue([account]) });

@@ -20,8 +20,8 @@ export const useSessionStore = create<SessionState>()(
       subject: null,
       authenticate: (role, subject) => set({ role, subject }),
       signOut: () => {
-        useCondoScope.getState().setCondo(null);
         set({ role: null, subject: null });
+        useCondoScope.getState().setCondo(null);
       },
     }),
     {

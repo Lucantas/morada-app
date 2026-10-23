@@ -105,7 +105,6 @@ export function LoginScreen({ onSubmit, error, pending }: Props) {
           >
             Morada
           </h1>
-          <p style={{ color: '#C9DCDD', fontSize: '1.2rem', marginTop: 8 }}>Bloco 2</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>

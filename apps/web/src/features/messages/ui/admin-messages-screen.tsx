@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -19,11 +20,12 @@ type Props = {
 };
 
 export function AdminMessagesScreen({ repository, onOpenThread, bottomNav }: Props) {
+  const condoName = useCondoName();
   const threads = useThreads(repository);
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Mensagens" />
+      <TopBar eyebrow={condoName} title="Mensagens" />
       <ScreenBody>
         {threads.isLoading && <StatusView variant="loading" message="Carregando conversas…" />}
         {threads.isError && (
@@ -59,6 +61,7 @@ function lastText(messages: Message[]): string {
 }
 
 function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void }) {
+  const condoName = useCondoName();
   return (
     <SurfaceCard
       onClick={onClick}
@@ -78,7 +81,9 @@ function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void })
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: '1rem' }}>{thread.residentName}</div>
-        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>{thread.apt} · Bloco 2</div>
+        <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
+          {thread.apt} · {condoName}
+        </div>
         <div
           style={{
             fontSize: '.88rem',

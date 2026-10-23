@@ -1,12 +1,16 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
 import { renderWithClient } from '@/test/render';
 import { buildReceipt } from '@/test/factories.receipts';
 
 import { InMemoryReceiptRepository } from '../data/in-memory-receipt-repository';
 
 import { ReceiptsScreen } from './receipts-screen';
+
+beforeEach(() => setTestCondo());
+afterEach(() => clearTestCondo());
 
 function setup() {
   const repository = new InMemoryReceiptRepository([
@@ -33,6 +37,14 @@ function setup() {
 }
 
 describe('ReceiptsScreen', () => {
+  test('shows the condominium name next to the apartment', async () => {
+    setup();
+
+    expect(
+      await screen.findByText(`Olá, Maria · Apto 302 · ${TEST_CONDO_NAME}`),
+    ).toBeInTheDocument();
+  });
+
   test('renders the receipt cards once loaded', async () => {
     setup();
 

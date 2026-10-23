@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
 import { renderWithClient } from '@/test/render';
 
 import { InMemoryNoticeRepository } from '../data/in-memory-notice-repository';
@@ -8,6 +9,21 @@ import { InMemoryNoticeRepository } from '../data/in-memory-notice-repository';
 import { SendNoticeScreen } from './send-notice-screen';
 
 describe('SendNoticeScreen', () => {
+  beforeEach(() => setTestCondo());
+  afterEach(() => clearTestCondo());
+
+  test('offers the condominium name as an audience', async () => {
+    renderWithClient(
+      <SendNoticeScreen
+        repository={new InMemoryNoticeRepository([])}
+        onSent={jest.fn()}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: TEST_CONDO_NAME })).toBeInTheDocument();
+  });
+
   test('filling the form and sending saves the notice and calls onSent', async () => {
     const repository = new InMemoryNoticeRepository([]);
     const onSent = jest.fn();

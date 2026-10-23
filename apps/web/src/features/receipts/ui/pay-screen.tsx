@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { formatBRL } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function PayScreen({ repository, receiptId, onDone }: Props) {
+  const condoName = useCondoName();
   const receipt = useQuery({
     queryKey: [...receiptsQueryKey, receiptId],
     queryFn: () => getReceipt(repository, receiptId),
@@ -97,7 +99,7 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Recibos · Bloco 2
+            Recibos · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             Pagar taxa

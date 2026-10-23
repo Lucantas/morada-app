@@ -2,12 +2,16 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { addMonths, formatMonthName } from '@/shared/lib/dates';
+import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
 import { renderWithClient } from '@/test/render';
 import { buildAccount } from '@/test/factories.accounts';
 
 import { InMemoryAccountRepository } from '../data/in-memory-account-repository';
 
 import { AccountsScreen } from './accounts-screen';
+
+beforeEach(() => setTestCondo());
+afterEach(() => clearTestCondo());
 
 function setup(accounts = defaultAccounts, monthlyIncomeCents: Record<string, number> = {}) {
   const repository = new InMemoryAccountRepository(accounts);
@@ -23,6 +27,12 @@ function setup(accounts = defaultAccounts, monthlyIncomeCents: Record<string, nu
   );
   return { onOpenAccount };
 }
+
+test('shows the condominium name', () => {
+  setup();
+
+  expect(screen.getByText(TEST_CONDO_NAME)).toBeInTheDocument();
+});
 
 async function expandFilters() {
   await userEvent.click(screen.getByText('Filtrar lançamentos'));

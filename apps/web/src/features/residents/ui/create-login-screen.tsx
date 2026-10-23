@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton, SurfaceCard } from '@/shared/ui/primitives';
@@ -29,6 +30,7 @@ export function CreateLoginScreen({
   reset,
   onBack,
 }: Props) {
+  const condoName = useCondoName();
   const [phase, setPhase] = useState<Phase>('loading');
   const [existingUsername, setExistingUsername] = useState<string | null>(null);
   const [suggestedUsername, setSuggestedUsername] = useState('');
@@ -119,7 +121,7 @@ export function CreateLoginScreen({
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Acesso do morador · Bloco 2
+            Acesso do morador · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             {residentName ?? 'Criar acesso'}

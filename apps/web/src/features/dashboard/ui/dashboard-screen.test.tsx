@@ -1,12 +1,16 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
 import { renderWithClient } from '@/test/render';
 import { buildDashboardSummary } from '@/test/factories.dashboard';
 
 import { InMemoryDashboardRepository } from '../data/in-memory-dashboard-repository';
 
 import { DashboardScreen } from './dashboard-screen';
+
+beforeEach(() => setTestCondo());
+afterEach(() => clearTestCondo());
 
 function setup() {
   const repository = new InMemoryDashboardRepository(buildDashboardSummary());
@@ -26,6 +30,12 @@ function setup() {
 }
 
 describe('DashboardScreen', () => {
+  test('shows the condominium name', async () => {
+    setup();
+
+    expect(await screen.findByText(TEST_CONDO_NAME)).toBeInTheDocument();
+  });
+
   test('renders the condo balance value', async () => {
     setup();
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { EmptyState } from '@/shared/ui/empty-state';
 import { SurfaceCard } from '@/shared/ui/primitives';
@@ -21,13 +22,14 @@ type Props = {
 };
 
 export function NoticesScreen({ repository, bottomNav }: Props) {
+  const condoName = useCondoName();
   const notices = useNotices(repository);
   const dismiss = useDismissNotice(repository);
   const clear = useClearNotices(repository);
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Avisos" />
+      <TopBar eyebrow={condoName} title="Avisos" />
       <ScreenBody>
         {notices.isLoading && <NoticesSkeleton />}
         {notices.isError && (

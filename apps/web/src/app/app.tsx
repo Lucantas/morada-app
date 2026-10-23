@@ -27,6 +27,7 @@ import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
+import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
@@ -38,6 +39,7 @@ import { StatusView } from '@/shared/ui/status-view';
 import {
   accountRepository,
   categoryRepository,
+  condoInfoRepository,
   confirmPayment,
   dashboardRepository,
   editReceipt,
@@ -278,9 +280,14 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
+  const condoInfo = useCondoInfo(condoInfoRepository);
+  const renameCondo = useRenameCondo(condoInfoRepository);
   return (
     <SettingsScreen
       repository={settingsRepository}
+      condoName={condoInfo.data?.name}
+      savingCondoName={renameCondo.isPending}
+      onRenameCondo={(name) => renameCondo.mutateAsync(name)}
       categories={categories.data}
       categoriesError={categories.isError}
       categoriesReady={categories.isSuccess}

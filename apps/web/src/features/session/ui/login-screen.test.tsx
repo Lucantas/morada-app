@@ -4,6 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { LoginScreen } from './login-screen';
 
 describe('LoginScreen', () => {
+  test('shows only the product name, with no condominium', () => {
+    render(<LoginScreen onSubmit={jest.fn()} />);
+
+    expect(screen.getByRole('heading', { name: 'Morada' })).toBeInTheDocument();
+    expect(screen.queryByText(/bloco/i)).not.toBeInTheDocument();
+  });
+
   test('submits the typed username and password', async () => {
     const user = userEvent.setup();
     const onSubmit = jest.fn();

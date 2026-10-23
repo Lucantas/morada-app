@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { TopBar } from '@/shared/ui/top-bar';
 
 export function ComingSoon({ title, bottomNav }: { title: string; bottomNav: ReactNode }) {
+  const condoName = useCondoName();
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title={title} />
+      <TopBar eyebrow={condoName} title={title} />
       <ScreenBody>
         <div
           style={{

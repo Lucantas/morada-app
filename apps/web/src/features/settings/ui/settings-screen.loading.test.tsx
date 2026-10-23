@@ -14,6 +14,9 @@ describe('SettingsScreen loading', () => {
     renderWithClient(
       <SettingsScreen
         repository={{} as never}
+        condoName={undefined}
+        savingCondoName={false}
+        onRenameCondo={async () => undefined}
         categories={[]}
         categoriesError={false}
         categoriesReady

@@ -5,7 +5,7 @@ import { apartmentReceiptTotals } from '@/features/receipts/domain/apartment-rec
 import type { Receipt, ReceiptMethod } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
 import { sortByDueDateDesc } from '@/features/receipts/domain/sort-by-due-date';
-import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
+import { scopedApiPath, useCondoScope, useCondoName } from '@/shared/lib/condo-scope';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
@@ -99,6 +99,7 @@ export function ResidentEditScreen({
   onRejectPayment,
   onOverrideStatus,
 }: Props) {
+  const condoName = useCondoName();
   const queryClient = useQueryClient();
   const registration = useMutation({
     mutationFn: (input: { receiptId: string; method: ReceiptMethod; paidAt: string }) =>
@@ -247,7 +248,7 @@ export function ResidentEditScreen({
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Apartamentos · Bloco 2
+            Apartamentos · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             {title}

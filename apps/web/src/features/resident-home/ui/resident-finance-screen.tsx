@@ -6,7 +6,7 @@ import type {
   PaidItem,
 } from '@/features/dashboard/domain/dashboard';
 import type { DashboardRepository } from '@/features/dashboard/domain/dashboard-repository';
-import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
+import { scopedApiPath, useCondoScope, useCondoName } from '@/shared/lib/condo-scope';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -21,11 +21,12 @@ type Props = {
 };
 
 export function ResidentFinanceScreen({ dashboardRepository, bottomNav }: Props) {
+  const condoName = useCondoName();
   const finance = useResidentFinance(dashboardRepository);
 
   return (
     <Screen>
-      <TopBar eyebrow="Condomínio Morada · Bloco 2" title="Condomínio" />
+      <TopBar eyebrow={condoName} title="Condomínio" />
       <ScreenBody>
         {finance.isLoading && <ResidentFinanceSkeleton />}
         {finance.isError && (

@@ -4,10 +4,10 @@ import type { ResidentRepository } from '../domain/resident-repository';
 
 export const currentResidentQueryKey = ['current-resident'] as const;
 
-export function useCurrentResident(repository: ResidentRepository, subject: string | null) {
+export function useCurrentResident(repository: ResidentRepository, scopeKey: string | null) {
   return useQuery({
-    queryKey: [...currentResidentQueryKey, subject],
-    queryFn: () => repository.getCurrent(subject as string),
-    enabled: subject !== null,
+    queryKey: [...currentResidentQueryKey, scopeKey],
+    queryFn: () => repository.getCurrent(scopeKey as string),
+    enabled: scopeKey !== null,
   });
 }

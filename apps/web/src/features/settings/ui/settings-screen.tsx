@@ -12,6 +12,9 @@ import { SettingsSkeleton } from './settings-skeleton';
 
 type Props = {
   repository: SettingsRepository;
+  condoName: string | undefined;
+  savingCondoName: boolean;
+  onRenameCondo: (name: string) => Promise<unknown>;
   categories: readonly Category[] | undefined;
   categoriesError: boolean;
   categoriesReady: boolean;
@@ -28,6 +31,9 @@ function reclassifiedMessage(count: number): string {
 
 export function SettingsScreen({
   repository,
+  condoName: savedCondoName,
+  savingCondoName,
+  onRenameCondo,
   categories,
   categoriesError,
   categoriesReady,
@@ -38,6 +44,7 @@ export function SettingsScreen({
   const settings = useSettings(repository);
   const saveSettings = useSaveSettings(repository);
 
+  const [condoName, setCondoName] = useState('');
   const [feeCents, setFeeCents] = useState(0);
   const [dueDay, setDueDay] = useState('15');
   const [localCategories, setLocalCategories] = useState<CategoryDraft[]>([]);
@@ -51,6 +58,10 @@ export function SettingsScreen({
       setDueDay(String(settings.data.dueDay));
     }
   }, [settings.data]);
+
+  useEffect(() => {
+    if (savedCondoName !== undefined) setCondoName(savedCondoName);
+  }, [savedCondoName]);
 
   useEffect(() => {
     if (categories) {
@@ -82,6 +93,10 @@ export function SettingsScreen({
 
   const submit = async () => {
     try {
+      const trimmedName = condoName.trim();
+      if (savedCondoName !== undefined && trimmedName !== savedCondoName) {
+        await onRenameCondo(trimmedName);
+      }
       const day = Number.parseInt(dueDay, 10);
       await saveSettings.mutateAsync({
         monthlyFeeCents: feeCents,
@@ -137,6 +152,7 @@ export function SettingsScreen({
         {settings.isLoading && <SettingsSkeleton />}
         {settings.isSuccess && (
           <div style={{ paddingTop: 2 }}>
+            <Field label="Nome do condomínio" value={condoName} onChange={setCondoName} />
             <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
             <Field label="Dia de vencimento" value={dueDay} onChange={setDueDay} type="number" />
           </div>
@@ -249,7 +265,12 @@ export function SettingsScreen({
           icon="check"
           onClick={() => void submit()}
           disabled={
-            !settings.isSuccess || !categoriesReady || saveSettings.isPending || savingCategories
+            !settings.isSuccess ||
+            savedCondoName === undefined ||
+            !categoriesReady ||
+            saveSettings.isPending ||
+            savingCondoName ||
+            savingCategories
           }
         >
           Salvar e reclassificar contas

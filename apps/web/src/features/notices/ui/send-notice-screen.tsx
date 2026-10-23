@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
@@ -10,7 +11,6 @@ import type { NoticeRepository } from '../domain/notice-repository';
 import { noticeKindView } from './notice-kind-view';
 import { useCreateNotice } from './use-notices';
 
-const AUDIENCES = ['Todos os moradores', 'Bloco 2', 'Síndico'];
 const KINDS: NoticeKind[] = ['aviso', 'urgente', 'manutencao'];
 
 type Props = {
@@ -21,7 +21,9 @@ type Props = {
 
 export function SendNoticeScreen({ repository, onSent, onBack }: Props) {
   const create = useCreateNotice(repository);
-  const [audience, setAudience] = useState<string>(AUDIENCES[0] ?? 'Todos os moradores');
+  const condoName = useCondoName();
+  const audiences = ['Todos os moradores', condoName, 'Síndico'];
+  const [audience, setAudience] = useState<string>('Todos os moradores');
   const [kind, setKind] = useState<NoticeKind>('aviso');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -65,7 +67,7 @@ export function SendNoticeScreen({ repository, onSent, onBack }: Props) {
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '.78rem', color: '#A9C6C9', fontWeight: 500 }}>
-            Avisos · Bloco 2
+            Avisos · {condoName}
           </div>
           <div className="fraunces" style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff' }}>
             Enviar aviso
@@ -86,7 +88,7 @@ export function SendNoticeScreen({ repository, onSent, onBack }: Props) {
             Destinatário
           </label>
           <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            {AUDIENCES.map((option) => {
+            {audiences.map((option) => {
               const active = audience === option;
               return (
                 <button
