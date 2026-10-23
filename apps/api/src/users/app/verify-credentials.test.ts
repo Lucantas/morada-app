@@ -43,7 +43,27 @@ const maria: User = {
   emailVerifiedAt: null,
 };
 
+const ana: User = {
+  ...maria,
+  id: 'u-2',
+  username: null,
+  email: 'ana@x.com',
+  name: 'Ana',
+};
+
 describe('verifyCredentials', () => {
+  test('looks up by normalized e-mail when the login contains @', async () => {
+    const repo = fakeRepo([ana]);
+    const user = await verifyCredentials(repo, acceptHasher, ' ANA@x.com ', 's3nha');
+    expect(user).toEqual(ana);
+  });
+
+  test('rejects an unknown e-mail', async () => {
+    await expect(
+      verifyCredentials(fakeRepo([ana]), acceptHasher, 'ghost@x.com', 's3nha'),
+    ).rejects.toBeInstanceOf(InvalidCredentialsError);
+  });
+
   test('returns the user when username and password match', async () => {
     const user = await verifyCredentials(fakeRepo([maria]), acceptHasher, 'maria302', 's3nha');
     expect(user).toEqual(maria);

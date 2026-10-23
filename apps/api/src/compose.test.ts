@@ -8,6 +8,8 @@ import { makePostgresRepositories } from './repositories';
 import { adminCredentials } from './seed-data';
 import { resetPg } from './test-support/pg';
 import { createTestCondo } from './test-support/condos';
+import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
+import { PostgresUserRepository } from './users/adapters/postgres/user-repository';
 import { residentCredentials, seedFixtures, TEST_CONDO_ID } from './test-fixtures';
 
 const P = `/api/condos/${TEST_CONDO_ID}`;
@@ -43,6 +45,36 @@ async function login(app: App, username: string, password: string): Promise<Resp
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
+}
+
+async function loginWith(app: App, body: Record<string, string>): Promise<Response> {
+  return app.request('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function insertUser(input: {
+  username: string | null;
+  email: string | null;
+  password: string;
+}): Promise<void> {
+  const hasher = new BcryptPasswordHasher(config.bcryptCost);
+  await new PostgresUserRepository(pool).save({
+    id: input.email === null ? `u-${input.username}` : 'u-ana',
+    username: input.username,
+    email: input.email,
+    name: input.email === null ? null : 'Ana',
+    passwordHash: await hasher.hash(input.password),
+    role: 'resident',
+    residentId: null,
+    emailVerifiedAt: null,
+  });
+}
+
+async function insertEmailUser(email: string, password: string): Promise<void> {
+  await insertUser({ username: null, email, password });
 }
 
 type Auth = { cookie: string; csrf: string };
@@ -764,7 +796,63 @@ describe('Morada API — real credentials', () => {
     expect(body).not.toHaveProperty('token');
     expect(body).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' }],
+      emailVerified: true,
     });
+  });
+
+  test('login returns emailVerified true for a legacy username user', async () => {
+    const res = await login(await makeApp(), adminCredentials.username, adminCredentials.password);
+    expect(await res.json()).toMatchObject({ emailVerified: true });
+  });
+
+  test('login by email ignores case and surrounding spaces', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: ' ANA@x.com ', password: 'senha-segura-1' });
+    expect(res.status).toBe(200);
+  });
+
+  test('an e-mail account with zero condos logs in', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+  });
+
+  test('a legacy username user with zero condos is refused with 401', async () => {
+    const app = await makeApp();
+    await insertUser({ username: 'solto101', email: null, password: 'senha-segura-1' });
+    const res = await loginWith(app, { login: 'solto101', password: 'senha-segura-1' });
+    expect(res.status).toBe(401);
+  });
+
+  test('login accepts both login and the username alias but not neither', async () => {
+    const app = await makeApp();
+    const neither = await loginWith(app, { password: adminCredentials.password });
+    expect(neither.status).toBe(400);
+  });
+
+  test('GET /me returns the account state', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const res = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = res.headers.getSetCookie();
+    const cookie = `session=${parseCookie(cookies, 'session')}; csrf=${parseCookie(cookies, 'csrf')}`;
+    const me = await app.request('/me', { headers: { Cookie: cookie } });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toEqual({
+      id: 'u-ana',
+      name: 'Ana',
+      email: 'ana@x.com',
+      emailVerified: false,
+      condos: [],
+    });
+  });
+
+  test('GET /me requires a session', async () => {
+    const res = await (await makeApp()).request('/me');
+    expect(res.status).toBe(401);
   });
 
   test('a wrong password is rejected with 401', async () => {
@@ -966,6 +1054,7 @@ describe('Morada API — admin provisions resident logins', () => {
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+      emailVerified: true,
     });
   });
 
@@ -1112,6 +1201,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
       condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+      emailVerified: true,
     });
   });
 

@@ -90,7 +90,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
       limiter: loginLimiter,
     }),
   );
-  app.route('/me', meRoutes(condos));
+  app.route('/me', meRoutes({ condos, users }));
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
