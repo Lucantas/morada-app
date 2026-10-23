@@ -111,7 +111,8 @@ and `apartment_id`; `accounts` carry an optional `due_date`.
 
 - `apartments`: `UNIQUE (condominium_id, label)` (was global on `label`).
 - `condo_settings`: primary key is `condominium_id` (the singleton `id` column is gone).
-- Categories, the monthly receipt per resident and similar constraints are scoped by condominium.
+- Categories have no unique constraint; they are scoped only by `condominium_id`.
+- `idx_receipts_condo_fee_month` is `(resident_id, ref)`; it is per-condominium only implicitly, because a resident belongs to exactly one condominium.
 - The one-active-occupant-per-apartment invariant is unchanged.
 
 ### Access rule (`CondoRepository.accessFor(userId, condominiumId)`)
