@@ -1,6 +1,8 @@
+import { AccountNotFoundError } from '../../domain/errors';
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import type { ProofBytes, ProofStorage } from '../../../receipts/domain/proof-storage';
+import { createTestCondo } from '../../../test-support/condos';
 import { resetPg } from '../../../test-support/pg';
 import { runAccountRepositoryContract } from '../account-repository.contract';
 
@@ -16,9 +18,19 @@ afterAll(async () => {
   await pool.end();
 });
 
-runAccountRepositoryContract('PostgresAccountRepository', async () => {
-  await resetPg(pool);
-  return new PostgresAccountRepository(pool, null);
+const LEGACY = 'condo-legacy';
+
+describe('PostgresAccountRepository — contract', () => {
+  beforeEach(async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+  });
+
+  runAccountRepositoryContract(
+    'PostgresAccountRepository',
+    async (condominiumId) => new PostgresAccountRepository(pool, condominiumId, null),
+  );
 });
 
 class FakeProofStorage implements ProofStorage {
@@ -57,23 +69,23 @@ describe('PostgresAccountRepository — proof offload/serve', () => {
 
   test('offloads a fresh data URL to storage, persisting proof_key (not base64) and hasProof', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresAccountRepository(pool, storage);
+    const repo = new PostgresAccountRepository(pool, LEGACY, storage);
 
     const saved = await repo.save({ ...BASE, proofDataUrl: DATA_URL });
 
     expect(saved.hasProof).toBe(true);
     expect(saved.proofDataUrl).toBeUndefined();
-    expect(storage.has('accounts/a-1')).toBe(true);
+    expect(storage.has(`condos/${LEGACY}/accounts/a-1`)).toBe(true);
     const { rows } = await pool.query(
       'SELECT proof_key, proof_data_url FROM accounts WHERE id = $1',
       ['a-1'],
     );
-    expect(rows[0].proof_key).toBe('accounts/a-1');
+    expect(rows[0].proof_key).toBe(`condos/${LEGACY}/accounts/a-1`);
     expect(rows[0].proof_data_url).toBeNull();
   });
 
   test('falls back to inline base64 when storage is null, still hasProof: true', async () => {
-    const repo = new PostgresAccountRepository(pool, null);
+    const repo = new PostgresAccountRepository(pool, LEGACY, null);
     await repo.save({ ...BASE, proofDataUrl: DATA_URL });
     const { rows } = await pool.query(
       'SELECT proof_key, proof_data_url FROM accounts WHERE id = $1',
@@ -86,21 +98,21 @@ describe('PostgresAccountRepository — proof offload/serve', () => {
 
   test('getProof returns bytes from storage when proof_key is set', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresAccountRepository(pool, storage);
+    const repo = new PostgresAccountRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE, proofDataUrl: DATA_URL });
     const proof = await repo.getProof('a-1');
     expect(proof?.contentType).toBe('image/png');
   });
 
   test('getProof decodes legacy base64 when only proof_data_url is set', async () => {
-    const repo = new PostgresAccountRepository(pool, null);
+    const repo = new PostgresAccountRepository(pool, LEGACY, null);
     await repo.save({ ...BASE, proofDataUrl: DATA_URL });
     const proof = await repo.getProof('a-1');
     expect(proof?.contentType).toBe('image/png');
   });
 
   test('getProof returns null with no proof and for an unknown id', async () => {
-    const repo = new PostgresAccountRepository(pool, null);
+    const repo = new PostgresAccountRepository(pool, LEGACY, null);
     await repo.save({ ...BASE, proofDataUrl: undefined });
     expect(await repo.getProof('a-1')).toBeNull();
     expect(await repo.getProof('nope')).toBeNull();
@@ -108,7 +120,7 @@ describe('PostgresAccountRepository — proof offload/serve', () => {
 
   test('list carries hasProof, never proofDataUrl', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresAccountRepository(pool, storage);
+    const repo = new PostgresAccountRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE, proofDataUrl: DATA_URL });
     const [item] = await repo.list();
     expect(item?.hasProof).toBe(true);
@@ -117,7 +129,7 @@ describe('PostgresAccountRepository — proof offload/serve', () => {
 
   test('re-save with proofDataUrl undefined preserves; null clears', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresAccountRepository(pool, storage);
+    const repo = new PostgresAccountRepository(pool, LEGACY, storage);
     await repo.save({ ...BASE, proofDataUrl: DATA_URL });
 
     const kept = await repo.save({
@@ -130,5 +142,29 @@ describe('PostgresAccountRepository — proof offload/serve', () => {
     const cleared = await repo.save({ ...BASE, proofDataUrl: null });
     expect(cleared.hasProof).toBe(false);
     expect(await repo.getProof('a-1')).toBeNull();
+  });
+});
+
+describe('PostgresAccountRepository — foreign upload', () => {
+  test("rejects an upload over another condo's row without storing the proof", async () => {
+    await resetPg(pool);
+    await createTestCondo(pool, 'condo-a');
+    await createTestCondo(pool, 'condo-b');
+    const storage = new FakeProofStorage();
+    const entity = {
+      id: 'a-x',
+      description: 'Água',
+      category: 'Utilidades',
+      date: '2026-04-05',
+      valueCents: 5000,
+      status: 'pago' as const,
+      proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    };
+    await new PostgresAccountRepository(pool, 'condo-a', storage).save(entity);
+
+    const attempt = new PostgresAccountRepository(pool, 'condo-b', storage).save({ ...entity });
+
+    await expect(attempt).rejects.toThrow(AccountNotFoundError);
+    expect(storage.has('condos/condo-b/accounts/a-x')).toBe(false);
   });
 });

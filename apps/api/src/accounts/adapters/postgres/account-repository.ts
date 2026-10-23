@@ -5,17 +5,18 @@ import {
   type ProofBytes,
   type ProofStorage,
 } from '../../../receipts/domain/proof-storage';
+import { AccountNotFoundError } from '../../domain/errors';
 import { accountSchema, type Account } from '../../domain/account';
 import type { AccountRepository } from '../../domain/account-repository';
 
 const DATA_URL_PATTERN = /^data:[^;]+;base64,/;
 
 const INSERT_COLUMNS =
-  'id, description, category, date, value_cents, status, proof_data_url, proof_key';
+  'id, description, category, date, value_cents, status, due_date, proof_data_url, proof_key, condominium_id';
 // DATE comes back as a YYYY-MM-DD string (::text). proof_* excluded from reads —
 // reads only need whether a proof exists (has_proof); bytes are served via getProof.
 const SELECT_COLUMNS =
-  'id, description, category, date::text AS date, value_cents, status, (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof';
+  'id, description, category, date::text AS date, value_cents, status, due_date::text AS due_date, (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof';
 
 interface AccountRow {
   id: string;
@@ -24,6 +25,7 @@ interface AccountRow {
   date: string | null;
   value_cents: number;
   status: string;
+  due_date: string | null;
   has_proof: boolean;
 }
 
@@ -40,6 +42,7 @@ function toAccount(row: AccountRow): Account {
     date: row.date,
     valueCents: row.value_cents,
     status: row.status,
+    dueDate: row.due_date,
     hasProof: row.has_proof,
   });
 }
@@ -47,28 +50,30 @@ function toAccount(row: AccountRow): Account {
 export class PostgresAccountRepository implements AccountRepository {
   constructor(
     private readonly pool: Pool,
+    private readonly condominiumId: string,
     private readonly storage: ProofStorage | null,
   ) {}
 
   async list(): Promise<Account[]> {
     const { rows } = await this.pool.query<AccountRow>(
-      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE visible = true`,
+      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE visible = true AND condominium_id = $1`,
+      [this.condominiumId],
     );
     return rows.map(toAccount);
   }
 
   async getById(id: string): Promise<Account | null> {
     const { rows } = await this.pool.query<AccountRow>(
-      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE id = $1 AND visible = true`,
-      [id],
+      `SELECT ${SELECT_COLUMNS} FROM accounts WHERE id = $1 AND visible = true AND condominium_id = $2`,
+      [id, this.condominiumId],
     );
     return rows[0] ? toAccount(rows[0]) : null;
   }
 
   async getProof(id: string): Promise<ProofBytes | null> {
     const { rows } = await this.pool.query<ProofRow>(
-      'SELECT proof_key, proof_data_url FROM accounts WHERE id = $1 AND visible = true',
-      [id],
+      'SELECT proof_key, proof_data_url FROM accounts WHERE id = $1 AND visible = true AND condominium_id = $2',
+      [id, this.condominiumId],
     );
     const row = rows[0];
     if (!row) return null;
@@ -84,7 +89,8 @@ export class PostgresAccountRepository implements AccountRepository {
     let proofKey: string | null = null;
     let proofDataUrl: string | null = null;
     if (isFreshUpload && this.storage) {
-      proofKey = `accounts/${account.id}`;
+      await this.assertNotForeign(account.id);
+      proofKey = `condos/${this.condominiumId}/accounts/${account.id}`;
       await this.storage.put(proofKey, account.proofDataUrl as string);
     } else if (touchesProof) {
       proofDataUrl = account.proofDataUrl ?? null;
@@ -96,11 +102,12 @@ export class PostgresAccountRepository implements AccountRepository {
 
     const result = await this.pool.query<{ has_proof: boolean }>(
       `INSERT INTO accounts (${INSERT_COLUMNS})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (id) DO UPDATE SET
          description = EXCLUDED.description, category = EXCLUDED.category,
          date = EXCLUDED.date, value_cents = EXCLUDED.value_cents,
-         status = EXCLUDED.status${proofSetClause}
+         status = EXCLUDED.status, due_date = EXCLUDED.due_date${proofSetClause}
+       WHERE accounts.condominium_id = EXCLUDED.condominium_id
        RETURNING (proof_key IS NOT NULL OR proof_data_url IS NOT NULL) AS has_proof`,
       [
         account.id,
@@ -109,19 +116,34 @@ export class PostgresAccountRepository implements AccountRepository {
         account.date,
         account.valueCents,
         account.status,
+        account.dueDate ?? null,
         proofDataUrl,
         proofKey,
+        this.condominiumId,
       ],
     );
 
+    const saved = result.rows[0];
+    if (!saved) throw new AccountNotFoundError(account.id);
     return accountSchema.parse({
       ...account,
       proofDataUrl: undefined,
-      hasProof: result.rows[0]?.has_proof ?? false,
+      hasProof: saved.has_proof,
     });
   }
 
   async archive(id: string): Promise<void> {
-    await this.pool.query('UPDATE accounts SET visible = false WHERE id = $1', [id]);
+    await this.pool.query(
+      'UPDATE accounts SET visible = false WHERE id = $1 AND condominium_id = $2',
+      [id, this.condominiumId],
+    );
+  }
+
+  private async assertNotForeign(id: string): Promise<void> {
+    const { rows } = await this.pool.query(
+      'SELECT 1 FROM accounts WHERE id = $1 AND condominium_id <> $2',
+      [id, this.condominiumId],
+    );
+    if (rows.length > 0) throw new AccountNotFoundError(id);
   }
 }

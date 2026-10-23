@@ -24,7 +24,10 @@ function fakeRepo(): AccountRepository {
 function mountApp() {
   const repo = fakeRepo();
   const app = new Hono();
-  app.route('/', accountRoutes(repo));
+  app.route(
+    '/',
+    accountRoutes(() => ({ accounts: repo })),
+  );
   return { app, repo };
 }
 
