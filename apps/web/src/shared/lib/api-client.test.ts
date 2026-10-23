@@ -108,6 +108,63 @@ describe('createApiClient', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  test('prefixes /api paths with the current condo', async () => {
+    const fetchMock = mockFetch({ ok: true, status: 200, json: [] });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await createApiClient({ baseUrl: 'http://api.test', condoId: () => 'c1' }).get(
+      '/api/residents',
+    );
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/api/condos/c1/residents');
+  });
+
+  test('leaves /auth and /me paths alone', async () => {
+    const fetchMock = mockFetch({ ok: true, status: 204 });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const apiClient = createApiClient({ baseUrl: 'http://api.test', condoId: () => 'c1' });
+
+    await apiClient.post('/auth/logout');
+    await apiClient.get('/me/condos');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://api.test/auth/logout');
+    expect(fetchMock.mock.calls[1][0]).toBe('http://api.test/me/condos');
+  });
+
+  test('treats a condo-not-found 404 as unauthorized', async () => {
+    global.fetch = mockFetch({
+      ok: false,
+      status: 404,
+      json: { error: 'Condomínio não encontrado' },
+    }) as unknown as typeof fetch;
+    const onUnauthorized = jest.fn();
+
+    await expect(
+      createApiClient({ baseUrl: 'http://api.test', onUnauthorized, condoId: () => 'c1' }).get(
+        '/api/residents',
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not sign out on any other 404', async () => {
+    global.fetch = mockFetch({
+      ok: false,
+      status: 404,
+      json: { error: 'Morador não encontrado' },
+    }) as unknown as typeof fetch;
+    const onUnauthorized = jest.fn();
+
+    await expect(
+      createApiClient({ baseUrl: 'http://api.test', onUnauthorized, condoId: () => 'c1' }).get(
+        '/api/residents/x',
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
   test('ApiError is an Error subclass', () => {
     expect(new ApiError(404, 'x')).toBeInstanceOf(Error);
   });

@@ -5,6 +5,9 @@ import { renderWithClient } from '@/test/render';
 import { InMemoryIncomeRepository } from '@/features/income/data/in-memory-income-repository';
 
 import { IncomeEditScreen } from './income-edit-screen';
+import { useCondoScope } from '@/shared/lib/condo-scope';
+
+beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
 
 describe('IncomeEditScreen', () => {
   test('creates a new income with the entered fields and navigates back', async () => {
@@ -77,7 +80,7 @@ describe('IncomeEditScreen', () => {
     expect(await screen.findByDisplayValue('Aluguel salão')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
       'href',
-      '/api/incomes/income-1/proof',
+      '/api/condos/c1/incomes/income-1/proof',
     );
   });
 

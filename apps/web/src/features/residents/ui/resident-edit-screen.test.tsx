@@ -11,6 +11,9 @@ import { buildReceipt } from '@/test/factories.receipts';
 import { InMemoryResidentRepository } from '../data/in-memory-resident-repository';
 
 import { ResidentEditScreen } from './resident-edit-screen';
+import { useCondoScope } from '@/shared/lib/condo-scope';
+
+beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
 
 const noReceipts = () => new InMemoryReceiptRepository([]);
 
@@ -381,7 +384,7 @@ describe('ResidentEditScreen', () => {
     expect(screen.queryByRole('button', { name: /dar baixa/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
       'href',
-      '/api/receipts/rc-1/proof',
+      '/api/condos/c1/receipts/rc-1/proof',
     );
 
     const confirmButton = screen.getByRole('button', { name: /^confirmar$/i });

@@ -1,3 +1,4 @@
+import { scopedApiPath } from './condo-scope';
 import { readCookie } from './cookies';
 
 export class ApiError extends Error {
@@ -19,10 +20,17 @@ export type ApiClient = {
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-export function createApiClient(opts: { baseUrl: string; onUnauthorized?: () => void }): ApiClient {
+const CONDO_NOT_FOUND = 'Condomínio não encontrado';
+
+export function createApiClient(opts: {
+  baseUrl: string;
+  onUnauthorized?: () => void;
+  condoId?: () => string | null;
+}): ApiClient {
   const request = async (method: string, path: string, body?: unknown): Promise<unknown> => {
     const csrf = UNSAFE_METHODS.has(method) ? readCookie('csrf') : null;
-    const res = await fetch(`${opts.baseUrl}${path}`, {
+    const target = opts.condoId ? scopedApiPath(path, opts.condoId()) : path;
+    const res = await fetch(`${opts.baseUrl}${target}`, {
       method,
       credentials: 'include',
       headers: {
@@ -32,8 +40,6 @@ export function createApiClient(opts: { baseUrl: string; onUnauthorized?: () => 
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!res.ok) {
-      // An expired/rejected token ends the session so the app returns to login.
-      if (res.status === 401) opts.onUnauthorized?.();
       let message = `Erro ${res.status}`;
       try {
         const data = (await res.json()) as { error?: unknown };
@@ -41,6 +47,8 @@ export function createApiClient(opts: { baseUrl: string; onUnauthorized?: () => 
       } catch {
         // response had no JSON body; keep the generic message
       }
+      const lostCondo = res.status === 404 && message === CONDO_NOT_FOUND;
+      if (res.status === 401 || lostCondo) opts.onUnauthorized?.();
       throw new ApiError(res.status, message);
     }
     if (res.status === 204) return undefined;

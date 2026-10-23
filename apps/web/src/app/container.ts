@@ -7,9 +7,15 @@ import { HttpNoticeRepository } from '@/features/notices/data/http-notice-reposi
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
+import { parseLoginResponse } from '@/features/session/domain/login-response';
 import type { Role } from '@/features/session/domain/session';
-import { useSessionStore } from '@/features/session/ui/session-store';
-import { createApiClient } from '@/shared/lib/api-client';
+import {
+  applyLogin,
+  signOutIfCondoMissing,
+  useSessionStore,
+} from '@/features/session/ui/session-store';
+import { ApiError, createApiClient } from '@/shared/lib/api-client';
+import { useCondoScope } from '@/shared/lib/condo-scope';
 
 // The app always talks to the real API. Point it elsewhere with VITE_API_URL;
 // it defaults to the local API from `make start` / `make start-backend`.
@@ -18,7 +24,10 @@ const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8787';
 const apiClient = createApiClient({
   baseUrl: apiUrl,
   onUnauthorized: () => useSessionStore.getState().signOut(),
+  condoId: () => useCondoScope.getState().condo?.id ?? null,
 });
+
+signOutIfCondoMissing();
 
 export const residentRepository = new HttpResidentRepository(apiClient);
 export const accountRepository = new HttpAccountRepository(apiClient);
@@ -31,7 +40,7 @@ export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
 
 /** Authenticate with a username and password against the API. The API sets the
- *  session cookie; the body only carries the role and subject to store. */
+ *  session cookie; the body lists the condominiums and roles the user can access. */
 export async function login(username: string, password: string): Promise<Role> {
   const res = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
@@ -41,9 +50,7 @@ export async function login(username: string, password: string): Promise<Role> {
   });
   if (res.status === 401) throw new Error('Usuário ou senha inválidos.');
   if (!res.ok) throw new Error('Não foi possível entrar. Verifique a conexão com o servidor.');
-  const data = (await res.json()) as { role: Role; subject: string | null };
-  useSessionStore.getState().authenticate(data.role, data.subject);
-  return data.role;
+  return applyLogin(parseLoginResponse(await res.json()));
 }
 
 /** Sign out: tell the server to clear the session cookie, then clear local state
@@ -142,11 +149,16 @@ export async function provisionResidentLogin(input: {
 export async function getResidentLogin(
   residentId: string,
 ): Promise<{ existingUsername: string | null; suggestedUsername: string } | null> {
-  const data = (await apiClient.get(`/api/residents/${residentId}/login`)) as {
-    username: string | null;
-    suggested: string;
-  } | null;
-  return data ? { existingUsername: data.username, suggestedUsername: data.suggested } : null;
+  try {
+    const data = (await apiClient.get(`/api/residents/${residentId}/login`)) as {
+      username: string | null;
+      suggested: string;
+    };
+    return { existingUsername: data.username, suggestedUsername: data.suggested };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 /** Admin-only: reset a resident's login password. The API returns a fresh

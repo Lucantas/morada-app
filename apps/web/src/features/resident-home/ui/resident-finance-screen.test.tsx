@@ -5,6 +5,9 @@ import { buildDashboardSummary } from '@/test/factories.dashboard';
 import { renderWithClient } from '@/test/render';
 
 import { ResidentFinanceScreen } from './resident-finance-screen';
+import { useCondoScope } from '@/shared/lib/condo-scope';
+
+beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
 
 function setup() {
   const dashboardRepository = new InMemoryDashboardRepository(buildDashboardSummary());
@@ -53,7 +56,7 @@ describe('ResidentFinanceScreen', () => {
     );
 
     const link = await screen.findByRole('link', { name: /baixar comprovante/i });
-    expect(link).toHaveAttribute('href', '/api/accounts/p-1/proof');
+    expect(link).toHaveAttribute('href', '/api/condos/c1/accounts/p-1/proof');
     expect(screen.getAllByRole('link', { name: /baixar comprovante/i })).toHaveLength(1);
   });
 });
