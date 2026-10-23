@@ -17,6 +17,7 @@ const ana: User = {
   role: 'admin',
   residentId: null,
   emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 async function setup(user: User = ana, expiresAt = new Date(NOW.getTime() + HOUR)) {
@@ -48,7 +49,8 @@ describe('confirmEmail', () => {
     const user = await confirmEmail(deps, token);
 
     expect(user.emailVerifiedAt).toEqual(NOW);
-    expect((await users.findById('u-ana'))?.emailVerifiedAt).toEqual(NOW);
+    expect(user.sessionVersion).toBe(1);
+    expect(await users.findById('u-ana')).toEqual(user);
     expect(confirmed).toEqual(['u-ana']);
   });
 
@@ -85,6 +87,7 @@ describe('confirmEmail', () => {
     const user = await confirmEmail(deps, token);
 
     expect(user.emailVerifiedAt).toEqual(earlier);
+    expect(user.sessionVersion).toBe(0);
     expect(confirmed).toEqual([]);
   });
 });

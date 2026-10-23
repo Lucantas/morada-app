@@ -21,6 +21,8 @@ function fakeRepo(users: User[] = []): UserRepository {
     existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
     markEmailVerified: async () => undefined,
     setPasswordHash: async () => undefined,
+    updateCredentials: async () => undefined,
+    bumpSessionVersion: async () => 1,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
@@ -101,6 +103,7 @@ const existingResident: User = {
   email: null,
   name: null,
   emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 describe('seedAdmin', () => {
@@ -124,6 +127,7 @@ describe('seedAdmin', () => {
       email: null,
       name: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -154,6 +158,7 @@ describe('seedAdmin', () => {
       email: null,
       name: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -169,6 +174,8 @@ describe('seedAdmin', () => {
       existsByEmail: async () => false,
       markEmailVerified: async () => undefined,
       setPasswordHash: async () => undefined,
+      updateCredentials: async () => undefined,
+      bumpSessionVersion: async () => 1,
       findByUsername: async (username) =>
         username === existingResident.username ? existingResident : null,
       findByResidentId: async (residentId) =>
@@ -218,6 +225,7 @@ describe('seedAdmin', () => {
       email: null,
       name: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const condos = fakeCondos([
       { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
@@ -240,6 +248,7 @@ describe('seedAdmin', () => {
       email: null,
       name: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     };
     const condos = fakeCondos();
 

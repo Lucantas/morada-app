@@ -38,6 +38,7 @@ async function ensureAdmin(users: UserRepository, hasher: PasswordHasher): Promi
     email: null,
     name: null,
     emailVerifiedAt: null,
+    sessionVersion: 0,
   };
   await users.save(admin);
 }

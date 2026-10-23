@@ -28,6 +28,7 @@ import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
 import { userRoutes } from './users/adapters/http/routes';
+import { sessionVersionOf } from './users/app/session-version';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
@@ -91,10 +92,12 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
 
   app.route('/healthz', healthRoutes());
 
+  const auth = authMiddleware(sessionVersionOf(users));
   const loginLimiter = createRateLimiter();
   app.route(
     '/auth',
     authRoutes({
+      auth,
       users,
       hasher,
       condosFor: (userId) => listMyCondos(condos, userId),
@@ -107,10 +110,10 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       afterEmailConfirmed: async () => undefined,
     }),
   );
-  app.route('/me', meRoutes({ condos, users }));
+  app.route('/me', meRoutes({ auth, condos, users }));
 
   const api = new Hono<ApiEnv>();
-  api.use('*', authMiddleware);
+  api.use('*', auth);
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 

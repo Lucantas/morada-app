@@ -399,4 +399,10 @@ CREATE TABLE auth_tokens (
 CREATE INDEX idx_auth_tokens_user_kind ON auth_tokens (user_id, kind);
 `,
   },
+  {
+    id: '021_session_version',
+    sql: `
+ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0;
+`,
+  },
 ];

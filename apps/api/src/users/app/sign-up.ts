@@ -3,16 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import type { EmailSender } from '../../platform/email/email-sender';
-import { generateToken, hashToken } from '../../platform/tokens';
-import { RESET_PASSWORD_TTL_MS } from '../domain/auth-token';
 import type { AuthTokenRepository } from '../domain/auth-token-repository';
 import { emailSchema } from '../domain/email';
 import { EmailTakenError } from '../domain/errors';
 import type { PasswordHasher } from '../domain/password-hasher';
 import type { UserRepository } from '../domain/user-repository';
 
-import { resetPasswordLink, signupAttemptMessage } from './emails';
+import { signupAttemptMessage } from './emails';
 import { issueConfirmation } from './issue-confirmation';
+import { issuePasswordReset } from './issue-password-reset';
 
 const signUpSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -30,14 +29,19 @@ export interface SignUpDeps {
 }
 
 async function warnOwner(deps: SignUpDeps, owner: { id: string; email: string }): Promise<void> {
-  const token = generateToken();
-  await deps.tokens.issue({
-    userId: owner.id,
-    kind: 'reset_password',
-    tokenHash: hashToken(token),
-    expiresAt: new Date(deps.now().getTime() + RESET_PASSWORD_TTL_MS),
-  });
-  await deps.email.send(signupAttemptMessage(owner.email, resetPasswordLink(deps.appUrl, token)));
+  const link = await issuePasswordReset(deps, owner.id);
+  await deps.email.send(signupAttemptMessage(owner.email, link));
+}
+
+async function takeOverUnverified(
+  deps: SignUpDeps,
+  owner: { id: string; email: string },
+  credentials: { name: string; passwordHash: string },
+): Promise<void> {
+  await deps.users.updateCredentials(owner.id, credentials);
+  await deps.tokens.revokeAll(owner.id, 'confirm_email', deps.now());
+  await deps.users.bumpSessionVersion(owner.id);
+  await issueConfirmation(deps, owner);
 }
 
 export async function signUp(deps: SignUpDeps, input: unknown): Promise<void> {
@@ -45,6 +49,10 @@ export async function signUp(deps: SignUpDeps, input: unknown): Promise<void> {
   const passwordHash = await deps.hasher.hash(password);
 
   const existing = await deps.users.findByEmail(email);
+  if (existing?.emailVerifiedAt === null) {
+    await takeOverUnverified(deps, { id: existing.id, email }, { name, passwordHash });
+    return;
+  }
   if (existing) {
     await warnOwner(deps, { id: existing.id, email });
     return;
@@ -59,6 +67,7 @@ export async function signUp(deps: SignUpDeps, input: unknown): Promise<void> {
     role: 'admin' as const,
     residentId: null,
     emailVerifiedAt: null,
+    sessionVersion: 0,
   };
   try {
     await deps.users.save(user);

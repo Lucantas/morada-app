@@ -11,6 +11,7 @@ const maria: User = {
   email: null,
   name: null,
   emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 // Behavioural contract every UserRepository must satisfy, run against both the
@@ -77,6 +78,7 @@ export function runUserRepositoryContract(
           email: null,
           name: null,
           emailVerifiedAt: null,
+          sessionVersion: 0,
         }),
       ).rejects.toThrow();
     });
@@ -92,6 +94,7 @@ export function runUserRepositoryContract(
         email: null,
         name: null,
         emailVerifiedAt: null,
+        sessionVersion: 0,
       };
       await repo.save(admin);
       expect(await repo.findByUsername('admin')).toEqual(admin);
@@ -113,6 +116,7 @@ export function runUserRepositoryContract(
       role: 'resident',
       residentId: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     };
 
     test('findByEmail returns the user saved with that e-mail', async () => {
@@ -149,6 +153,47 @@ export function runUserRepositoryContract(
       await repo.save(ana);
       await repo.setPasswordHash('u-ana', 'hash-new');
       expect((await repo.findById('u-ana'))?.passwordHash).toBe('hash-new');
+    });
+
+    test('bumpSessionVersion increments and returns the stored version', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+
+      expect(await repo.bumpSessionVersion('u-ana')).toBe(1);
+      expect(await repo.bumpSessionVersion('u-ana')).toBe(2);
+      expect((await repo.findById('u-ana'))?.sessionVersion).toBe(2);
+    });
+
+    test('bumpSessionVersion rejects an unknown user', async () => {
+      const repo = await makeRepo();
+      await expect(repo.bumpSessionVersion('u-ghost')).rejects.toThrow();
+    });
+
+    test('save never rolls back the session version', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      await repo.bumpSessionVersion('u-ana');
+
+      await repo.save({ ...ana, passwordHash: 'hash-rotated' });
+
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        passwordHash: 'hash-rotated',
+        sessionVersion: 1,
+      });
+    });
+
+    test('updateCredentials replaces the name and the hash', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+
+      await repo.updateCredentials('u-ana', { name: 'Outra', passwordHash: 'hash-other' });
+
+      expect(await repo.findById('u-ana')).toEqual({
+        ...ana,
+        name: 'Outra',
+        passwordHash: 'hash-other',
+      });
     });
 
     test('rejects a second user with the same e-mail', async () => {

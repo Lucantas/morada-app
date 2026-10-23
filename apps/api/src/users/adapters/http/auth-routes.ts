@@ -1,8 +1,8 @@
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
 
-import { authMiddleware, type ApiEnv } from '../../../platform/auth';
+import type { ApiEnv } from '../../../platform/auth';
 import type { CondoSummary } from '../../../condos/app/condo-access-views';
 import { config } from '../../../platform/config';
 import { CSRF_COOKIE, SESSION_COOKIE, clearCookieOptions } from '../../../platform/cookies';
@@ -10,12 +10,14 @@ import { csrfMiddleware } from '../../../platform/csrf';
 import type { EmailSender } from '../../../platform/email/email-sender';
 import type { RateLimiter } from '../../../platform/rate-limit';
 import { confirmEmail } from '../../app/confirm-email';
+import { requestPasswordReset } from '../../app/request-password-reset';
 import { resendConfirmation } from '../../app/resend-confirmation';
+import { resetPassword } from '../../app/reset-password';
 import { signUp } from '../../app/sign-up';
 import type { AuthTokenRepository } from '../../domain/auth-token-repository';
 import { verifyCredentials } from '../../app/verify-credentials';
 import { normalizeEmail } from '../../domain/email';
-import { InvalidCredentialsError } from '../../domain/errors';
+import { InvalidCredentialsError, InvalidLinkError } from '../../domain/errors';
 import type { PasswordHasher } from '../../domain/password-hasher';
 import type { UserRepository } from '../../domain/user-repository';
 
@@ -37,6 +39,19 @@ const loginSchema = z
     password,
   }));
 
+const tokenBodySchema = z.object({ token: z.string().min(1).max(200) });
+const passwordBodySchema = z.object({ password: z.string().min(8).max(200) });
+
+function tokenFrom(body: unknown): string {
+  const parsed = tokenBodySchema.safeParse(body);
+  if (!parsed.success) throw new InvalidLinkError();
+  return parsed.data.token;
+}
+
+function readJson(c: Context<ApiEnv>): Promise<unknown> {
+  return c.req.json().catch(() => undefined);
+}
+
 function clientIpFrom(c: { req: { header: (name: string) => string | undefined } }): string {
   return (
     c.req.header('Fly-Client-IP') ??
@@ -46,6 +61,7 @@ function clientIpFrom(c: { req: { header: (name: string) => string | undefined }
 }
 
 export function authRoutes(deps: {
+  auth: MiddlewareHandler<ApiEnv>;
   users: UserRepository;
   hasher: PasswordHasher;
   condosFor: (userId: string) => Promise<CondoSummary[]>;
@@ -103,15 +119,12 @@ export function authRoutes(deps: {
         appUrl: deps.appUrl,
         now: deps.now,
       },
-      await c.req.json().catch(() => undefined),
+      await readJson(c),
     );
     return c.json({}, 202);
   });
 
   app.post('/email/confirm', async (c) => {
-    const body: unknown = await c.req.json().catch(() => undefined);
-    const rawToken =
-      typeof body === 'object' && body !== null ? (body as { token?: unknown }).token : undefined;
     const user = await confirmEmail(
       {
         users: deps.users,
@@ -119,12 +132,43 @@ export function authRoutes(deps: {
         now: deps.now,
         afterEmailConfirmed: deps.afterEmailConfirmed,
       },
-      rawToken,
+      tokenFrom(await readJson(c)),
     );
     return sessionResponse(c, user, await deps.condosFor(user.id));
   });
 
-  app.post('/email/resend', authMiddleware, csrfMiddleware, async (c) => {
+  app.post('/password/forgot', async (c) => {
+    if (!withinSignupLimit(c)) return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
+    await requestPasswordReset(
+      {
+        users: deps.users,
+        tokens: deps.tokens,
+        email: deps.email,
+        appUrl: deps.appUrl,
+        now: deps.now,
+      },
+      await readJson(c),
+    );
+    return c.body(null, 204);
+  });
+
+  app.post('/password/reset', async (c) => {
+    const body = await readJson(c);
+    const { password } = passwordBodySchema.parse(body);
+    const user = await resetPassword(
+      {
+        users: deps.users,
+        tokens: deps.tokens,
+        hasher: deps.hasher,
+        now: deps.now,
+        afterEmailConfirmed: deps.afterEmailConfirmed,
+      },
+      { token: tokenFrom(body), password },
+    );
+    return sessionResponse(c, user, await deps.condosFor(user.id));
+  });
+
+  app.post('/email/resend', deps.auth, csrfMiddleware, async (c) => {
     if (!withinSignupLimit(c)) return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
     await resendConfirmation(
       {

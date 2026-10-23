@@ -1,6 +1,6 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 
-import { authMiddleware, requireRole, type ApiEnv } from '../../../platform/auth';
+import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { getCondoInfo, renameCondo } from '../../app/condo-info';
 import { listMyCondos } from '../../app/condo-access-views';
 import type { CondoRepository } from '../../domain/condo-repository';
@@ -8,12 +8,13 @@ import { isEmailVerified } from '../../../users/domain/user';
 import type { UserRepository } from '../../../users/domain/user-repository';
 
 export function meRoutes(deps: {
+  auth: MiddlewareHandler<ApiEnv>;
   condos: Pick<CondoRepository, 'listForUser'>;
   users: Pick<UserRepository, 'findById'>;
 }) {
   const { condos, users } = deps;
   const app = new Hono<ApiEnv>();
-  app.use('*', authMiddleware);
+  app.use('*', deps.auth);
   app.get('/', async (c) => {
     const user = await users.findById(c.get('uid'));
     if (!user) return c.json({ error: 'Sessão inválida' }, 401);

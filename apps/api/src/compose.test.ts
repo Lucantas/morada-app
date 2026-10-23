@@ -72,6 +72,7 @@ async function insertUser(input: {
     role: 'resident',
     residentId: null,
     emailVerifiedAt: null,
+    sessionVersion: 0,
   });
 }
 
@@ -1167,6 +1168,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
       email: null,
       name: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
     });
     const auth = await adminAuthFor(app);
 
@@ -1792,16 +1794,18 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     expect(res.headers.getSetCookie()).toEqual([]);
   });
 
-  test('sign-up with a taken e-mail answers 202, creates nothing and warns the owner', async () => {
+  test('sign-up with a verified e-mail answers 202, creates nothing and warns the owner', async () => {
     const sender = new InMemoryEmailSender();
     const app = await makeApp({ email: sender });
     await signup(app);
+    await postJson(app, '/auth/email/confirm', { token: confirmTokenIn(sender, 'ana@x.com') });
 
     const res = await signup(app, { ...signupBody, name: 'Intruso' });
 
     expect(res.status).toBe(202);
     expect(await count("users WHERE email = 'ana@x.com'")).toBe(1);
     expect(sender.sent).toHaveLength(2);
+    expect(await count("users WHERE email = 'ana@x.com' AND name = 'Ana'")).toBe(1);
     expect(sender.lastTo('ana@x.com')?.subject).not.toBe('Confirme seu e-mail no Morada');
     expect(sender.lastTo('ana@x.com')?.text).toContain('/#/redefinir-senha/');
   });
@@ -1893,16 +1897,237 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     expect(second).not.toBe(first);
 
     expect((await postJson(app, '/auth/email/confirm', { token: first })).status).toBe(404);
-    expect((await postJson(app, '/auth/email/confirm', { token: second })).status).toBe(200);
+    const confirmed = await postJson(app, '/auth/email/confirm', { token: second });
+    expect(confirmed.status).toBe(200);
+    expect(
+      (await postJson(app, '/auth/email/resend', {}, { Cookie: cookie, 'X-CSRF-Token': csrf }))
+        .status,
+    ).toBe(401);
 
+    const fresh = confirmed.headers.getSetCookie();
+    const freshCsrf = parseCookie(fresh, 'csrf');
+    const freshCookie = `session=${parseCookie(fresh, 'session')}; csrf=${freshCsrf}`;
     const sentBefore = sender.sent.length;
     const noop = await postJson(
       app,
       '/auth/email/resend',
       {},
-      { Cookie: cookie, 'X-CSRF-Token': csrf },
+      { Cookie: freshCookie, 'X-CSRF-Token': freshCsrf },
     );
     expect(noop.status).toBe(204);
     expect(sender.sent).toHaveLength(sentBefore);
+  });
+});
+
+describe('Morada API — forgot and reset password', () => {
+  function postJson(app: App, path: string, body: unknown, headers: Record<string, string> = {}) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function forgot(app: App, email: string, ip = '1.1.1.1') {
+    return postJson(app, '/auth/password/forgot', { email }, { 'X-Forwarded-For': ip });
+  }
+
+  function resetTokenIn(sender: InMemoryEmailSender, to: string): string {
+    return /redefinir-senha\/([\w-]+)/.exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  function sessionCookieOf(res: Response): string {
+    return `session=${parseCookie(res.headers.getSetCookie(), 'session')}`;
+  }
+
+  test('an unknown e-mail answers 204 and sends nothing', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const res = await forgot(app, 'ghost@x.com');
+
+    expect(res.status).toBe(204);
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('a known e-mail answers 204 and receives a reset link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+
+    const res = await forgot(app, 'ANA@x.com');
+
+    expect(res.status).toBe(204);
+    expect(sender.lastTo('ana@x.com')?.subject).toBe('Redefinição de senha do Morada');
+    expect(resetTokenIn(sender, 'ana@x.com')).not.toBe('');
+  });
+
+  test('forgot rejects an invalid e-mail with 400', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await forgot(app, 'nope')).status).toBe(400);
+  });
+
+  test('forgot shares the sign-up IP limiter', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    for (let i = 0; i < 10; i += 1) {
+      expect((await forgot(app, `u${i}@x.com`)).status).toBe(204);
+    }
+
+    expect((await forgot(app, 'u10@x.com')).status).toBe(429);
+    const signup = await postJson(
+      app,
+      '/auth/signup',
+      { name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' },
+      { 'X-Forwarded-For': '1.1.1.1' },
+    );
+    expect(signup.status).toBe(429);
+    expect((await forgot(app, 'u10@x.com', '2.2.2.2')).status).toBe(204);
+  });
+
+  test('reset changes the password, verifies the e-mail and logs in', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: true });
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-antiga-1' })).status).toBe(
+      401,
+    );
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-nova-123' })).status).toBe(
+      200,
+    );
+    expect(await count("users WHERE email = 'ana@x.com' AND email_verified_at IS NOT NULL")).toBe(
+      1,
+    );
+  });
+
+  test('reset ends earlier sessions and the returned session works', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    const before = await loginWith(app, { login: 'ana@x.com', password: 'senha-antiga-1' });
+    const oldCookie = sessionCookieOf(before);
+    expect((await app.request('/me', { headers: { Cookie: oldCookie } })).status).toBe(200);
+    await forgot(app, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    const stale = await app.request('/me', { headers: { Cookie: oldCookie } });
+    expect(stale.status).toBe(401);
+    expect(await stale.json()).toEqual({ error: 'Sessão inválida' });
+    const fresh = await app.request('/me', { headers: { Cookie: sessionCookieOf(res) } });
+    expect(fresh.status).toBe(200);
+  });
+
+  test('a reused token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const token = resetTokenIn(sender, 'ana@x.com');
+    await postJson(app, '/auth/password/reset', { token, password: 'senha-nova-123' });
+
+    const again = await postJson(app, '/auth/password/reset', { token, password: 'outra-123' });
+
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Link inválido ou expirado' });
+  });
+
+  test('a token older than one hour is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const lateApp = await buildApp(makePostgresRepositories(pool), {
+      email: sender,
+      now: () => new Date('2026-01-01T01:00:00.000Z'),
+    });
+
+    const res = await postJson(lateApp, '/auth/password/reset', {
+      token: resetTokenIn(sender, 'ana@x.com'),
+      password: 'senha-nova-123',
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('a short password is 400 and keeps the token usable; a malformed token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await insertEmailUser('ana@x.com', 'senha-antiga-1');
+    await forgot(app, 'ana@x.com');
+    const token = resetTokenIn(sender, 'ana@x.com');
+
+    expect((await postJson(app, '/auth/password/reset', { token, password: 'curta' })).status).toBe(
+      400,
+    );
+    expect(
+      (await postJson(app, '/auth/password/reset', { token: 42, password: 'senha-nova-123' }))
+        .status,
+    ).toBe(404);
+    expect(
+      (await postJson(app, '/auth/password/reset', { token, password: 'senha-nova-123' })).status,
+    ).toBe(200);
+  });
+
+  test('confirm rejects a non-string token with 404', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await postJson(app, '/auth/email/confirm', { token: 42 })).status).toBe(404);
+  });
+
+  test('sign-up on an unverified e-mail replaces the credentials and ends its sessions', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const intruder = { name: 'Intruso', email: 'ana@x.com', password: 'senha-intruso-1' };
+    await postJson(app, '/auth/signup', intruder, { 'X-Forwarded-For': '9.9.9.9' });
+    const intruderSession = sessionCookieOf(
+      await loginWith(app, { login: 'ana@x.com', password: 'senha-intruso-1' }),
+    );
+
+    const res = await postJson(
+      app,
+      '/auth/signup',
+      { name: 'Ana', email: 'ana@x.com', password: 'senha-da-ana-1' },
+      { 'X-Forwarded-For': '1.1.1.1' },
+    );
+
+    expect(res.status).toBe(202);
+    expect((await app.request('/me', { headers: { Cookie: intruderSession } })).status).toBe(401);
+    expect((await loginWith(app, { login: 'ana@x.com', password: 'senha-intruso-1' })).status).toBe(
+      401,
+    );
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      token: /confirmar-email\/([\w-]+)/.exec(sender.lastTo('ana@x.com')?.text ?? '')?.[1],
+    });
+    expect(confirmed.status).toBe(200);
+    const me = await app.request('/me', { headers: { Cookie: sessionCookieOf(confirmed) } });
+    expect(await me.json()).toMatchObject({ name: 'Ana', emailVerified: true });
+  });
+
+  test('a session token without a version is rejected', async () => {
+    const app = await makeApp();
+    const now = Math.floor(Date.now() / 1000);
+    const legacy = await sign(
+      { uid: 'u-admin', iat: now, exp: now + 60 },
+      config.jwtSecret,
+      'HS256',
+    );
+
+    const res = await app.request('/me', { headers: { Cookie: `session=${legacy}` } });
+
+    expect(res.status).toBe(401);
   });
 });

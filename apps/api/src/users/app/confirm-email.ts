@@ -28,6 +28,7 @@ export async function confirmEmail(deps: ConfirmEmailDeps, rawToken: unknown): P
   if (user.emailVerifiedAt !== null) return user;
 
   await deps.users.markEmailVerified(user.id, now);
+  const sessionVersion = await deps.users.bumpSessionVersion(user.id);
   await deps.afterEmailConfirmed(user.id);
-  return { ...user, emailVerifiedAt: now };
+  return { ...user, emailVerifiedAt: now, sessionVersion };
 }

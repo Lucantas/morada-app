@@ -30,6 +30,7 @@ runAuthTokenRepositoryContract('PostgresAuthTokenRepository', async () => {
     role: 'admin',
     residentId: null,
     emailVerifiedAt: null,
+    sessionVersion: 0,
   });
   return new PostgresAuthTokenRepository(pool);
 });

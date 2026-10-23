@@ -18,7 +18,7 @@ export async function sessionResponse(
   user: User,
   condos: CondoSummary[],
 ): Promise<Response> {
-  const token = await signSession(user.id);
+  const token = await signSession(user.id, user.sessionVersion);
   setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
   setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
   return c.json({ condos, emailVerified: isEmailVerified(user) });

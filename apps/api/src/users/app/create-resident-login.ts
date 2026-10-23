@@ -60,6 +60,7 @@ export async function createResidentLogin(
     email: null,
     name: null,
     emailVerifiedAt: null,
+    sessionVersion: 0,
   });
   const saved = await repo.save(user);
   await condos.grant({ condominiumId, userId: saved.id, role: 'morador', residentId });

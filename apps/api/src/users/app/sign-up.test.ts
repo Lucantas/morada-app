@@ -23,6 +23,7 @@ const existing: User = {
   role: 'admin',
   residentId: null,
   emailVerifiedAt: NOW,
+  sessionVersion: 0,
 };
 
 function setup(initial: User[] = []) {
@@ -52,6 +53,7 @@ describe('signUp', () => {
       role: 'admin',
       residentId: null,
       emailVerifiedAt: null,
+      sessionVersion: 0,
       passwordHash: 'hash:senha-segura-1',
     });
     const message = email.lastTo('ana@x.com');
@@ -83,6 +85,47 @@ describe('signUp', () => {
     expect(message?.subject).not.toBe('Confirme seu e-mail no Morada');
     const token = tokenFrom(message?.text ?? '', 'redefinir-senha');
     expect(await tokens.consume(hashToken(token), 'reset_password', NOW)).toEqual({
+      userId: 'u-ana',
+    });
+  });
+
+  test('a taken e-mail revokes the previous reset link before issuing a new one', async () => {
+    const { email, tokens, deps } = setup([existing]);
+    await signUp(deps, { name: 'Intruso', email: 'ana@x.com', password: 'outra-senha-1' });
+    const first = tokenFrom(email.lastTo('ana@x.com')?.text ?? '', 'redefinir-senha');
+
+    await signUp(deps, { name: 'Intruso', email: 'ana@x.com', password: 'outra-senha-1' });
+    const second = tokenFrom(email.lastTo('ana@x.com')?.text ?? '', 'redefinir-senha');
+
+    expect(await tokens.consume(hashToken(first), 'reset_password', NOW)).toBeNull();
+    expect(await tokens.consume(hashToken(second), 'reset_password', NOW)).not.toBeNull();
+  });
+
+  test('an unverified e-mail takes the new credentials, ends sessions and gets a fresh link', async () => {
+    const unverified: User = { ...existing, emailVerifiedAt: null, sessionVersion: 4 };
+    const { users, email, tokens, deps } = setup([unverified]);
+    await tokens.issue({
+      userId: 'u-ana',
+      kind: 'confirm_email',
+      tokenHash: hashToken('old-link'),
+      expiresAt: new Date(NOW.getTime() + 60_000),
+    });
+
+    await signUp(deps, { name: 'Ana Real', email: 'ana@x.com', password: 'senha-nova-1' });
+
+    expect(users.all()).toEqual([
+      {
+        ...unverified,
+        name: 'Ana Real',
+        passwordHash: 'hash:senha-nova-1',
+        sessionVersion: 5,
+      },
+    ]);
+    expect(await tokens.consume(hashToken('old-link'), 'confirm_email', NOW)).toBeNull();
+    const message = email.lastTo('ana@x.com');
+    expect(message?.subject).toBe('Confirme seu e-mail no Morada');
+    const token = tokenFrom(message?.text ?? '', 'confirmar-email');
+    expect(await tokens.consume(hashToken(token), 'confirm_email', NOW)).toEqual({
       userId: 'u-ana',
     });
   });

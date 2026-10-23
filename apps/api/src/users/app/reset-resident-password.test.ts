@@ -13,6 +13,8 @@ function fakeRepo(users: User[] = []): UserRepository {
     existsByEmail: async (email) => list.some((u) => u.email === email),
     markEmailVerified: async () => undefined,
     setPasswordHash: async () => undefined,
+    updateCredentials: async () => undefined,
+    bumpSessionVersion: async () => 1,
     findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => list.some((u) => u.username === username),
@@ -42,6 +44,7 @@ describe('resetResidentPassword', () => {
         email: null,
         name: null,
         emailVerifiedAt: null,
+        sessionVersion: 0,
       },
     ]);
 
@@ -70,6 +73,7 @@ describe('resetResidentPassword', () => {
         email: null,
         name: null,
         emailVerifiedAt: null,
+        sessionVersion: 0,
       },
     ]);
 
@@ -96,6 +100,7 @@ describe('resetResidentPassword', () => {
         email: null,
         name: null,
         emailVerifiedAt: null,
+        sessionVersion: 0,
       },
     ]);
 

@@ -16,6 +16,7 @@ const ana: User = {
   role: 'admin',
   residentId: null,
   emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 function setup(user: User = ana) {

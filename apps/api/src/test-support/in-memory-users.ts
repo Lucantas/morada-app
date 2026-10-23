@@ -21,6 +21,16 @@ export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () 
     setPasswordHash: async (id, passwordHash) => {
       list = list.map((u) => (u.id === id ? { ...u, passwordHash } : u));
     },
+    updateCredentials: async (id, { name, passwordHash }) => {
+      list = list.map((u) => (u.id === id ? { ...u, name, passwordHash } : u));
+    },
+    bumpSessionVersion: async (id) => {
+      const found = list.find((u) => u.id === id);
+      if (!found) throw new Error(`User not found: ${id}`);
+      const sessionVersion = found.sessionVersion + 1;
+      list = list.map((u) => (u.id === id ? { ...u, sessionVersion } : u));
+      return sessionVersion;
+    },
     save: async (user) => {
       list = [...list.filter((existing) => existing.id !== user.id), user];
       return user;

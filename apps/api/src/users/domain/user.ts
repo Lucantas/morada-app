@@ -24,6 +24,7 @@ export const userSchema = z.object({
   role: userRoleSchema,
   residentId: z.string().min(1).max(64).nullable(),
   emailVerifiedAt: z.date().nullable(),
+  sessionVersion: z.number().int().min(0),
 });
 export type User = z.infer<typeof userSchema>;
 

@@ -13,6 +13,8 @@ function fakeRepo(users: User[] = []): UserRepository {
     existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
     markEmailVerified: async () => undefined,
     setPasswordHash: async () => undefined,
+    updateCredentials: async () => undefined,
+    bumpSessionVersion: async () => 1,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
@@ -41,6 +43,7 @@ const maria: User = {
   email: null,
   name: null,
   emailVerifiedAt: null,
+  sessionVersion: 0,
 };
 
 const ana: User = {
