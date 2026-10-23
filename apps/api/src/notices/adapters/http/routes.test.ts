@@ -51,7 +51,10 @@ function mount(repo: NoticeRepository, role: Role = 'admin', sub = 'admin') {
     c.set('sub', sub);
     await next();
   });
-  app.route('/notices', noticeRoutes(repo));
+  app.route(
+    '/notices',
+    noticeRoutes(() => ({ notices: repo })),
+  );
   return app;
 }
 

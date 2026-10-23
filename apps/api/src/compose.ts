@@ -163,17 +163,22 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   // Notices: reads and per-resident dismiss are open to any authenticated user;
   // creating and deleting notices is admin-only (guarded inside noticeRoutes).
-  api.route('/notices', noticeRoutes(unscoped.notices));
+  api.route('/notices', noticeRoutes(scoped(({ notices }) => ({ notices }))));
 
   // Threads: listing all conversations is admin-only (guarded inside threadRoutes);
   // per-thread access stays open. A resident's thread is created lazily from
   // their record on first use.
   api.route(
     '/threads',
-    threadRoutes(unscoped.threads, (condoId) => async (id) => {
-      const resident = await repos.forCondo(condoId).residents.getById(id);
-      return resident ? { name: resident.name, apt: resident.apt } : null;
-    }),
+    threadRoutes(
+      scoped(({ threads }) => ({ threads })),
+      (condoId) => async (id) => {
+        const resident = await repos.forCondo(condoId).residents.getById(id);
+        return resident
+          ? { name: resident.name, apt: resident.apt, apartmentId: resident.apartmentId }
+          : null;
+      },
+    ),
   );
 
   app.route('/api/condos/:condoId', api);

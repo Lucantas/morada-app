@@ -326,6 +326,78 @@ describe('Morada API', () => {
     expect(res.status).toBe(404);
   });
 
+  test('cross-condo notices access answers 404', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.notices.save({
+      id: 'n-foreign',
+      title: 'Aviso alheio',
+      body: 'Corpo',
+      kind: 'aviso',
+      audience: 'todos',
+      dateLabel: 'Agora',
+      dismissed: false,
+    });
+    const admin = await authFor(app, adminCredentials);
+    const resident = await authFor(app, residentCredentials);
+    const adminHeaders = { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf };
+    const residentHeaders = { Cookie: resident.cookie, 'X-CSRF-Token': resident.csrf };
+
+    const list = await app.request(`${P}/notices`, { headers: adminHeaders });
+    const dismiss = await app.request(`${P}/notices/n-foreign/dismiss`, {
+      method: 'POST',
+      headers: residentHeaders,
+    });
+    const remove = await app.request(`${P}/notices/n-foreign`, {
+      method: 'DELETE',
+      headers: adminHeaders,
+    });
+
+    expect(((await list.json()) as { id: string }[]).map((n) => n.id)).not.toContain('n-foreign');
+    expect(dismiss.status).toBe(404);
+    expect(remove.status).toBe(204);
+    expect((await other.notices.getById('n-foreign'))?.title).toBe('Aviso alheio');
+    const dismissals = await pool.query('SELECT 1 FROM notice_dismissals WHERE notice_id = $1', [
+      'n-foreign',
+    ]);
+    expect(dismissals.rowCount).toBe(0);
+  });
+
+  test('cross-condo threads access answers 404', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.threads.save({
+      id: 'th-foreign',
+      residentId: null,
+      apartmentId: null,
+      residentName: 'Alheio',
+      apt: 'Apto 9',
+      unread: false,
+      messages: [],
+    });
+    const admin = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: admin.cookie,
+      'X-CSRF-Token': admin.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const list = await app.request(`${P}/threads`, { headers });
+    const read = await app.request(`${P}/threads/th-foreign`, { headers });
+    const post = await app.request(`${P}/threads/th-foreign/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ text: 'Oi' }),
+    });
+
+    expect(((await list.json()) as { id: string }[]).map((t) => t.id)).not.toContain('th-foreign');
+    expect(read.status).toBe(404);
+    expect(post.status).toBe(404);
+    expect((await other.threads.getById('th-foreign'))?.messages).toEqual([]);
+  });
+
   test('cross-condo incomes access answers 404', async () => {
     const app = await makeApp();
     const other = await seedForeignLedger();

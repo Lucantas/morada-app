@@ -12,6 +12,8 @@ export const threadSchema = z.object({
   id: z.string().min(1),
   residentName: z.string().min(1),
   apt: z.string().min(1),
+  residentId: z.string().min(1).nullable().default(null),
+  apartmentId: z.string().min(1).nullable().default(null),
   unread: z.boolean(),
   messages: z.array(messageSchema),
 });

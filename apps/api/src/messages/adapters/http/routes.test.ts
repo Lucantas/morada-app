@@ -4,7 +4,7 @@ import type { ApiEnv, Role } from '../../../platform/auth';
 import type { Thread } from '../../domain/message';
 import type { ThreadRepository } from '../../domain/thread-repository';
 
-import { threadRoutes } from './routes';
+import { threadRoutes, type ThreadResidentLookup } from './routes';
 
 function fakeRepo(list: Thread[]): ThreadRepository {
   const map = new Map(list.map((t) => [t.id, t]));
@@ -22,6 +22,8 @@ const build = (over: Partial<Thread>): Thread => ({
   id: 't-1',
   residentName: 'Ana',
   apt: 'Apto 1',
+  residentId: null,
+  apartmentId: null,
   unread: false,
   messages: [],
   ...over,
@@ -29,9 +31,10 @@ const build = (over: Partial<Thread>): Thread => ({
 
 function mount(
   repo: ThreadRepository,
-  lookup: (id: string) => Promise<{ name: string; apt: string } | null> = async () => ({
+  lookup: ThreadResidentLookup = async () => ({
     name: 'Morador',
     apt: 'Apto',
+    apartmentId: 'ap-1',
   }),
   role: Role = 'admin',
 ) {
@@ -43,7 +46,10 @@ function mount(
   });
   app.route(
     '/threads',
-    threadRoutes(repo, () => lookup),
+    threadRoutes(
+      () => ({ threads: repo }),
+      () => lookup,
+    ),
   );
   return app;
 }
@@ -65,16 +71,30 @@ describe('threadRoutes', () => {
   });
 
   test('GET /:id materialises an empty thread when none exists yet', async () => {
-    const app = mount(fakeRepo([]), async () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const app = mount(fakeRepo([]), async () => ({
+      name: 'Maria',
+      apt: 'Apto 302',
+      apartmentId: 'ap-302',
+    }));
     const res = await app.request('/threads/r-1');
     expect(res.status).toBe(200);
     const body = (await res.json()) as Thread;
-    expect(body).toMatchObject({ id: 'r-1', residentName: 'Maria', messages: [] });
+    expect(body).toMatchObject({
+      id: 'r-1',
+      residentName: 'Maria',
+      residentId: 'r-1',
+      apartmentId: 'ap-302',
+      messages: [],
+    });
   });
 
   test('POST /:id/messages creates the thread on the first message', async () => {
     const repo = fakeRepo([]);
-    const app = mount(repo, async () => ({ name: 'Maria', apt: 'Apto 302' }));
+    const app = mount(repo, async () => ({
+      name: 'Maria',
+      apt: 'Apto 302',
+      apartmentId: 'ap-302',
+    }));
     const res = await app.request('/threads/r-1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

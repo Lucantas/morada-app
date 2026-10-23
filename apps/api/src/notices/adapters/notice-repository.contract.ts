@@ -4,11 +4,11 @@ import type { NoticeRepository } from '../domain/notice-repository';
 // Behavioural contract every NoticeRepository must satisfy.
 export function runNoticeRepositoryContract(
   label: string,
-  makeRepo: () => Promise<NoticeRepository>,
+  makeRepo: (condominiumId: string) => Promise<NoticeRepository>,
 ): void {
   describe(label, () => {
     test('save then getById round-trips, always dismissed false', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       const notice = {
         id: 'n-1',
         title: 'Aviso',
@@ -25,7 +25,7 @@ export function runNoticeRepositoryContract(
     });
 
     test('save upserts on conflicting id', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save({
         id: 'n-1',
         title: 'Aviso',
@@ -50,7 +50,7 @@ export function runNoticeRepositoryContract(
     });
 
     test('remove deletes the notice', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save({
         id: 'n-1',
         title: 'Aviso',
@@ -68,12 +68,12 @@ export function runNoticeRepositoryContract(
     });
 
     test('getById returns null when missing', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       expect(await repo.getById('nope')).toBeNull();
     });
 
     test('dismiss marks the notice dismissed only for the dismissing resident', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save({
         id: 'n-1',
         title: 'Aviso',
@@ -93,7 +93,7 @@ export function runNoticeRepositoryContract(
     });
 
     test('dismiss is idempotent for the same resident', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save({
         id: 'n-1',
         title: 'Aviso',
@@ -112,7 +112,7 @@ export function runNoticeRepositoryContract(
     });
 
     test('remove also clears dismissals for that notice', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save({
         id: 'n-1',
         title: 'Aviso',
@@ -130,7 +130,7 @@ export function runNoticeRepositoryContract(
     });
 
     test('dismiss throws NoticeNotFoundError when the notice vanishes mid-dismiss', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       // Insert and then delete the notice to simulate the race condition
       // where the notice is deleted between the insert and getById
       await repo.save({
@@ -145,6 +145,34 @@ export function runNoticeRepositoryContract(
       await repo.remove('race-notice');
 
       await expect(repo.dismiss('race-notice', 'r-1')).rejects.toBeInstanceOf(NoticeNotFoundError);
+    });
+
+    test("isolation: condo B never sees or changes condo A's data", async () => {
+      const repoA = await makeRepo('condo-a');
+      const repoB = await makeRepo('condo-b');
+      const notice = {
+        id: 'iso-1',
+        title: 'Aviso',
+        body: 'Corpo',
+        kind: 'aviso' as const,
+        audience: 'todos',
+        dateLabel: 'Agora',
+        dismissed: false,
+      };
+      await repoA.save(notice);
+
+      expect(await repoB.list(null)).toEqual([]);
+      expect(await repoB.getById('iso-1')).toBeNull();
+      await expect(repoB.save({ ...notice, title: 'Hack' })).rejects.toBeInstanceOf(
+        NoticeNotFoundError,
+      );
+      await expect(repoB.dismiss('iso-1', 'resident-b')).rejects.toBeInstanceOf(
+        NoticeNotFoundError,
+      );
+      await repoB.remove('iso-1');
+
+      expect((await repoA.getById('iso-1'))?.title).toBe('Aviso');
+      expect((await repoA.list('resident-b')).find((n) => n.id === 'iso-1')?.dismissed).toBe(false);
     });
   });
 }
