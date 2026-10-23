@@ -1,7 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { CondoRole, OrgRole, Permission } from './permissions';
+import { z } from 'zod';
+
+import {
+  condoRoleSchema,
+  orgRoleSchema,
+  permissionSchema,
+  type CondoRole,
+  type OrgRole,
+  type Permission,
+} from './permissions';
 
 export type CurrentCondo = {
   id: string;
@@ -13,11 +22,28 @@ export type CurrentCondo = {
   orgRole: OrgRole | null;
 };
 
+const currentCondoSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  condoRole: condoRoleSchema,
+  permissions: z.array(permissionSchema),
+  hasHome: z.boolean(),
+  organizationId: z.string().min(1),
+  orgRole: orgRoleSchema.nullable(),
+});
+
 type CondoScopeState = {
   condo: CurrentCondo | null;
   setCondo: (condo: CurrentCondo | null) => void;
   rename: (name: string) => void;
 };
+
+function parseStoredCondo(persisted: unknown): CurrentCondo | null {
+  const stored = z.object({ condo: z.unknown() }).safeParse(persisted);
+  if (!stored.success) return null;
+  const parsed = currentCondoSchema.safeParse(stored.data.condo);
+  return parsed.success ? parsed.data : null;
+}
 
 export const useCondoScope = create<CondoScopeState>()(
   persist(
@@ -26,7 +52,13 @@ export const useCondoScope = create<CondoScopeState>()(
       setCondo: (condo) => set({ condo }),
       rename: (name) => set((state) => (state.condo ? { condo: { ...state.condo, name } } : state)),
     }),
-    { name: 'morada-condo', partialize: (state) => ({ condo: state.condo }) },
+    {
+      name: 'morada-condo',
+      version: 1,
+      partialize: (state) => ({ condo: state.condo }),
+      migrate: (persisted) => ({ condo: parseStoredCondo(persisted) }),
+      merge: (persisted, current) => ({ ...current, condo: parseStoredCondo(persisted) }),
+    },
   ),
 );
 

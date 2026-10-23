@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 
@@ -85,6 +85,32 @@ describe('SettingsScreen permissions', () => {
     expect(screen.queryByRole('textbox', { name: 'Valor da taxa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Nome do condomínio' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Nome da nova categoria')).toBeInTheDocument();
+  });
+});
+
+describe('SettingsScreen read-only condo name', () => {
+  test('saves without a condominium name error when the person cannot manage the condo', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo: CondoInfoRepository = {
+      get: () => Promise.reject(new Error('offline')),
+      rename: () => Promise.reject(new Error('offline')),
+    };
+    act(() => useCondoScope.getState().setCondo(null));
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(screen.queryByText('Informe o nome do condomínio')).not.toBeInTheDocument();
   });
 });
 

@@ -112,18 +112,18 @@ export function SettingsScreen({
 
   const submit = async () => {
     try {
-      const trimmedName = canManageCondo ? condoName.trim() : savedCondoName;
-      if (trimmedName === '') {
+      const trimmedName = condoName.trim();
+      if (canManageCondo && trimmedName === '') {
         setReclassifiedMsg(null);
         setSaveError('Informe o nome do condomínio');
         return;
       }
-      if (trimmedName.length > MAX_CONDO_NAME_LENGTH) {
+      if (canManageCondo && trimmedName.length > MAX_CONDO_NAME_LENGTH) {
         setReclassifiedMsg(null);
         setSaveError('Nome muito longo');
         return;
       }
-      if (trimmedName !== savedCondoName) {
+      if (canManageCondo && trimmedName !== savedCondoName) {
         await onRenameCondo(trimmedName);
       }
       if (canManageFees) {

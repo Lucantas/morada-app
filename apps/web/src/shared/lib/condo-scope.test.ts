@@ -2,6 +2,7 @@ import { act } from '@testing-library/react';
 
 import { renderHook } from '@testing-library/react';
 
+import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
 import { testCondo } from '@/test/condo';
 
 import { scopedApiPath, useCanDo, useCondoName, useCondoScope } from './condo-scope';
@@ -70,5 +71,46 @@ describe('useCanDo', () => {
 
   test('is false without a condominium', () => {
     expect(renderHook(() => useCanDo('manage_money')).result.current).toBe(false);
+  });
+});
+
+describe('persisted condo from an older version', () => {
+  afterEach(() => {
+    localStorage.clear();
+    act(() => useCondoScope.getState().setCondo(null));
+  });
+
+  test('drops a stored condo without permissions instead of crashing', async () => {
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({ state: { condo: { id: 'c1', name: 'Morada' } }, version: 0 }),
+    );
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState().condo).toBeNull();
+    expect(renderHook(() => useCanDo('manage_fees')).result.current).toBe(false);
+  });
+
+  test('keeps a complete stored condo', async () => {
+    const condo = testCondo();
+    localStorage.setItem('morada-condo', JSON.stringify({ state: { condo }, version: 1 }));
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState().condo).toEqual(condo);
+  });
+
+  test('a logged-in session with an old stored condo is signed out', async () => {
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({ state: { condo: { id: 'c1', name: 'Morada' } }, version: 0 }),
+    );
+    act(() => useSessionStore.getState().authenticate('admin', null));
+
+    await act(() => useCondoScope.persist.rehydrate());
+    signOutIfCondoMissing();
+
+    expect(useSessionStore.getState().role).toBeNull();
   });
 });
