@@ -21,7 +21,7 @@ export async function renameCondo(
   const parsed = condominiumSchema.shape.name.safeParse(
     typeof input === 'object' && input !== null ? (input as { name?: unknown }).name : undefined,
   );
-  if (!parsed.success) throw new CondoGrantValidationError('Nome do condomínio inválido');
+  if (!parsed.success) throw new CondoGrantValidationError('Dados inválidos');
   const condo = await condos.rename(condoId, parsed.data);
   return { id: condo.id, name: condo.name };
 }

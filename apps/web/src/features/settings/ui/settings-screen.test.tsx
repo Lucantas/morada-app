@@ -105,6 +105,56 @@ describe('SettingsScreen', () => {
     expect(rename).not.toHaveBeenCalled();
   });
 
+  test('saves settings even when the condominium info query fails', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo = new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+    jest.spyOn(condoInfo, 'get').mockRejectedValue(new Error('offline'));
+    const rename = jest.spyOn(condoInfo, 'rename');
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Valor da taxa')).toHaveValue('150,00'));
+    fireEvent.change(screen.getByLabelText('Valor da taxa'), { target: { value: '20000' } });
+    const save = screen.getByRole('button', { name: /salvar e reclassificar/i });
+    await waitFor(() => expect(save).toBeEnabled());
+    await user.click(save);
+
+    await waitFor(() => expect(settings.snapshot().monthlyFeeCents).toBe(20000));
+    expect(rename).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['   ', 'Informe o nome do condomínio'],
+    ['x'.repeat(81), 'Nome muito longo'],
+  ])('rejects an invalid condominium name inline without saving (%#)', async (name, message) => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo = new InMemoryCondoInfoRepository({ id: 'c1', name: TEST_CONDO_NAME });
+    const rename = jest.spyOn(condoInfo, 'rename');
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+      />,
+    );
+
+    const field = await screen.findByDisplayValue(TEST_CONDO_NAME);
+    fireEvent.change(field, { target: { value: name } });
+    fireEvent.change(screen.getByLabelText('Valor da taxa'), { target: { value: '20000' } });
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(rename).not.toHaveBeenCalled();
+    expect(settings.snapshot().monthlyFeeCents).toBe(15000);
+  });
+
   test('shows an error and keeps the old name when the rename is rejected', async () => {
     const user = userEvent.setup();
     const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
