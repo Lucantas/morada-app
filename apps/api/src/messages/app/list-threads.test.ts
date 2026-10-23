@@ -23,6 +23,8 @@ const build = (over: Partial<Thread>): Thread => ({
   id: 'x',
   residentName: 'Nome',
   apt: 'Apto 1',
+  residentId: null,
+  apartmentId: null,
   unread: false,
   messages: [],
   ...over,
