@@ -11,11 +11,7 @@ import {
   newCsrfToken,
   sessionCookieOptions,
 } from '../../../platform/cookies';
-import type { User } from '../../domain/user';
-
-export function isEmailVerified(user: User): boolean {
-  return user.email === null || user.emailVerifiedAt !== null;
-}
+import { isEmailVerified, type User } from '../../domain/user';
 
 export async function sessionResponse(
   c: Context<ApiEnv>,

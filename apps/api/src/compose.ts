@@ -17,6 +17,8 @@ import { config } from './platform/config';
 import { createRepositories, type CondoRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { healthRoutes } from './platform/http/health-routes';
+import { createEmailSender } from './platform/email/create-email-sender';
+import type { EmailSender } from './platform/email/email-sender';
 import { createRateLimiter } from './platform/rate-limit';
 import { apartmentReceiptRoutes } from './receipts/adapters/http/apartment-routes';
 import { receiptRoutes } from './receipts/adapters/http/routes';
@@ -35,8 +37,17 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   return group;
 }
 
-export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
-  const { users, condos } = repos;
+const SIGNUP_LIMIT = { maxAttempts: 10, windowMs: 3_600_000, lockoutMs: 3_600_000 };
+
+export interface AppOptions {
+  email?: EmailSender;
+  now?: () => Date;
+}
+
+export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<Hono<ApiEnv>> {
+  const { users, condos, authTokens } = repos;
+  const email = opts?.email ?? createEmailSender(config);
+  const now = opts?.now ?? (() => new Date());
   const scoped =
     <T>(pick: (condoRepos: CondoRepositories) => T): Scoped<T> =>
     (condoId) =>
@@ -88,6 +99,12 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
       hasher,
       condosFor: (userId) => listMyCondos(condos, userId),
       limiter: loginLimiter,
+      tokens: authTokens,
+      email,
+      appUrl: config.appUrl,
+      now,
+      signupLimiter: createRateLimiter(SIGNUP_LIMIT),
+      afterEmailConfirmed: async () => undefined,
     }),
   );
   app.route('/me', meRoutes({ condos, users }));

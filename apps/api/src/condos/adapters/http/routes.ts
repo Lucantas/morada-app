@@ -4,7 +4,7 @@ import { authMiddleware, requireRole, type ApiEnv } from '../../../platform/auth
 import { getCondoInfo, renameCondo } from '../../app/condo-info';
 import { listMyCondos } from '../../app/condo-access-views';
 import type { CondoRepository } from '../../domain/condo-repository';
-import { isEmailVerified } from '../../../users/adapters/http/session-cookies';
+import { isEmailVerified } from '../../../users/domain/user';
 import type { UserRepository } from '../../../users/domain/user-repository';
 
 export function meRoutes(deps: {

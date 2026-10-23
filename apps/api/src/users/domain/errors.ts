@@ -53,3 +53,11 @@ export class ResidentLoginNotFoundError extends Error {
     this.name = 'ResidentLoginNotFoundError';
   }
 }
+
+export class InvalidLinkError extends Error {
+  readonly status = 404;
+  constructor() {
+    super('Link inválido ou expirado');
+    this.name = 'InvalidLinkError';
+  }
+}

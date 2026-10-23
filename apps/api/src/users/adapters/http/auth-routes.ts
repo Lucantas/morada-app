@@ -1,13 +1,18 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { authMiddleware, type ApiEnv } from '../../../platform/auth';
 import type { CondoSummary } from '../../../condos/app/condo-access-views';
 import { config } from '../../../platform/config';
 import { CSRF_COOKIE, SESSION_COOKIE, clearCookieOptions } from '../../../platform/cookies';
 import { csrfMiddleware } from '../../../platform/csrf';
+import type { EmailSender } from '../../../platform/email/email-sender';
 import type { RateLimiter } from '../../../platform/rate-limit';
+import { confirmEmail } from '../../app/confirm-email';
+import { resendConfirmation } from '../../app/resend-confirmation';
+import { signUp } from '../../app/sign-up';
+import type { AuthTokenRepository } from '../../domain/auth-token-repository';
 import { verifyCredentials } from '../../app/verify-credentials';
 import { normalizeEmail } from '../../domain/email';
 import { InvalidCredentialsError } from '../../domain/errors';
@@ -15,6 +20,8 @@ import type { PasswordHasher } from '../../domain/password-hasher';
 import type { UserRepository } from '../../domain/user-repository';
 
 import { sessionResponse } from './session-cookies';
+
+const TOO_MANY_ATTEMPTS = 'Muitas tentativas, tente mais tarde';
 
 const loginSchema = z
   .object({
@@ -43,15 +50,29 @@ export function authRoutes(deps: {
   hasher: PasswordHasher;
   condosFor: (userId: string) => Promise<CondoSummary[]>;
   limiter: RateLimiter;
+  tokens: AuthTokenRepository;
+  email: EmailSender;
+  appUrl: string;
+  now: () => Date;
+  signupLimiter: RateLimiter;
+  afterEmailConfirmed: (userId: string) => Promise<void>;
 }) {
   const app = new Hono<ApiEnv>();
+
+  const withinSignupLimit = (c: Context<ApiEnv>): boolean => {
+    const key = clientIpFrom(c);
+    const nowMs = deps.now().getTime();
+    if (!deps.signupLimiter.check(key, nowMs).allowed) return false;
+    deps.signupLimiter.fail(key, nowMs);
+    return true;
+  };
 
   app.post('/login', async (c) => {
     const { login, password } = loginSchema.parse(await c.req.json());
     const key = `${clientIpFrom(c)}:${login.includes('@') ? normalizeEmail(login) : login}`;
 
     if (!deps.limiter.check(key, Date.now()).allowed) {
-      return c.json({ error: 'Muitas tentativas, tente mais tarde' }, 429);
+      return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
     }
 
     let user;
@@ -69,6 +90,53 @@ export function authRoutes(deps: {
 
     deps.limiter.succeed(key);
     return sessionResponse(c, user, condos);
+  });
+
+  app.post('/signup', async (c) => {
+    if (!withinSignupLimit(c)) return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
+    await signUp(
+      {
+        users: deps.users,
+        tokens: deps.tokens,
+        hasher: deps.hasher,
+        email: deps.email,
+        appUrl: deps.appUrl,
+        now: deps.now,
+      },
+      await c.req.json().catch(() => undefined),
+    );
+    return c.json({}, 202);
+  });
+
+  app.post('/email/confirm', async (c) => {
+    const body: unknown = await c.req.json().catch(() => undefined);
+    const rawToken =
+      typeof body === 'object' && body !== null ? (body as { token?: unknown }).token : undefined;
+    const user = await confirmEmail(
+      {
+        users: deps.users,
+        tokens: deps.tokens,
+        now: deps.now,
+        afterEmailConfirmed: deps.afterEmailConfirmed,
+      },
+      rawToken,
+    );
+    return sessionResponse(c, user, await deps.condosFor(user.id));
+  });
+
+  app.post('/email/resend', authMiddleware, csrfMiddleware, async (c) => {
+    if (!withinSignupLimit(c)) return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
+    await resendConfirmation(
+      {
+        users: deps.users,
+        tokens: deps.tokens,
+        email: deps.email,
+        appUrl: deps.appUrl,
+        now: deps.now,
+      },
+      c.get('uid'),
+    );
+    return c.body(null, 204);
   });
 
   app.post('/logout', csrfMiddleware, (c) => {

@@ -20,7 +20,9 @@ import { PostgresResidentRepository } from './residents/adapters/postgres/reside
 import type { ResidentRepository } from './residents/domain/resident-repository';
 import { PostgresSettingsRepository } from './settings/adapters/postgres/settings-repository';
 import type { SettingsRepository } from './settings/domain/settings-repository';
+import { PostgresAuthTokenRepository } from './users/adapters/postgres/auth-token-repository';
 import { PostgresUserRepository } from './users/adapters/postgres/user-repository';
+import type { AuthTokenRepository } from './users/domain/auth-token-repository';
 import type { UserRepository } from './users/domain/user-repository';
 
 import { migrate } from './platform/postgres/migrate';
@@ -43,6 +45,7 @@ export interface CondoRepositories {
 export interface Repositories {
   forCondo(condominiumId: string): CondoRepositories;
   users: UserRepository;
+  authTokens: AuthTokenRepository;
   condos: CondoRepository;
 }
 
@@ -61,6 +64,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
       incomes: new PostgresIncomeRepository(pool, condominiumId, proofStorage),
     }),
     users: new PostgresUserRepository(pool),
+    authTokens: new PostgresAuthTokenRepository(pool),
     condos: new PostgresCondoRepository(pool),
   };
 }

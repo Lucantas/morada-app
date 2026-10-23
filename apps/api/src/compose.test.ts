@@ -2,6 +2,8 @@ import { sign } from 'hono/jwt';
 
 import { buildApp } from './compose';
 import { config } from './platform/config';
+import type { EmailSender } from './platform/email/email-sender';
+import { InMemoryEmailSender } from './platform/email/in-memory-email-sender';
 import { migrate } from './platform/postgres/migrate';
 import { createPool } from './platform/postgres/pool';
 import { makePostgresRepositories } from './repositories';
@@ -33,10 +35,10 @@ async function count(from: string): Promise<number> {
 
 // Each call resets to a fresh seeded state, so a test may build more than one app
 // (e.g. one per credential) against the shared Postgres without id collisions.
-async function makeApp(): Promise<App> {
+async function makeApp(opts?: { email?: EmailSender; now?: () => Date }): Promise<App> {
   await resetPg(pool);
   await seedFixtures(pool);
-  return buildApp(makePostgresRepositories(pool));
+  return buildApp(makePostgresRepositories(pool), opts);
 }
 
 async function login(app: App, username: string, password: string): Promise<Response> {
@@ -1751,5 +1753,156 @@ describe('Morada API — authorization wiring', () => {
       (await app.request(`${P}/accounts/ghost/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
     ).toBe(404);
+  });
+});
+
+describe('Morada API — sign-up and e-mail confirmation', () => {
+  const signupBody = { name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' };
+
+  function postJson(app: App, path: string, body: unknown, headers: Record<string, string> = {}) {
+    return app.request(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function signup(app: App, body: unknown = signupBody, ip = '1.1.1.1') {
+    return postJson(app, '/auth/signup', body, { 'X-Forwarded-For': ip });
+  }
+
+  function confirmTokenIn(sender: InMemoryEmailSender, to: string): string {
+    return /confirmar-email\/([\w-]+)/.exec(sender.lastTo(to)?.text ?? '')?.[1] ?? '';
+  }
+
+  test('sign-up answers 202, creates an unconfirmed user and e-mails a confirmation link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const res = await signup(app);
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({});
+    const { rows } = await pool.query(
+      'SELECT name, role, username, email_verified_at FROM users WHERE email = $1',
+      ['ana@x.com'],
+    );
+    expect(rows).toEqual([{ name: 'Ana', role: 'admin', username: null, email_verified_at: null }]);
+    expect(sender.lastTo('ana@x.com')?.subject).toBe('Confirme seu e-mail no Morada');
+    expect(res.headers.getSetCookie()).toEqual([]);
+  });
+
+  test('sign-up with a taken e-mail answers 202, creates nothing and warns the owner', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+
+    const res = await signup(app, { ...signupBody, name: 'Intruso' });
+
+    expect(res.status).toBe(202);
+    expect(await count("users WHERE email = 'ana@x.com'")).toBe(1);
+    expect(sender.sent).toHaveLength(2);
+    expect(sender.lastTo('ana@x.com')?.subject).not.toBe('Confirme seu e-mail no Morada');
+    expect(sender.lastTo('ana@x.com')?.text).toContain('/#/redefinir-senha/');
+  });
+
+  test('sign-up rejects invalid data with 400', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await signup(app, { ...signupBody, password: 'curta' })).status).toBe(400);
+  });
+
+  test('the 11th sign-up from one IP is rate limited', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i += 1) {
+      statuses.push((await signup(app, { ...signupBody, email: `u${i}@x.com` })).status);
+    }
+
+    expect(statuses.slice(0, 10)).toEqual(Array(10).fill(202));
+    expect(statuses[10]).toBe(429);
+    expect((await signup(app, signupBody, '2.2.2.2')).status).toBe(202);
+  });
+
+  test('confirming sets emailVerifiedAt, logs in, and a second use of the token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+
+    const res = await postJson(app, '/auth/email/confirm', { token });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: true });
+    expect(res.headers.getSetCookie().some((c) => c.startsWith('session='))).toBe(true);
+    const { rows } = await pool.query('SELECT email_verified_at FROM users WHERE email = $1', [
+      'ana@x.com',
+    ]);
+    expect(rows[0]?.email_verified_at).toBeInstanceOf(Date);
+
+    const again = await postJson(app, '/auth/email/confirm', { token });
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Link inválido ou expirado' });
+  });
+
+  test('an unknown or malformed token is 404', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+
+    expect((await postJson(app, '/auth/email/confirm', { token: 'nope' })).status).toBe(404);
+    expect((await postJson(app, '/auth/email/confirm', {})).status).toBe(404);
+  });
+
+  test('an expired token is 404', async () => {
+    const sender = new InMemoryEmailSender();
+    const issuedAt = new Date('2026-01-01T00:00:00.000Z');
+    const app = await makeApp({ email: sender, now: () => issuedAt });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+    const lateApp = await buildApp(makePostgresRepositories(pool), {
+      email: sender,
+      now: () => new Date('2026-01-03T00:00:00.000Z'),
+    });
+
+    expect((await postJson(lateApp, '/auth/email/confirm', { token })).status).toBe(404);
+  });
+
+  test('resend needs a session and CSRF, sends a new link and revokes the previous one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const first = confirmTokenIn(sender, 'ana@x.com');
+
+    expect((await postJson(app, '/auth/email/resend', {})).status).toBe(401);
+
+    const unconfirmed = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = unconfirmed.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    const cookie = `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`;
+
+    expect((await postJson(app, '/auth/email/resend', {}, { Cookie: cookie })).status).toBe(403);
+    const res = await postJson(
+      app,
+      '/auth/email/resend',
+      {},
+      { Cookie: cookie, 'X-CSRF-Token': csrf },
+    );
+    expect(res.status).toBe(204);
+    const second = confirmTokenIn(sender, 'ana@x.com');
+    expect(second).not.toBe(first);
+
+    expect((await postJson(app, '/auth/email/confirm', { token: first })).status).toBe(404);
+    expect((await postJson(app, '/auth/email/confirm', { token: second })).status).toBe(200);
+
+    const sentBefore = sender.sent.length;
+    const noop = await postJson(
+      app,
+      '/auth/email/resend',
+      {},
+      { Cookie: cookie, 'X-CSRF-Token': csrf },
+    );
+    expect(noop.status).toBe(204);
+    expect(sender.sent).toHaveLength(sentBefore);
   });
 });

@@ -26,3 +26,7 @@ export const userSchema = z.object({
   emailVerifiedAt: z.date().nullable(),
 });
 export type User = z.infer<typeof userSchema>;
+
+export function isEmailVerified(user: User): boolean {
+  return user.email === null || user.emailVerifiedAt !== null;
+}

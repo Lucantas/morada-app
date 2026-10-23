@@ -384,4 +384,19 @@ ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE email IS NOT NULL;
 `,
   },
+  {
+    id: '020_auth_tokens',
+    sql: `
+CREATE TABLE auth_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  kind TEXT NOT NULL CHECK (kind IN ('confirm_email', 'reset_password')),
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_auth_tokens_user_kind ON auth_tokens (user_id, kind);
+`,
+  },
 ];
