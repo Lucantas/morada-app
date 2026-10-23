@@ -16,6 +16,11 @@ import { config } from './platform/config';
 function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
+    findById: async (id) => [...map.values()].find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => [...map.values()].find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    setPasswordHash: async () => undefined,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
@@ -93,6 +98,9 @@ const existingResident: User = {
   passwordHash: 'existing-hash',
   role: 'resident',
   residentId: 'r-1',
+  email: null,
+  name: null,
+  emailVerifiedAt: null,
 };
 
 describe('seedAdmin', () => {
@@ -113,6 +121,9 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -140,6 +151,9 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
     };
     const repo = fakeRepo([existingAdmin]);
     await seedAdmin(repo, fakeCondos(), noopHasher);
@@ -150,6 +164,11 @@ describe('seedAdmin', () => {
     (config as { isProduction: boolean }).isProduction = true;
     const saveSpy = jest.fn(async (u: User) => u);
     const repo: UserRepository = {
+      findById: async () => null,
+      findByEmail: async () => null,
+      existsByEmail: async () => false,
+      markEmailVerified: async () => undefined,
+      setPasswordHash: async () => undefined,
       findByUsername: async (username) =>
         username === existingResident.username ? existingResident : null,
       findByResidentId: async (residentId) =>
@@ -196,6 +215,9 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
     };
     const condos = fakeCondos([
       { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
@@ -215,6 +237,9 @@ describe('seedAdmin', () => {
       passwordHash: 'existing-hash',
       role: 'admin',
       residentId: null,
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
     };
     const condos = fakeCondos();
 

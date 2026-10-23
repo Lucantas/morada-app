@@ -1073,6 +1073,9 @@ describe('Morada API — admin reads and resets resident logins', () => {
       passwordHash: 'hash-foreign',
       role: 'resident',
       residentId: 'r-foreign',
+      email: null,
+      name: null,
+      emailVerifiedAt: null,
     });
     const auth = await adminAuthFor(app);
 

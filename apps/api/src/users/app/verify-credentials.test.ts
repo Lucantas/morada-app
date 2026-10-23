@@ -8,6 +8,11 @@ import { verifyCredentials } from './verify-credentials';
 function fakeRepo(users: User[] = []): UserRepository {
   const map = new Map(users.map((u) => [u.username, u]));
   return {
+    findById: async (id) => [...map.values()].find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => [...map.values()].find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => [...map.values()].some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    setPasswordHash: async () => undefined,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>
       [...map.values()].find((u) => u.residentId === residentId) ?? null,
@@ -33,6 +38,9 @@ const maria: User = {
   passwordHash: 'hash:s3nha',
   role: 'resident',
   residentId: 'r-1',
+  email: null,
+  name: null,
+  emailVerifiedAt: null,
 };
 
 describe('verifyCredentials', () => {

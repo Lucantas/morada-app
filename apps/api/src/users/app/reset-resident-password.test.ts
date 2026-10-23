@@ -8,6 +8,11 @@ import { resetResidentPassword } from './reset-resident-password';
 function fakeRepo(users: User[] = []): UserRepository {
   let list = [...users];
   return {
+    findById: async (id) => list.find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => list.find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => list.some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    setPasswordHash: async () => undefined,
     findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => list.some((u) => u.username === username),
@@ -34,6 +39,9 @@ describe('resetResidentPassword', () => {
         passwordHash: 'hash:old-secret',
         role: 'resident',
         residentId: 'r-1',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
       },
     ]);
 
@@ -59,6 +67,9 @@ describe('resetResidentPassword', () => {
         passwordHash: 'hash:old',
         role: 'resident',
         residentId: 'r-2',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
       },
     ]);
 
@@ -82,6 +93,9 @@ describe('resetResidentPassword', () => {
         passwordHash: 'hash:old',
         role: 'resident',
         residentId: 'r-3',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
       },
     ]);
 

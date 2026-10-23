@@ -1,4 +1,5 @@
 import type { User } from '../domain/user';
+import { EmailTakenError } from '../domain/errors';
 import type { UserRepository } from '../domain/user-repository';
 
 const maria: User = {
@@ -7,6 +8,9 @@ const maria: User = {
   passwordHash: 'hash-a',
   role: 'resident',
   residentId: 'r-1',
+  email: null,
+  name: null,
+  emailVerifiedAt: null,
 };
 
 // Behavioural contract every UserRepository must satisfy, run against both the
@@ -70,6 +74,9 @@ export function runUserRepositoryContract(
           passwordHash: 'hash-c',
           role: 'resident',
           residentId: 'r-1',
+          email: null,
+          name: null,
+          emailVerifiedAt: null,
         }),
       ).rejects.toThrow();
     });
@@ -82,6 +89,9 @@ export function runUserRepositoryContract(
         passwordHash: 'hash-b',
         role: 'admin',
         residentId: null,
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
       };
       await repo.save(admin);
       expect(await repo.findByUsername('admin')).toEqual(admin);
@@ -92,6 +102,65 @@ export function runUserRepositoryContract(
       await repo.save(maria);
       await repo.save({ ...maria, passwordHash: 'hash-rotated' });
       expect((await repo.findByUsername('maria302'))?.passwordHash).toBe('hash-rotated');
+    });
+
+    const ana: User = {
+      id: 'u-ana',
+      username: null,
+      email: 'ana@x.com',
+      name: 'Ana',
+      passwordHash: 'hash-ana',
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: null,
+    };
+
+    test('findByEmail returns the user saved with that e-mail', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      expect(await repo.findByEmail('ana@x.com')).toEqual(ana);
+      expect(await repo.findByEmail('ghost@x.com')).toBeNull();
+    });
+
+    test('findById returns the saved user', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      expect(await repo.findById('u-ana')).toEqual(ana);
+      expect(await repo.findById('u-ghost')).toBeNull();
+    });
+
+    test('existsByEmail reflects saved users', async () => {
+      const repo = await makeRepo();
+      expect(await repo.existsByEmail('ana@x.com')).toBe(false);
+      await repo.save(ana);
+      expect(await repo.existsByEmail('ana@x.com')).toBe(true);
+    });
+
+    test('markEmailVerified sets emailVerifiedAt', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      const at = new Date('2026-10-23T12:00:00.000Z');
+      await repo.markEmailVerified('u-ana', at);
+      expect((await repo.findById('u-ana'))?.emailVerifiedAt).toEqual(at);
+    });
+
+    test('setPasswordHash replaces the hash', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      await repo.setPasswordHash('u-ana', 'hash-new');
+      expect((await repo.findById('u-ana'))?.passwordHash).toBe('hash-new');
+    });
+
+    test('rejects a second user with the same e-mail', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      await expect(repo.save({ ...ana, id: 'u-ana-2' })).rejects.toBeInstanceOf(EmailTakenError);
+    });
+
+    test('a user with a null username round-trips', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      expect((await repo.findById('u-ana'))?.username).toBeNull();
     });
   });
 }

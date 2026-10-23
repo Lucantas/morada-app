@@ -57,6 +57,9 @@ export async function createResidentLogin(
     passwordHash: await hasher.hash(password),
     role: 'resident',
     residentId,
+    email: null,
+    name: null,
+    emailVerifiedAt: null,
   });
   const saved = await repo.save(user);
   await condos.grant({ condominiumId, userId: saved.id, role: 'morador', residentId });

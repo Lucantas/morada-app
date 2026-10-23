@@ -374,4 +374,14 @@ ALTER TABLE incomes ALTER COLUMN condominium_id DROP DEFAULT;
 ALTER TABLE condo_settings ALTER COLUMN condominium_id DROP DEFAULT;
 `,
   },
+  {
+    id: '019_identity',
+    sql: `
+ALTER TABLE users ALTER COLUMN username DROP NOT NULL;
+ALTER TABLE users ADD COLUMN email TEXT;
+ALTER TABLE users ADD COLUMN name TEXT;
+ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE email IS NOT NULL;
+`,
+  },
 ];

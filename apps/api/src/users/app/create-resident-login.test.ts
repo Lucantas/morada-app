@@ -15,6 +15,11 @@ import { createResidentLogin, type ResidentLookup } from './create-resident-logi
 function fakeRepo(users: User[] = []): UserRepository {
   const list = [...users];
   return {
+    findById: async (id) => list.find((u) => u.id === id) ?? null,
+    findByEmail: async (email) => list.find((u) => u.email === email) ?? null,
+    existsByEmail: async (email) => list.some((u) => u.email === email),
+    markEmailVerified: async () => undefined,
+    setPasswordHash: async () => undefined,
     findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => list.some((u) => u.username === username),
@@ -133,7 +138,16 @@ describe('createResidentLogin', () => {
 
   test('throws UsernameTakenError when the derived username already exists', async () => {
     const repo = fakeRepo([
-      { id: 'u-9', username: 'maria302', passwordHash: 'x', role: 'resident', residentId: 'r-9' },
+      {
+        id: 'u-9',
+        username: 'maria302',
+        passwordHash: 'x',
+        role: 'resident',
+        residentId: 'r-9',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
+      },
     ]);
     await expect(
       createResidentLogin(repo, fakeCondos(), hasher, lookupReturning(fakeResident()), {
@@ -156,7 +170,16 @@ describe('createResidentLogin', () => {
 
   test('throws ResidentLoginExistsError when the resident already has a login', async () => {
     const repo = fakeRepo([
-      { id: 'u-1', username: 'maria302', passwordHash: 'x', role: 'resident', residentId: 'r-1' },
+      {
+        id: 'u-1',
+        username: 'maria302',
+        passwordHash: 'x',
+        role: 'resident',
+        residentId: 'r-1',
+        email: null,
+        name: null,
+        emailVerifiedAt: null,
+      },
     ]);
     await expect(
       createResidentLogin(

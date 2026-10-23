@@ -35,6 +35,9 @@ async function ensureAdmin(users: UserRepository, hasher: PasswordHasher): Promi
     passwordHash: await hasher.hash(adminCredentials.password),
     role: 'admin',
     residentId: null,
+    email: null,
+    name: null,
+    emailVerifiedAt: null,
   };
   await users.save(admin);
 }

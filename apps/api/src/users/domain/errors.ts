@@ -14,6 +14,14 @@ export class UsernameTakenError extends Error {
   }
 }
 
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  constructor(email: string) {
+    super(`E-mail já cadastrado: ${email}`);
+    this.name = 'EmailTakenError';
+  }
+}
+
 export class UserValidationError extends Error {
   readonly status = 400;
   constructor(message: string) {
