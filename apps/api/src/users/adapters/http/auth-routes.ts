@@ -8,7 +8,8 @@ import { config } from '../../../platform/config';
 import { CSRF_COOKIE, SESSION_COOKIE, clearCookieOptions } from '../../../platform/cookies';
 import { csrfMiddleware } from '../../../platform/csrf';
 import type { EmailSender } from '../../../platform/email/email-sender';
-import type { RateLimiter } from '../../../platform/rate-limit';
+import { clientIpFrom } from '../../../platform/client-ip';
+import { consumeAttempt, type RateLimiter } from '../../../platform/rate-limit';
 import { confirmEmail } from '../../app/confirm-email';
 import { requestPasswordReset } from '../../app/request-password-reset';
 import { resendConfirmation } from '../../app/resend-confirmation';
@@ -53,14 +54,6 @@ function readJson(c: Context<ApiEnv>): Promise<unknown> {
   return c.req.json().catch(() => undefined);
 }
 
-function clientIpFrom(c: { req: { header: (name: string) => string | undefined } }): string {
-  return (
-    c.req.header('Fly-Client-IP') ??
-    c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ??
-    'unknown'
-  );
-}
-
 export function authRoutes(deps: {
   auth: MiddlewareHandler<ApiEnv>;
   users: UserRepository;
@@ -73,16 +66,12 @@ export function authRoutes(deps: {
   now: () => Date;
   signupLimiter: RateLimiter;
   afterEmailConfirmed: (userId: string) => Promise<void>;
+  onVerifiedLogin: (userId: string) => Promise<void>;
 }) {
   const app = new Hono<ApiEnv>();
 
-  const withinSignupLimit = (c: Context<ApiEnv>): boolean => {
-    const key = clientIpFrom(c);
-    const nowMs = deps.now().getTime();
-    if (!deps.signupLimiter.check(key, nowMs).allowed) return false;
-    deps.signupLimiter.fail(key, nowMs);
-    return true;
-  };
+  const withinSignupLimit = (c: Context<ApiEnv>): boolean =>
+    consumeAttempt(deps.signupLimiter, clientIpFrom(c), deps.now().getTime());
 
   app.post('/login', async (c) => {
     const { login, password } = loginSchema.parse(await c.req.json());
@@ -102,6 +91,7 @@ export function authRoutes(deps: {
       throw error;
     }
 
+    if (user.email !== null && user.emailVerifiedAt !== null) await deps.onVerifiedLogin(user.id);
     const condos = await deps.condosFor(user.id);
     if (condos.length === 0 && user.email === null) throw new InvalidCredentialsError();
 

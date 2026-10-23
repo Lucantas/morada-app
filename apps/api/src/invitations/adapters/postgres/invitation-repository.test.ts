@@ -54,3 +54,44 @@ runInvitationRepositoryContract('PostgresInvitationRepository', async (condomini
   invitations: new PostgresInvitationRepository(pool, condominiumId),
   tokens: new PostgresInvitationTokenRepository(pool),
 }));
+
+async function waitForLockWait(): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const { rows } = await pool.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()",
+    );
+    if ((rows[0]?.n ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('create never waited on the pending invitation lock');
+}
+
+test('a create racing another pending invitation answers 409 Já existe um convite pendente', async () => {
+  const racer = await pool.connect();
+  try {
+    await racer.query('BEGIN');
+    await racer.query(
+      `INSERT INTO invitations (id, condominium_id, resident_id, role, email, token_hash, status, expires_at, created_by)
+       VALUES ('inv-racer', 'condo-a', $1, 'morador', NULL, 'h-racer', 'pendente', now() + interval '1 day', $2)`,
+      [CONTRACT_RESIDENT_A, CONTRACT_ADMIN_ID],
+    );
+    const repo = new PostgresInvitationRepository(pool, 'condo-a');
+    const pending = repo
+      .create({
+        residentId: CONTRACT_RESIDENT_A,
+        email: null,
+        tokenHash: 'h-late',
+        expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+        createdBy: CONTRACT_ADMIN_ID,
+      })
+      .catch((error: unknown) => error);
+    await waitForLockWait();
+    await racer.query('COMMIT');
+
+    expect(await pending).toMatchObject({ status: 409, message: 'Já existe um convite pendente' });
+  } finally {
+    racer.release();
+  }
+  const { rows } = await pool.query("SELECT id FROM invitations WHERE status = 'pendente'");
+  expect(rows).toEqual([{ id: 'inv-racer' }]);
+});

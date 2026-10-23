@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 
 import type { Pool } from 'pg';
 
-import { InvitationResidentNotFoundError } from '../../domain/errors';
+import {
+  InvitationResidentNotFoundError,
+  PendingInvitationConflictError,
+} from '../../domain/errors';
 import {
   effectiveStatus,
   type Invitation,
@@ -25,6 +28,13 @@ interface InvitationRow {
   claimed_by: string | null;
   accepted_at: Date | null;
   created_at: Date;
+}
+
+const ONE_PENDING_INDEX = 'idx_invitations_one_pending';
+
+function isPendingConflict(error: unknown): boolean {
+  const { code, constraint } = (error ?? {}) as { code?: unknown; constraint?: unknown };
+  return code === '23505' && constraint === ONE_PENDING_INDEX;
 }
 
 const COLUMNS =
@@ -93,6 +103,7 @@ export class PostgresInvitationRepository implements CondoInvitationRepository {
       return toInvitation(row, now);
     } catch (error) {
       await client.query('ROLLBACK');
+      if (isPendingConflict(error)) throw new PendingInvitationConflictError();
       throw error;
     } finally {
       client.release();

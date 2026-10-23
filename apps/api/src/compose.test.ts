@@ -2461,3 +2461,224 @@ describe('Resident invitations', () => {
     expect((await other.invitations.latestForResident('r-foreign'))?.status).toBe('pendente');
   });
 });
+
+describe('Accepting an invitation', () => {
+  const APP_URL = config.appUrl;
+  const CONDO = { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' };
+
+  async function adminHeaders(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf, 'Content-Type': 'application/json' };
+  }
+
+  async function invite(app: App, body: { email?: string } = {}): Promise<string> {
+    const res = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers: await adminHeaders(app),
+      body: JSON.stringify(body),
+    });
+    const { link } = (await res.json()) as { link: string };
+    return link.slice(`${APP_URL}/#/convite/`.length);
+  }
+
+  async function whatsappInvite(app: App): Promise<string> {
+    await pool.query("UPDATE residents SET email = '' WHERE id = 'r-1'");
+    return invite(app);
+  }
+
+  function accept(app: App, token: string, body: unknown, ip = '9.9.9.9') {
+    return app.request(`/auth/invitations/${token}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function preview(app: App, token: string, ip = '9.9.9.9') {
+    return app.request(`/auth/invitations/${token}`, { headers: { 'X-Forwarded-For': ip } });
+  }
+
+  function cookieOf(res: Response): string {
+    const setCookies = res.headers.getSetCookie();
+    return `session=${parseCookie(setCookies, 'session')}`;
+  }
+
+  const newAccount = { password: 'senha-segura-1', name: 'Maria Ribeiro' };
+
+  test('the preview shows the condo, resident and apartment, never the token or the phone', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const res = await preview(app, token);
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(JSON.parse(text)).toEqual({
+      condoName: CONDO.name,
+      residentName: 'Maria Ribeiro',
+      apt: 'Apto 302',
+      email: 'maria@email.com',
+      accountExists: false,
+    });
+    expect(text).not.toContain(token);
+    expect(text).not.toContain('90000-0001');
+    const unknown = await preview(app, 'nao-existe');
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ error: 'Convite inválido ou expirado' });
+  });
+
+  test('an e-mail invite with a new account logs in verified with the condo listed', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const res = await accept(app, token, newAccount);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    const me = await app.request('/me', { headers: { Cookie: cookieOf(res) } });
+    expect(me.status).toBe(200);
+    expect(await count("invitations WHERE status = 'aceito'")).toBe(1);
+  });
+
+  test('accept is single use', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+    await accept(app, token, newAccount);
+
+    const again = await accept(app, token, { ...newAccount, email: 'outra@x.com' });
+
+    expect(again.status).toBe(404);
+    expect(await again.json()).toEqual({ error: 'Convite inválido ou expirado' });
+    expect((await preview(app, token)).status).toBe(404);
+  });
+
+  test('the legacy derived login of that resident gets 401 after acceptance', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    expect(
+      (await login(app, residentCredentials.username, residentCredentials.password)).status,
+    ).toBe(200);
+    const token = await invite(app);
+
+    await accept(app, token, newAccount);
+
+    const legacy = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(legacy.status).toBe(401);
+    expect(await count("condo_roles WHERE user_id = 'u-maria' AND active")).toBe(0);
+  });
+
+  test('existing account must authenticate', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await insertEmailUser('ana@x.com', 'senha-da-ana');
+    const token = await invite(app, { email: 'ana@x.com' });
+
+    const preview1 = (await (await preview(app, token)).json()) as { accountExists: boolean };
+    const wrong = await accept(app, token, { password: 'errada' });
+
+    expect(preview1.accountExists).toBe(true);
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({ error: 'Usuário ou senha inválidos' });
+    expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+
+    const right = await accept(app, token, { password: 'senha-da-ana' });
+
+    expect(right.status).toBe(200);
+    expect(await right.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect((await app.request('/me', { headers: { Cookie: cookieOf(right) } })).status).toBe(200);
+  });
+
+  test('a WhatsApp invite with a new account waits for the e-mail; claim activates on confirmation', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const token = await whatsappInvite(app);
+
+    const res = await accept(app, token, { ...newAccount, email: 'Maria.Nova@x.com' });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+    const confirmToken =
+      /confirmar-email\/([\w-]+)/.exec(sender.lastTo('maria.nova@x.com')?.text ?? '')?.[1] ?? '';
+    const confirmed = await app.request('/auth/email/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: confirmToken, password: newAccount.password }),
+    });
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    const legacy = await login(app, residentCredentials.username, residentCredentials.password);
+    expect(legacy.status).toBe(401);
+  });
+
+  test('a WhatsApp invite requires the e-mail in the body', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+
+    expect((await accept(app, token, newAccount)).status).toBe(400);
+  });
+
+  test('claimed invite cannot be claimed again', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'primeira@x.com' });
+
+    const second = await accept(app, token, { ...newAccount, email: 'segunda@x.com' });
+
+    expect(second.status).toBe(404);
+    expect(await count("users WHERE email = 'segunda@x.com'")).toBe(0);
+  });
+
+  test('a verified login retries the activation of claimed invitations', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await whatsappInvite(app);
+    await accept(app, token, { ...newAccount, email: 'primeira@x.com' });
+    await pool.query("UPDATE users SET email_verified_at = now() WHERE email = 'primeira@x.com'");
+
+    const res = await loginWith(app, { login: 'primeira@x.com', password: newAccount.password });
+
+    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+  });
+
+  test('an invite for a resident who moved out is invalid, and new ones are refused', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+    await makePostgresRepositories(pool).forCondo(TEST_CONDO_ID).residents.deactivate('r-1');
+
+    const res = await accept(app, token, newAccount);
+    const again = await app.request(`${P}/residents/r-1/invitation`, {
+      method: 'POST',
+      headers: await adminHeaders(app),
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(404);
+    expect((await preview(app, token)).status).toBe(404);
+    expect(again.status).toBe(409);
+    expect(await again.json()).toEqual({ error: 'Morador inativo' });
+  });
+
+  test('an expired invite is invalid', async () => {
+    let now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const token = await invite(app);
+    now = new Date('2026-10-30T12:00:00.000Z');
+
+    expect((await accept(app, token, newAccount)).status).toBe(404);
+  });
+
+  test('preview and accept share the sign-up limiter', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const token = await invite(app);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 10; i += 1) statuses.push((await preview(app, token, '7.7.7.7')).status);
+    const blocked = await accept(app, token, newAccount, '7.7.7.7');
+    const signup = await app.request('/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '7.7.7.7' },
+      body: JSON.stringify({ name: 'Ana', email: 'ana@x.com', password: 'senha-segura-1' }),
+    });
+
+    expect(statuses).toEqual(Array(10).fill(200));
+    expect(blocked.status).toBe(429);
+    expect(signup.status).toBe(429);
+  });
+});

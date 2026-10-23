@@ -8,7 +8,9 @@ import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
 import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
+import { publicInvitationRoutes } from './invitations/adapters/http/public-routes';
 import { invitationRoutes } from './invitations/adapters/http/routes';
+import { activateClaimedInvitations } from './invitations/app/activate-claimed-invitations';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
@@ -94,20 +96,44 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
 
   const auth = authMiddleware((userId) => users.sessionVersionOf(userId));
   const loginLimiter = createRateLimiter();
+  const signupLimiter = createRateLimiter(SIGNUP_LIMIT);
+  const condosFor = (userId: string) => listMyCondos(condos, userId);
+  const invitationAccess = {
+    invitations: repos.invitationTokens,
+    condos,
+    users,
+    residentsFor: (condoId: string) => repos.forCondo(condoId).residents,
+    now,
+  };
+  const activateClaimed = (userId: string) => activateClaimedInvitations(invitationAccess, userId);
   app.route(
     '/auth',
     authRoutes({
       auth,
       users,
       hasher,
-      condosFor: (userId) => listMyCondos(condos, userId),
+      condosFor,
       limiter: loginLimiter,
       tokens: authTokens,
       email,
       appUrl: config.appUrl,
       now,
-      signupLimiter: createRateLimiter(SIGNUP_LIMIT),
-      afterEmailConfirmed: async () => undefined,
+      signupLimiter,
+      afterEmailConfirmed: activateClaimed,
+      onVerifiedLogin: activateClaimed,
+    }),
+  );
+  app.route(
+    '/auth/invitations',
+    publicInvitationRoutes({
+      ...invitationAccess,
+      hasher,
+      tokens: authTokens,
+      email,
+      appUrl: config.appUrl,
+      activateClaimed,
+      condosFor,
+      limiter: signupLimiter,
     }),
   );
   app.route('/me', meRoutes({ auth, condos, users }));

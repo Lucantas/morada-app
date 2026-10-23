@@ -23,4 +23,9 @@ export interface CondoRepository {
   create(input: CreateCondominiumInput): Promise<Condominium>;
   createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }>;
   grant(input: CondoGrant): Promise<void>;
+  deactivateResidentGrants(
+    condominiumId: string,
+    residentId: string,
+    exceptUserId: string,
+  ): Promise<void>;
 }

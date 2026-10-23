@@ -425,4 +425,15 @@ CREATE TABLE invitations (
 CREATE INDEX idx_invitations_condo_resident ON invitations (condominium_id, resident_id);
 `,
   },
+  {
+    id: '023_one_pending_invitation',
+    sql: `
+UPDATE invitations SET status = 'revogado'
+WHERE status = 'pendente' AND id NOT IN (
+  SELECT DISTINCT ON (resident_id) id FROM invitations
+  WHERE status = 'pendente' ORDER BY resident_id, created_at DESC
+);
+CREATE UNIQUE INDEX idx_invitations_one_pending ON invitations (resident_id) WHERE status = 'pendente';
+`,
+  },
 ];

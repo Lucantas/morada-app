@@ -297,3 +297,45 @@ describe('migrating an empty database', () => {
     expect(settings.rows).toEqual([{ monthly_fee_cents: 15000, due_day: 15 }]);
   });
 });
+
+describe('023 keeps one pending invitation per resident', () => {
+  beforeAll(async () => {
+    await recreateSchema();
+    await migrateTo(pool, '022_invitations');
+    await pool.query(
+      "INSERT INTO users (id, username, password_hash, role) VALUES ('u-admin', 'admin', 'x', 'admin')",
+    );
+    await pool.query(
+      "INSERT INTO residents (id, name, phone, email, status, condominium_id) VALUES ('r-1', 'Lúcia', '', '', 'em_dia', 'condo-legacy')",
+    );
+    for (const [id, createdAt] of [
+      ['inv-old', '2026-10-01T00:00:00Z'],
+      ['inv-new', '2026-10-02T00:00:00Z'],
+    ]) {
+      await pool.query(
+        `INSERT INTO invitations (id, condominium_id, resident_id, role, token_hash, status, expires_at, created_by, created_at)
+         VALUES ($1, 'condo-legacy', 'r-1', 'morador', $1, 'pendente', '2099-01-01', 'u-admin', $2)`,
+        [id, createdAt],
+      );
+    }
+    await migrate(pool);
+  });
+
+  test('revokes the older duplicates and keeps the newest pending', async () => {
+    const { rows } = await pool.query('SELECT id, status FROM invitations ORDER BY id');
+
+    expect(rows).toEqual([
+      { id: 'inv-new', status: 'pendente' },
+      { id: 'inv-old', status: 'revogado' },
+    ]);
+  });
+
+  test('a second pending invitation for the same resident is rejected', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO invitations (id, condominium_id, resident_id, role, token_hash, status, expires_at, created_by)
+         VALUES ('inv-dup', 'condo-legacy', 'r-1', 'morador', 'inv-dup', 'pendente', '2099-01-01', 'u-admin')`,
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+});

@@ -51,3 +51,9 @@ export function createRateLimiter(opts?: {
     },
   };
 }
+
+export function consumeAttempt(limiter: RateLimiter, key: string, now: number): boolean {
+  if (!limiter.check(key, now).allowed) return false;
+  limiter.fail(key, now);
+  return true;
+}

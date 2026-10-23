@@ -280,6 +280,36 @@ export function runCondoRepositoryContract(
       expect((await repo.accessFor('u-1', 'condo-a'))?.role).toBe('administrador');
     });
 
+    test('deactivateResidentGrants retires the other grants of that resident in that condo only', async () => {
+      const { repo, pool } = await makeRepo();
+      for (const id of ['u-legacy', 'u-new', 'u-neighbor']) await insertUser(pool, id);
+      await createTestCondo(pool, 'condo-a', { name: 'A' });
+      await createTestCondo(pool, 'condo-b', { name: 'B' });
+      await insertOccupiedResident(pool, 'condo-a', 'r-1');
+      await insertOccupiedResident(pool, 'condo-a', 'r-2');
+      await insertOccupiedResident(pool, 'condo-b', 'r-b');
+      const morador = (condominiumId: string, userId: string, residentId: string) =>
+        repo.grant({ condominiumId, userId, role: 'morador', residentId });
+      await morador('condo-a', 'u-legacy', 'r-1');
+      await morador('condo-a', 'u-new', 'r-1');
+      await morador('condo-a', 'u-neighbor', 'r-2');
+      await morador('condo-b', 'u-legacy', 'r-b');
+
+      await repo.deactivateResidentGrants('condo-a', 'r-1', 'u-new');
+
+      const { rows } = await pool.query(
+        'SELECT condominium_id, user_id, active FROM condo_roles ORDER BY condominium_id, user_id',
+      );
+      expect(rows).toEqual([
+        { condominium_id: 'condo-a', user_id: 'u-legacy', active: false },
+        { condominium_id: 'condo-a', user_id: 'u-neighbor', active: true },
+        { condominium_id: 'condo-a', user_id: 'u-new', active: true },
+        { condominium_id: 'condo-b', user_id: 'u-legacy', active: true },
+      ]);
+      expect(await repo.accessFor('u-legacy', 'condo-a')).toBeNull();
+      expect((await repo.accessFor('u-new', 'condo-a'))?.residentId).toBe('r-1');
+    });
+
     test('morador whose resident lives in another condo has no access', async () => {
       const { repo, pool } = await makeRepo();
       await insertUser(pool, 'u-1');

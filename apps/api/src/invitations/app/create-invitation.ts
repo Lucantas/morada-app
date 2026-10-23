@@ -4,7 +4,11 @@ import { generateToken, hashToken } from '../../platform/tokens';
 import type { ResidentRepository } from '../../residents/domain/resident-repository';
 import { normalizeEmail, emailSchema } from '../../users/domain/email';
 import { invitationLink, invitationMessage } from '../../users/app/emails';
-import { InvitationCondoNotFoundError, InvitationResidentNotFoundError } from '../domain/errors';
+import {
+  InactiveResidentError,
+  InvitationCondoNotFoundError,
+  InvitationResidentNotFoundError,
+} from '../domain/errors';
 import { invitationExpiry, type InvitationStatus } from '../domain/invitation';
 import type { CondoInvitationRepository } from '../domain/invitation-repository';
 import { invitationWhatsappUrl } from '../domain/whatsapp';
@@ -45,6 +49,7 @@ export async function createInvitation(
 ): Promise<CreatedInvitation> {
   const resident = await deps.residents.getById(residentId);
   if (!resident) throw new InvitationResidentNotFoundError(residentId);
+  if (!resident.active) throw new InactiveResidentError();
   const condo = await deps.condos.getById(condominiumId);
   if (!condo) throw new InvitationCondoNotFoundError();
   const email = resolveEmail(requestedEmail, resident.email);

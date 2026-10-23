@@ -191,6 +191,18 @@ export class PostgresCondoRepository implements CondoRepository {
     );
   }
 
+  async deactivateResidentGrants(
+    condominiumId: string,
+    residentId: string,
+    exceptUserId: string,
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE condo_roles SET active = FALSE
+       WHERE condominium_id = $1 AND resident_id = $2 AND user_id <> $3 AND active`,
+      [condominiumId, residentId, exceptUserId],
+    );
+  }
+
   private async inTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {
