@@ -61,3 +61,11 @@ export class InvalidLinkError extends Error {
     this.name = 'InvalidLinkError';
   }
 }
+
+export class UnknownUserError extends Error {
+  readonly status = 404;
+  constructor(username: string) {
+    super(`Usuário não encontrado: ${username}`);
+    this.name = 'UnknownUserError';
+  }
+}

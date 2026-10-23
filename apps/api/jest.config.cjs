@@ -17,6 +17,7 @@ module.exports = {
     'src/**/*.ts',
     '!src/main.ts',
     '!src/migrate-main.ts',
+    '!src/set-user-email.ts',
     '!src/**/*.d.ts',
     '!src/**/*.contract.ts',
     '!src/test-support/**',

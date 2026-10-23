@@ -22,7 +22,7 @@ export DATABASE_URL
 # `morada_test` DB — never the app's `morada` data. Nothing auto-reseeds `morada`.
 TEST_DB_URL ?= postgres://morada:morada@localhost:5433/morada_test
 
-.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check db-up db-down e2e spec-gate spec-index new-feature
+.PHONY: help install start start-lan start-tunnel start-backend start-app build test test-watch coverage typecheck lint format format-check check reset-db clean api-dev api-test api-typecheck api-lint api-check set-user-email db-up db-down e2e spec-gate spec-index new-feature
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -107,6 +107,10 @@ api-lint: ## Run ESLint on the API (includes architecture boundaries)
 	$(API) lint
 
 api-check: api-typecheck api-lint api-test ## Run every API gate
+
+set-user-email: db-up ## Set + verify a legacy user's e-mail: make set-user-email username=admin email=a@b.com
+	@test -n "$(username)" -a -n "$(email)" || (echo "usage: make set-user-email username=<legacy> email=<e-mail>" && exit 1)
+	$(API) set-user-email $(username) $(email)
 
 db-up: ## Start the local Postgres (docker compose) the API + tests run against
 	docker compose up -d --wait

@@ -17,6 +17,11 @@ All operational data is condominium-scoped; one phone-framed UI.
 - `Condominium` — an independent building; every operational row carries its `condominium_id`
 - `OrgMember` — user ↔ organization link, role `owner` or `member`, `active` flag
 - `CondoRole` — user ↔ condominium link, role `administrador` / `sindico` / `morador`, `active` flag
+- `User` — a login; signs in by e-mail (legacy derived logins keep a `username`
+  until the resident accepts an invitation). Never call it `Account`.
+- `Invitation` — an admin's invite for a resident to take a `morador` grant;
+  `pendente` / `aceito` / `expirado` / `revogado`, one pending per resident
+- `AuthToken` — a single-use e-mailed link (`confirm_email` or `reset_password`)
 - `Apartment` — the stable unit and ledger anchor (`Apto 302`); survives resident
   turnover. **The apartment is the key, never the resident's name/login.**
 - `Resident` — a person; belongs to an apartment via an `Occupancy`
@@ -28,6 +33,9 @@ All operational data is condominium-scoped; one phone-framed UI.
 - `Notice` — a communication the admin sends to residents (`aviso`)
 - `Message` — a resident→admin message in the admin inbox
 - `CondoBalance` — condominium financial summary (saldo, entradas, contas pagas)
+
+The web identity flows (login, sign-up, confirmation, reset, invitation accept)
+live in `apps/web/src/features/auth`.
 
 See [docs/DATA-MODEL.md](docs/DATA-MODEL.md) for the apartment/resident/occupancy spec.
 
@@ -83,4 +91,5 @@ Monorepo (pnpm workspaces): `apps/web` is the app. Run commands as
 - `make start` — full stack (API :8787 + web :5173 wired to it); `make start-backend` /
   `make start-app` run the pieces (the web always targets the real API)
 - `make test` / `make coverage` — web Jest (gate = 80%); `make api-test` for the API
+- `make set-user-email username=… email=…` — set + verify a legacy user's e-mail
 - `make check` — every web gate (hooks); `make api-check` — every API gate

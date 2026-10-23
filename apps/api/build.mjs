@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 
 await build({
-  entryPoints: ['src/main.ts', 'src/migrate-main.ts'],
+  entryPoints: ['src/main.ts', 'src/migrate-main.ts', 'src/set-user-email.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',

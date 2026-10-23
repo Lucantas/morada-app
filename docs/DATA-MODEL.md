@@ -134,3 +134,56 @@ Nothing is granted when the condominium or its organization is inactive.
 The session JWT identifies the user; the current condominium comes from the
 route (`/api/condos/:condoId/...`), and login returns `{ condos }` (the
 condominiums the user can enter, with the resolved role).
+
+## Accounts and invitations (migrations 019–023)
+
+### Users (`users`)
+
+Login identity. New accounts sign in by e-mail; legacy derived logins keep their
+`username` until the resident accepts an invitation.
+
+| Column              | Notes                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `username`          | nullable (019); legacy derived login, e.g. `lucia303`                                                                     |
+| `email`             | nullable, normalized (`trim().toLowerCase()`); partial unique index `idx_users_email`                                     |
+| `name`              | nullable display name                                                                                                     |
+| `email_verified_at` | set by e-mail confirmation (needs the account password) or by `set-user-email`                                            |
+| `session_version`   | (021) the JWT carries it as `sv`; a mismatch is a 401. Bumped by password reset, e-mail confirmation and sign-up takeover |
+
+Sign-up over an **unverified** e-mail replaces its credentials (takeover) and
+releases its invite claims; over a **verified** one the owner is told someone
+tried, with a reset link.
+
+### AuthToken (`auth_tokens`, 020)
+
+Single-use e-mail links. Only the SHA-256 hex of the token is stored.
+
+| Column                  | Notes                                            |
+| ----------------------- | ------------------------------------------------ |
+| `user_id`               | → `users.id`                                     |
+| `kind`                  | `confirm_email` (24 h) \| `reset_password` (1 h) |
+| `token_hash`            | unique                                           |
+| `expires_at`, `used_at` | `used_at` set on consumption                     |
+
+### Invitation (`invitations`, 022–023)
+
+An admin's invite for a resident to take over a `morador` grant in one condominium.
+
+| Column                     | Notes                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `condominium_id`           | → `condominiums.id`; cross-condo access answers 404                               |
+| `resident_id`              | → `residents.id`                                                                  |
+| `role`                     | `morador` only in SP2                                                             |
+| `email`                    | optional target address                                                           |
+| `token_hash`               | unique SHA-256 hex; the raw token is shown once at creation (7 days)              |
+| `status`                   | `pendente` \| `aceito` \| `revogado`; `expirado` is derived from `expires_at`     |
+| `created_by`, `claimed_by` | → `users.id`; `claimed_by` is a WhatsApp invite claimed by an unconfirmed account |
+| `accepted_at`              |                                                                                   |
+
+`idx_invitations_one_pending` (023) allows **one `pendente` invitation per
+resident**; resending revokes the previous one. Nothing is deleted: invitations
+change `status`.
+
+Accepting retires the resident's legacy derived-login grant (`condo_roles.active`
+flips to 0). A claimed WhatsApp invite activates on e-mail confirmation and is
+retried at login.

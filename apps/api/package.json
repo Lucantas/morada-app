@@ -8,6 +8,7 @@
     "start": "tsx src/main.ts",
     "build": "node build.mjs",
     "migrate": "node dist/migrate-main.js",
+    "set-user-email": "tsx src/set-user-email.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
