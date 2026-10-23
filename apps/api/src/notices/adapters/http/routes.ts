@@ -5,6 +5,7 @@ import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { createNotice } from '../../app/create-notice';
 import { dismissNotice } from '../../app/dismiss-notice';
 import { listNotices } from '../../app/list-notices';
+import { removeNotice } from '../../app/remove-notice';
 import { noticeDraftSchema } from '../../domain/notice';
 import type { NoticeRepository } from '../../domain/notice-repository';
 
@@ -32,7 +33,7 @@ export function noticeRoutes(scope: Scoped<NoticeRoutesDeps>) {
   );
 
   app.delete('/:id', requireRole('admin'), async (c) => {
-    await scope(c.get('condoId')).notices.remove(c.req.param('id'));
+    await removeNotice(scope(c.get('condoId')).notices, c.req.param('id'));
     return c.body(null, 204);
   });
 

@@ -110,6 +110,7 @@ export class PostgresReceiptRepository implements ReceiptRepository {
     let proofKey: string | null = null;
     let proofDataUrl: string | null = null;
     if (isFreshUpload && this.storage) {
+      await this.assertNotForeign(receipt.id);
       proofKey = `condos/${this.condominiumId}/receipts/${receipt.id}`;
       await this.storage.put(proofKey, receipt.proofDataUrl as string);
     } else if (touchesProof) {
@@ -180,5 +181,13 @@ export class PostgresReceiptRepository implements ReceiptRepository {
       'UPDATE receipts SET visible = false WHERE id = $1 AND condominium_id = $2',
       [id, this.condominiumId],
     );
+  }
+
+  private async assertNotForeign(id: string): Promise<void> {
+    const { rows } = await this.pool.query(
+      'SELECT 1 FROM receipts WHERE id = $1 AND condominium_id <> $2',
+      [id, this.condominiumId],
+    );
+    if (rows.length > 0) throw new ReceiptNotFoundError(id);
   }
 }

@@ -13,3 +13,11 @@ export class CondoGrantValidationError extends Error {
     this.name = 'CondoGrantValidationError';
   }
 }
+
+export class CondoValidationError extends Error {
+  readonly status = 400;
+  constructor() {
+    super('Dados inválidos');
+    this.name = 'CondoValidationError';
+  }
+}
