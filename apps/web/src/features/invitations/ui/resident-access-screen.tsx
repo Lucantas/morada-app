@@ -55,7 +55,9 @@ export function ResidentAccessScreen({ residentId, repository, residents, onBack
               view={invitation.data ?? null}
               repository={repository}
             />
-            <LegacyLoginCard residentId={residentId} repository={repository} />
+            {invitation.data?.status !== 'aceito' && (
+              <LegacyLoginCard residentId={residentId} repository={repository} />
+            )}
           </>
         )}
       </ScreenBody>
@@ -88,9 +90,9 @@ function InvitationPanel({
   const revoke = useMutation({
     mutationFn: () => repository.revoke(residentId),
     onSuccess: () => {
-      setConfirmingRevoke(false);
       void refresh();
     },
+    onSettled: () => setConfirmingRevoke(false),
   });
 
   if (created) return <InviteShare created={created} />;
@@ -132,7 +134,7 @@ function InvitationPanel({
     <>
       <StateCard
         title={`Convite pendente · vence em ${formatDayMonth(view.expiresAt)}`}
-        detail={view.email ? `Enviado para ${view.email}` : 'Enviado por link'}
+        detail={view.email ? `Convite para ${view.email}` : 'Convite por link'}
         note="Se o link foi repassado para outra pessoa, gere um novo convite."
       />
       {(inviteError || revoke.isError) && (

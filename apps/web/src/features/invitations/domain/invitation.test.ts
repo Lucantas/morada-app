@@ -34,8 +34,10 @@ describe('invitation schemas', () => {
       expiresAt: '2026-10-30T15:00:00.000Z',
       link: 'https://morada.app/#/convite/abc',
       whatsappUrl: 'https://wa.me/5521999990000?text=oi',
+      emailSent: false,
     });
     expect(created.link).toBe('https://morada.app/#/convite/abc');
+    expect(created.emailSent).toBe(false);
   });
 
   test('parses a preview', () => {

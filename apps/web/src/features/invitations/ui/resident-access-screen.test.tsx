@@ -102,6 +102,37 @@ describe('ResidentAccessScreen', () => {
     expect(await screen.findByRole('button', { name: 'Link copiado!' })).toBeInTheDocument();
   });
 
+  test('an e-mail that could not be sent points to WhatsApp or the link', async () => {
+    renderAccess(
+      fakeInvitationRepository({
+        invite: jest.fn().mockResolvedValue({ ...CREATED_INVITATION, emailSent: false }),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Gerar convite' }));
+
+    expect(
+      await screen.findByText(
+        'Não foi possível enviar o e-mail agora. Envie pelo WhatsApp ou copie o link.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/E-mail enviado para/)).not.toBeInTheDocument();
+  });
+
+  test('a failed copy is explained', async () => {
+    renderAccess();
+    const user = userEvent.setup();
+    jest.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('denied'));
+
+    await user.click(await screen.findByRole('button', { name: 'Gerar convite' }));
+    await user.click(await screen.findByRole('button', { name: 'Copiar link' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Não foi possível copiar' }),
+    ).toBeInTheDocument();
+  });
+
   test('a link-only invite hides the e-mail action', async () => {
     renderAccess(
       fakeInvitationRepository({
@@ -123,6 +154,7 @@ describe('ResidentAccessScreen', () => {
     const user = userEvent.setup();
 
     expect(await screen.findByText('Convite pendente · vence em 30/10')).toBeInTheDocument();
+    expect(screen.getByText('Convite para ana@exemplo.com')).toBeInTheDocument();
     expect(
       screen.getByText('Se o link foi repassado para outra pessoa, gere um novo convite.'),
     ).toBeInTheDocument();
@@ -148,6 +180,24 @@ describe('ResidentAccessScreen', () => {
     expect(repository.revoke).toHaveBeenCalledWith('r-1');
     expect(await screen.findByText('Convite revogado')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Gerar novo convite' })).toBeInTheDocument();
+  });
+
+  test('a failed revoke closes the dialog and shows the error', async () => {
+    renderAccess(
+      fakeInvitationRepository({
+        invitation: jest.fn().mockResolvedValue(PENDING_INVITATION),
+        revoke: jest.fn().mockRejectedValue(new InvitationError('unavailable')),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Revogar' }));
+    await user.click(screen.getByRole('button', { name: 'Revogar convite' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível concluir. Verifique a conexão com o servidor.',
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   test('cancelling the revoke keeps the invite', async () => {
@@ -191,10 +241,7 @@ describe('ResidentAccessScreen', () => {
   test.each([
     ['inactive-resident', 'Este morador não está mais ativo no apartamento.'],
     ['pending-conflict', 'Já existe um convite pendente. Atualize a tela.'],
-    [
-      'email-unavailable',
-      'Envio de e-mail indisponível. Apague o e-mail para gerar um convite só por link.',
-    ],
+    ['not-found', 'Morador não encontrado.'],
     ['unavailable', 'Não foi possível concluir. Verifique a conexão com o servidor.'],
   ] as const)('a %s failure explains itself', async (kind, message) => {
     renderAccess(
@@ -246,6 +293,19 @@ describe('ResidentAccessScreen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Não foi possível redefinir a senha.',
     );
+  });
+
+  test('an accepted invite hides the retired legacy login', async () => {
+    const { repository } = renderAccess(
+      fakeInvitationRepository({
+        invitation: jest.fn().mockResolvedValue({ ...PENDING_INVITATION, status: 'aceito' }),
+        legacyLogin: jest.fn().mockResolvedValue('ana302'),
+      }),
+    );
+
+    expect(await screen.findByText('Acesso ativo por e-mail')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redefinir senha' })).not.toBeInTheDocument();
+    expect(repository.legacyLogin).not.toHaveBeenCalled();
   });
 
   test('without a legacy login there is no reset', async () => {

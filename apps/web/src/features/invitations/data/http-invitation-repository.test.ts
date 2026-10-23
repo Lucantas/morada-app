@@ -18,6 +18,7 @@ const CREATED = {
   ...VIEW,
   link: 'https://morada.app/#/convite/abc',
   whatsappUrl: 'https://wa.me/5521999990000?text=oi',
+  emailSent: true,
 };
 const PREVIEW = {
   condoName: 'Morada',

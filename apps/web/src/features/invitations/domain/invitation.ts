@@ -22,6 +22,7 @@ export type InvitationView = z.infer<typeof invitationViewSchema>;
 export const createdInvitationSchema = invitationViewSchema.extend({
   link: z.string().url(),
   whatsappUrl: z.string().url(),
+  emailSent: z.boolean(),
 });
 export type CreatedInvitation = z.infer<typeof createdInvitationSchema>;
 

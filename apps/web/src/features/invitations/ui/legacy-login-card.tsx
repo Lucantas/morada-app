@@ -4,7 +4,7 @@ import { PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives
 
 import type { InvitationRepository } from '../domain/invitation-repository';
 
-import { CredentialRow } from './copy-button';
+import { CredentialRow } from './credential-row';
 
 type Props = {
   residentId: string;

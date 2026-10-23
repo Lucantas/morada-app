@@ -2,7 +2,11 @@ import { sign } from 'hono/jwt';
 
 import { buildApp } from './compose';
 import { config } from './platform/config';
-import { DisabledEmailSender, type EmailSender } from './platform/email/email-sender';
+import {
+  DisabledEmailSender,
+  EmailDeliveryError,
+  type EmailSender,
+} from './platform/email/email-sender';
 import { InMemoryEmailSender } from './platform/email/in-memory-email-sender';
 import { migrate } from './platform/postgres/migrate';
 import { hashToken } from './platform/tokens';
@@ -2285,6 +2289,7 @@ describe('Resident invitations', () => {
     expect(body).toMatchObject({
       status: 'pendente',
       email: 'maria@email.com',
+      emailSent: true,
       expiresAt: '2026-10-30T12:00:00.000Z',
     });
     expect(body.link).toMatch(new RegExp(`^${APP_URL}/#/convite/[\\w-]{43}$`));
@@ -2335,7 +2340,7 @@ describe('Resident invitations', () => {
     const res = await post(app, '/residents/r-1/invitation', headers);
 
     expect(res.status).toBe(201);
-    expect(((await res.json()) as { email: string | null }).email).toBeNull();
+    expect(await res.json()).toMatchObject({ email: null, emailSent: false });
     expect(sender.sent).toEqual([]);
   });
 
@@ -2365,16 +2370,29 @@ describe('Resident invitations', () => {
     );
   });
 
-  test('the disabled sender fails with 503 when an e-mail is given, and succeeds without one', async () => {
+  test('with e-mail off, an e-mail invite still answers 201 with the link and emailSent false', async () => {
     const app = await makeApp({ email: new DisabledEmailSender() });
-    await setResident('r-1', { email: '' });
     const headers = await adminSession(app);
 
-    const withEmail = await post(app, '/residents/r-1/invitation', headers, { email: 'a@x.com' });
-    const without = await post(app, '/residents/r-1/invitation', headers, {});
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: 'a@x.com' });
 
-    expect(withEmail.status).toBe(503);
-    expect(without.status).toBe(201);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { email: string; emailSent: boolean; link: string };
+    expect(body).toMatchObject({ email: 'a@x.com', emailSent: false });
+    expect(body.link).toMatch(new RegExp(`^${APP_URL}/#/convite/`));
+    const { rows } = await pool.query('SELECT status, email FROM invitations');
+    expect(rows).toEqual([{ status: 'pendente', email: 'a@x.com' }]);
+  });
+
+  test('a failed delivery still answers 201 with emailSent false', async () => {
+    const failing: EmailSender = { send: () => Promise.reject(new EmailDeliveryError()) };
+    const app = await makeApp({ email: failing });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers);
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ email: 'maria@email.com', emailSent: false });
   });
 
   test('GET returns null, then the status without the link or token', async () => {

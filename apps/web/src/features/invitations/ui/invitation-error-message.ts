@@ -12,8 +12,8 @@ const SHARED: Messages = {
   'rate-limited': 'Muitas tentativas, tente mais tarde.',
   'inactive-resident': 'Este morador não está mais ativo no apartamento.',
   'pending-conflict': 'Já existe um convite pendente. Atualize a tela.',
-  'email-unavailable':
-    'Envio de e-mail indisponível. Apague o e-mail para gerar um convite só por link.',
+  'not-found': 'Morador não encontrado.',
+  'email-unavailable': 'Envio de e-mail indisponível. Tente mais tarde.',
 };
 
 const CONNECTION = 'Não foi possível concluir. Verifique a conexão com o servidor.';

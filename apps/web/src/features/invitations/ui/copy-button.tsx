@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { copyText } from '@/shared/lib/clipboard';
 
 const COPIED_FEEDBACK_MS = 2000;
+const COPY_FAILED = 'Não foi possível copiar';
 
 type Props = { value: string; label: string; copiedLabel: string; ariaLabel?: string };
 
 export function CopyButton({ value, label, copiedLabel, ariaLabel }: Props) {
-  const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<'copied' | 'failed' | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -17,17 +18,22 @@ export function CopyButton({ value, label, copiedLabel, ariaLabel }: Props) {
   }, []);
 
   const copy = async () => {
-    await copyText(value);
-    setCopied(true);
+    const next = await copyText(value).then(
+      () => 'copied' as const,
+      () => 'failed' as const,
+    );
+    setFeedback(next);
     if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    timeoutRef.current = window.setTimeout(() => setFeedback(null), COPIED_FEEDBACK_MS);
   };
+
+  const text = feedback === 'copied' ? copiedLabel : feedback === 'failed' ? COPY_FAILED : label;
 
   return (
     <button
       type="button"
       onClick={() => void copy()}
-      aria-label={ariaLabel}
+      aria-label={feedback === null ? ariaLabel : undefined}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -60,52 +66,7 @@ export function CopyButton({ value, label, copiedLabel, ariaLabel }: Props) {
         <rect x="9" y="9" width="13" height="13" rx="2" />
         <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
       </svg>
-      {copied ? copiedLabel : label}
+      {text}
     </button>
-  );
-}
-
-export function CredentialRow({
-  label,
-  value,
-  testId,
-}: {
-  label: string;
-  value: string;
-  testId: string;
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12,
-        padding: '10px 0',
-        borderTop: '1px solid var(--line)',
-      }}
-    >
-      <span style={{ color: 'var(--ink-500)', fontSize: '.86rem' }}>{label}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-        <span
-          data-testid={testId}
-          style={{
-            fontWeight: 600,
-            color: 'var(--ink-900)',
-            fontVariantLigatures: 'none',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {value}
-        </span>
-        <CopyButton
-          value={value}
-          label="Copiar"
-          copiedLabel="Copiado!"
-          ariaLabel={`Copiar ${label}`}
-        />
-      </div>
-    </div>
   );
 }

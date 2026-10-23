@@ -45,13 +45,17 @@ export function InviteShare({ created }: { created: CreatedInvitation }) {
             marginTop: 14,
             padding: '12px 14px',
             borderRadius: 'var(--r-md)',
-            background: 'var(--pago-bg)',
-            border: '1px solid var(--pago-line)',
-            color: 'var(--pago-700)',
+            background: created.emailSent ? 'var(--pago-bg)' : 'var(--atraso-bg)',
+            border: `1px solid ${created.emailSent ? 'var(--pago-line)' : 'var(--atraso-line)'}`,
+            color: created.emailSent ? 'var(--pago-700)' : 'var(--atraso-700)',
           }}
         >
           <strong style={{ display: 'block', marginBottom: 2 }}>Enviar por e-mail</strong>
-          <span style={{ fontSize: '.92rem' }}>{`E-mail enviado para ${created.email}`}</span>
+          <span style={{ fontSize: '.92rem' }}>
+            {created.emailSent
+              ? `E-mail enviado para ${created.email}`
+              : 'Não foi possível enviar o e-mail agora. Envie pelo WhatsApp ou copie o link.'}
+          </span>
         </div>
       )}
     </div>

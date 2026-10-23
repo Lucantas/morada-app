@@ -1,5 +1,10 @@
 import type { CondoRepository } from '../../condos/domain/condo-repository';
-import type { EmailSender } from '../../platform/email/email-sender';
+import {
+  EmailDeliveryError,
+  EmailUnavailableError,
+  type EmailMessage,
+  type EmailSender,
+} from '../../platform/email/email-sender';
 import { generateToken, hashToken } from '../../platform/tokens';
 import type { ResidentRepository } from '../../residents/domain/resident-repository';
 import { normalizeEmail, emailSchema } from '../../users/domain/email';
@@ -28,6 +33,17 @@ export interface CreatedInvitation {
   expiresAt: Date;
   link: string;
   whatsappUrl: string;
+  emailSent: boolean;
+}
+
+async function trySend(email: EmailSender, message: EmailMessage): Promise<boolean> {
+  try {
+    await email.send(message);
+    return true;
+  } catch (error) {
+    if (error instanceof EmailUnavailableError || error instanceof EmailDeliveryError) return false;
+    throw error;
+  }
 }
 
 function resolveEmail(requested: string | undefined, stored: string): string | null {
@@ -61,7 +77,8 @@ export async function createInvitation(
     now,
   );
   const link = invitationLink(deps.appUrl, token);
-  if (email !== null) await deps.email.send(invitationMessage(email, condo.name, link));
+  const emailSent =
+    email !== null && (await trySend(deps.email, invitationMessage(email, condo.name, link)));
 
   return {
     status: invitation.status,
@@ -69,5 +86,6 @@ export async function createInvitation(
     expiresAt: invitation.expiresAt,
     link,
     whatsappUrl: invitationWhatsappUrl(resident.phone, resident.name, condo.name, link),
+    emailSent,
   };
 }

@@ -17,6 +17,7 @@ export const CREATED_INVITATION: CreatedInvitation = {
   ...PENDING_INVITATION,
   link: 'https://morada.app/#/convite/abcDEF0123456789_-xyz',
   whatsappUrl: 'https://wa.me/5521999990000?text=convite',
+  emailSent: true,
 };
 
 export const OPEN_PREVIEW: InvitationPreview = {
