@@ -239,6 +239,16 @@ describe('EntryRouter', () => {
     expect(onLanded).not.toHaveBeenCalled();
   });
 
+  test('"Esqueci a senha" on an invite opens the forgot-password screen', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    renderEntry();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Esqueci a senha' }));
+
+    expect(screen.getByRole('heading', { name: 'Esqueci a senha' })).toBeInTheDocument();
+  });
+
   test('an invalid invite goes back to the login', async () => {
     window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
     renderEntry(

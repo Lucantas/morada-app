@@ -158,6 +158,7 @@ describe('HttpInvitationRepository — public', () => {
     [401, 'invalid-credentials'],
     [400, 'invalid-input'],
     [429, 'rate-limited'],
+    [503, 'email-unavailable'],
     [500, 'unavailable'],
   ])('maps a public %i to %s', async (status, kind) => {
     const publicApi = fakeApi({ post: jest.fn().mockRejectedValue(new ApiError(status, 'x')) });

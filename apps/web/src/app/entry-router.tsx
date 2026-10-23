@@ -88,6 +88,7 @@ export function EntryRouter({ repository, invitations, onLanded, onSignOut, chil
           setInvitedCondo(condoName);
         }}
         onSignIn={() => leavePublicRoute('login')}
+        onForgotPassword={() => leavePublicRoute('forgot')}
       />
     );
   }

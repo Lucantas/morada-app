@@ -22,9 +22,16 @@ type Props = {
   repository: Pick<InvitationRepository, 'preview' | 'accept'>;
   onAccepted: (response: LoginResponse, condoName: string) => void;
   onSignIn: () => void;
+  onForgotPassword: () => void;
 };
 
-export function AcceptInviteScreen({ token, repository, onAccepted, onSignIn }: Props) {
+export function AcceptInviteScreen({
+  token,
+  repository,
+  onAccepted,
+  onSignIn,
+  onForgotPassword,
+}: Props) {
   const preview = useQuery({
     queryKey: ['invitation-preview', token],
     queryFn: () => repository.preview(token),
@@ -69,6 +76,7 @@ export function AcceptInviteScreen({ token, repository, onAccepted, onSignIn }: 
       preview={preview.data}
       repository={repository}
       onAccepted={onAccepted}
+      onForgotPassword={onForgotPassword}
     />
   );
 }
@@ -84,11 +92,13 @@ function AcceptForm({
   preview,
   repository,
   onAccepted,
+  onForgotPassword,
 }: {
   token: string;
   preview: InvitationPreview;
   repository: Pick<InvitationRepository, 'accept'>;
   onAccepted: (response: LoginResponse, condoName: string) => void;
+  onForgotPassword: () => void;
 }) {
   const mode = acceptMode(preview);
   const [email, setEmail] = useState(preview.email ?? '');
@@ -140,6 +150,11 @@ function AcceptForm({
           autoComplete={mode === 'existing-account' ? 'current-password' : 'new-password'}
           placeholder={mode === 'existing-account' ? undefined : 'Pelo menos 8 caracteres'}
         />
+        {mode !== 'new-account' && (
+          <LinkRow>
+            <TextLink onClick={onForgotPassword}>Esqueci a senha</TextLink>
+          </LinkRow>
+        )}
         {mode === 'new-account' && (
           <Field
             label="Confirme a senha"

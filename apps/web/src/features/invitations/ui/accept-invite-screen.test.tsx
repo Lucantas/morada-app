@@ -15,7 +15,13 @@ import { AcceptInviteScreen } from './accept-invite-screen';
 const EMAIL_PREVIEW = { ...OPEN_PREVIEW, email: 'ana@exemplo.com' };
 
 function renderAccept(repository = fakeInvitationRepository()) {
-  const props = { token: 'tok-123', repository, onAccepted: jest.fn(), onSignIn: jest.fn() };
+  const props = {
+    token: 'tok-123',
+    repository,
+    onAccepted: jest.fn(),
+    onSignIn: jest.fn(),
+    onForgotPassword: jest.fn(),
+  };
   renderWithClient(<AcceptInviteScreen {...props} />);
   return props;
 }
@@ -78,6 +84,27 @@ describe('AcceptInviteScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
 
     expect(repository.accept).toHaveBeenCalledWith('tok-123', { password: 'minha-senha' });
+  });
+
+  test.each([
+    ['an existing account', { ...EMAIL_PREVIEW, accountExists: true }],
+    ['an open invite', OPEN_PREVIEW],
+  ])('%s offers "Esqueci a senha" under the password', async (_mode, preview) => {
+    const { onForgotPassword } = renderAccept(withPreview(preview));
+    const user = userEvent.setup();
+
+    await screen.findByLabelText('Senha');
+    await user.click(screen.getByRole('button', { name: 'Esqueci a senha' }));
+
+    expect(onForgotPassword).toHaveBeenCalled();
+  });
+
+  test('a new account does not offer "Esqueci a senha"', async () => {
+    renderAccept(withPreview(EMAIL_PREVIEW));
+
+    await screen.findByLabelText('Confirme a senha');
+
+    expect(screen.queryByRole('button', { name: 'Esqueci a senha' })).not.toBeInTheDocument();
   });
 
   test('a wrong password for an existing account is explained', async () => {
@@ -160,6 +187,7 @@ describe('AcceptInviteScreen', () => {
   test.each([
     ['invalid-input', 'Confira os dados informados.'],
     ['rate-limited', 'Muitas tentativas, tente mais tarde.'],
+    ['email-unavailable', 'Envio de e-mail indisponível. Tente mais tarde.'],
     ['unavailable', 'Não foi possível concluir. Verifique a conexão com o servidor.'],
   ] as const)('a %s failure on accept is explained', async (kind, message) => {
     renderAccept(
