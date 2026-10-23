@@ -2,7 +2,7 @@ import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import { createTestCondo } from '../../../test-support/condos';
 import { insertRows, resetPg } from '../../../test-support/pg';
-import { MonthlyReceiptExistsError } from '../../domain/errors';
+import { MonthlyReceiptExistsError, ReceiptNotFoundError } from '../../domain/errors';
 import type { ProofBytes, ProofStorage } from '../../domain/proof-storage';
 import { runReceiptRepositoryContract } from '../receipt-repository.contract';
 
@@ -215,6 +215,21 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
     const fetched = await repo.getById('rc-1');
     expect(fetched?.hasProof).toBe(true);
     expect(fetched?.proofDataUrl).toBeUndefined();
+  });
+
+  test('save of a foreign id stores nothing in storage and throws not found', async () => {
+    await createTestCondo(pool, 'condo-other');
+    const other = new PostgresReceiptRepository(pool, 'condo-other', null);
+    await other.save({ ...BASE_RECEIPT });
+    const storage = new FakeProofStorage();
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
+
+    await expect(repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL })).rejects.toThrow(
+      ReceiptNotFoundError,
+    );
+
+    expect(storage.has(`condos/${CONDO}/receipts/rc-1`)).toBe(false);
+    expect(storage.has('condos/condo-other/receipts/rc-1')).toBe(false);
   });
 
   test('save falls back to storing the base64 inline when storage is null, still reporting hasProof: true', async () => {

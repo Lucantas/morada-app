@@ -429,7 +429,7 @@ describe('Morada API', () => {
 
     expect(((await list.json()) as { id: string }[]).map((n) => n.id)).not.toContain('n-foreign');
     expect(dismiss.status).toBe(404);
-    expect(remove.status).toBe(204);
+    expect(remove.status).toBe(404);
     expect((await other.notices.getById('n-foreign'))?.title).toBe('Aviso alheio');
     const dismissals = await pool.query('SELECT 1 FROM notice_dismissals WHERE notice_id = $1', [
       'n-foreign',

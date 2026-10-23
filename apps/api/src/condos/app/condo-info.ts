@@ -1,6 +1,6 @@
 import { condominiumSchema } from '../domain/condominium';
 import type { CondoRepository } from '../domain/condo-repository';
-import { CondoNotFoundError, CondoGrantValidationError } from '../domain/errors';
+import { CondoNotFoundError, CondoValidationError } from '../domain/errors';
 
 export type CondoInfo = { id: string; name: string };
 
@@ -21,7 +21,7 @@ export async function renameCondo(
   const parsed = condominiumSchema.shape.name.safeParse(
     typeof input === 'object' && input !== null ? (input as { name?: unknown }).name : undefined,
   );
-  if (!parsed.success) throw new CondoGrantValidationError('Dados inválidos');
+  if (!parsed.success) throw new CondoValidationError();
   const condo = await condos.rename(condoId, parsed.data);
   return { id: condo.id, name: condo.name };
 }
