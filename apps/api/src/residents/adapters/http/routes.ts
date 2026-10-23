@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import type { Scoped } from '../../../platform/condo-scope';
 import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { generateTempPassword } from '../../../platform/temp-password';
 import type { ReceiptRepository } from '../../../receipts/domain/receipt-repository';
@@ -19,20 +20,23 @@ interface ResidentRoutesDeps {
   residents: ResidentRepository;
   receipts: ReceiptRepository;
   users: UserRepository;
-  hasher: PasswordHasher;
 }
 
-export function residentRoutes({ residents, receipts, users, hasher }: ResidentRoutesDeps) {
+export function residentRoutes(scope: Scoped<ResidentRoutesDeps>, hasher: PasswordHasher) {
   const app = new Hono<ApiEnv>();
 
   // A resident reads their own record by their JWT subject (before the
   // admin-only routes below, which would otherwise 403 this).
-  app.get('/me', async (c) => c.json(await getResident(residents, receipts, c.get('sub'))));
+  app.get('/me', async (c) => {
+    const { residents, receipts } = scope(c.get('condoId'));
+    return c.json(await getResident(residents, receipts, c.get('sub')));
+  });
 
   // Admin-only: read a resident's login state — the existing username (never the
   // hash) and the login derived from name + apartment. Null when the resident is
   // gone. Registered before '/:id' below or they would be shadowed by its param.
   app.get('/:id/login', requireRole('admin'), async (c) => {
+    const { residents, users } = scope(c.get('condoId'));
     const id = c.req.param('id');
     const resident = await residents.getById(id);
     if (!resident) return c.json(null);
@@ -43,35 +47,44 @@ export function residentRoutes({ residents, receipts, users, hasher }: ResidentR
     });
   });
   app.post('/:id/login/reset', requireRole('admin'), async (c) => {
+    const { users } = scope(c.get('condoId'));
     const tempPassword = generateTempPassword();
     const user = await resetResidentPassword(users, hasher, c.req.param('id'), tempPassword);
     return c.json({ username: user.username, tempPassword });
   });
 
-  app.get('/', requireRole('admin'), async (c) => c.json(await listResidents(residents, receipts)));
+  app.get('/', requireRole('admin'), async (c) => {
+    const { residents, receipts } = scope(c.get('condoId'));
+    return c.json(await listResidents(residents, receipts));
+  });
 
-  app.get('/:id', requireRole('admin'), async (c) =>
-    c.json(await getResident(residents, receipts, c.req.param('id'))),
-  );
+  app.get('/:id', requireRole('admin'), async (c) => {
+    const { residents, receipts } = scope(c.get('condoId'));
+    return c.json(await getResident(residents, receipts, c.req.param('id')));
+  });
 
   app.post('/', requireRole('admin'), async (c) => {
+    const { residents } = scope(c.get('condoId'));
     const draft = residentDraftSchema.parse(await c.req.json());
     // POST always creates: ignore any client-supplied id so it can't overwrite.
     return c.json(await saveResident(residents, { ...draft, id: undefined }), 201);
   });
 
   app.put('/:id', requireRole('admin'), async (c) => {
+    const { residents } = scope(c.get('condoId'));
     const draft = residentDraftSchema.parse({ ...(await c.req.json()), id: c.req.param('id') });
     return c.json(await saveResident(residents, draft));
   });
 
   // Move-out: free the apartment for the next occupant (history preserved).
   app.post('/:id/deactivate', requireRole('admin'), async (c) => {
+    const { residents } = scope(c.get('condoId'));
     await deactivateResident(residents, c.req.param('id'));
     return c.body(null, 204);
   });
 
   app.put('/:id/status', requireRole('admin'), async (c) => {
+    const { residents } = scope(c.get('condoId'));
     await overrideStatus(residents, c.req.param('id'), await c.req.json());
     return c.json({ ok: true });
   });

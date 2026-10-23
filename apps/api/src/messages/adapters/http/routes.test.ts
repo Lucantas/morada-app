@@ -41,7 +41,10 @@ function mount(
     c.set('sub', 't-1');
     await next();
   });
-  app.route('/threads', threadRoutes(repo, lookup));
+  app.route(
+    '/threads',
+    threadRoutes(repo, () => lookup),
+  );
   return app;
 }
 

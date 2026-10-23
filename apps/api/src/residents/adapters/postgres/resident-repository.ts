@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { Pool, PoolClient } from 'pg';
 
-import { ApartmentOccupiedError } from '../../domain/errors';
+import { ApartmentOccupiedError, ResidentNotFoundError } from '../../domain/errors';
 import { residentSchema, type Resident } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
 
@@ -23,7 +23,8 @@ const SELECT = `
          ar.apartment_id AS apartment_id, a.label AS apt, ar.active AS active
   FROM residents r
   JOIN apartment_residents ar ON ar.resident_id = r.id
-  JOIN apartments a ON a.id = ar.apartment_id`;
+  JOIN apartments a ON a.id = ar.apartment_id
+  WHERE r.condominium_id = $1 AND a.condominium_id = $1`;
 
 function toResident(row: ResidentRow): Resident {
   return residentSchema.parse({
@@ -40,24 +41,31 @@ function toResident(row: ResidentRow): Resident {
 }
 
 export class PostgresResidentRepository implements ResidentRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly condominiumId: string,
+  ) {}
 
   async list(): Promise<Resident[]> {
     const { rows } = await this.pool.query<ResidentRow>(
-      `${SELECT} WHERE ar.active ORDER BY a.label`,
+      `${SELECT} AND ar.active ORDER BY a.label`,
+      [this.condominiumId],
     );
     return rows.map(toResident);
   }
 
   async getById(id: string): Promise<Resident | null> {
-    const { rows } = await this.pool.query<ResidentRow>(`${SELECT} WHERE r.id = $1`, [id]);
+    const { rows } = await this.pool.query<ResidentRow>(`${SELECT} AND r.id = $2`, [
+      this.condominiumId,
+      id,
+    ]);
     return rows[0] ? toResident(rows[0]) : null;
   }
 
   async listByApartment(apartmentId: string): Promise<Resident[]> {
     const { rows } = await this.pool.query<ResidentRow>(
-      `${SELECT} WHERE ar.apartment_id = $1 ORDER BY ar.active DESC`,
-      [apartmentId],
+      `${SELECT} AND ar.apartment_id = $2 ORDER BY ar.active DESC`,
+      [this.condominiumId, apartmentId],
     );
     return rows.map(toResident);
   }
@@ -66,8 +74,8 @@ export class PostgresResidentRepository implements ResidentRepository {
     const { rows } = await this.pool.query<{ apartmentId: string; apt: string }>(
       `SELECT ar.apartment_id AS "apartmentId", a.label AS apt
        FROM apartment_residents ar JOIN apartments a ON a.id = ar.apartment_id
-       WHERE ar.resident_id = $1`,
-      [residentId],
+       WHERE ar.resident_id = $1 AND a.condominium_id = $2`,
+      [residentId, this.condominiumId],
     );
     return rows[0] ?? null;
   }
@@ -80,11 +88,18 @@ export class PostgresResidentRepository implements ResidentRepository {
     email: string;
     status: Resident['status'];
   }): Promise<Resident> {
-    const exists = await this.pool.query('SELECT 1 FROM residents WHERE id = $1', [input.id]);
-    if ((exists.rowCount ?? 0) > 0) {
+    const exists = await this.pool.query<{ condominium_id: string }>(
+      'SELECT condominium_id FROM residents WHERE id = $1',
+      [input.id],
+    );
+    const owner = exists.rows[0]?.condominium_id;
+    if (owner !== undefined && owner !== this.condominiumId) {
+      throw new ResidentNotFoundError(input.id);
+    }
+    if (owner !== undefined) {
       await this.pool.query(
-        'UPDATE residents SET name = $2, phone = $3, email = $4, status = $5 WHERE id = $1',
-        [input.id, input.name, input.phone, input.email, input.status],
+        'UPDATE residents SET name = $2, phone = $3, email = $4, status = $5 WHERE id = $1 AND condominium_id = $6',
+        [input.id, input.name, input.phone, input.email, input.status, this.condominiumId],
       );
       return this.getByIdOrThrow(input.id);
     }
@@ -99,8 +114,8 @@ export class PostgresResidentRepository implements ResidentRepository {
       );
       if ((occupied.rowCount ?? 0) > 0) throw new ApartmentOccupiedError(input.apt);
       await client.query(
-        'INSERT INTO residents (id, name, phone, email, status) VALUES ($1, $2, $3, $4, $5)',
-        [input.id, input.name, input.phone, input.email, input.status],
+        'INSERT INTO residents (id, name, phone, email, status, condominium_id) VALUES ($1, $2, $3, $4, $5, $6)',
+        [input.id, input.name, input.phone, input.email, input.status, this.condominiumId],
       );
       await client.query(
         'INSERT INTO apartment_residents (id, apartment_id, resident_id, active) VALUES ($1, $2, $3, TRUE)',
@@ -117,23 +132,33 @@ export class PostgresResidentRepository implements ResidentRepository {
   }
 
   async deactivate(id: string): Promise<void> {
-    await this.pool.query('UPDATE apartment_residents SET active = FALSE WHERE resident_id = $1', [
-      id,
-    ]);
+    await this.pool.query(
+      `UPDATE apartment_residents SET active = FALSE
+       WHERE resident_id = $1
+         AND apartment_id IN (SELECT id FROM apartments WHERE condominium_id = $2)`,
+      [id, this.condominiumId],
+    );
   }
 
   async setStatusOverride(id: string, status: Resident['status'] | null): Promise<void> {
-    await this.pool.query('UPDATE residents SET status_override = $2 WHERE id = $1', [id, status]);
+    await this.pool.query(
+      'UPDATE residents SET status_override = $2 WHERE id = $1 AND condominium_id = $3',
+      [id, status, this.condominiumId],
+    );
   }
 
   private async apartmentIdForLabel(client: PoolClient, label: string): Promise<string> {
     const existing = await client.query<{ id: string }>(
-      'SELECT id FROM apartments WHERE label = $1',
-      [label],
+      'SELECT id FROM apartments WHERE condominium_id = $1 AND label = $2',
+      [this.condominiumId, label],
     );
     if (existing.rows[0]) return existing.rows[0].id;
     const id = randomUUID();
-    await client.query('INSERT INTO apartments (id, label) VALUES ($1, $2)', [id, label]);
+    await client.query('INSERT INTO apartments (id, label, condominium_id) VALUES ($1, $2, $3)', [
+      id,
+      label,
+      this.condominiumId,
+    ]);
     return id;
   }
 

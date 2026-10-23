@@ -28,35 +28,39 @@ import { createPool } from './platform/postgres/pool';
 import { config } from './platform/config';
 import { R2ProofStorage } from './receipts/adapters/r2/r2-proof-storage';
 
-// The domain repositories the composition root wires into the app, backed by
-// Postgres. ui/app/domain depend only on the interfaces, never on the store.
-export interface Repositories {
+export interface CondoRepositories {
   residents: ResidentRepository;
   accounts: AccountRepository;
   receipts: ReceiptRepository;
   notices: NoticeRepository;
   threads: ThreadRepository;
   dashboard: DashboardRepository;
-  users: UserRepository;
   settings: SettingsRepository;
   categories: CategoryRepository;
   incomes: IncomeRepository;
+}
+
+export interface Repositories {
+  forCondo(condominiumId: string): CondoRepositories;
+  users: UserRepository;
   condos: CondoRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
   const proofStorage = config.r2 ? new R2ProofStorage(config.r2) : null;
   return {
-    residents: new PostgresResidentRepository(pool),
-    accounts: new PostgresAccountRepository(pool, proofStorage),
-    receipts: new PostgresReceiptRepository(pool, proofStorage),
-    notices: new PostgresNoticeRepository(pool),
-    threads: new PostgresThreadRepository(pool),
-    dashboard: new PostgresDashboardRepository(pool),
+    forCondo: (condominiumId) => ({
+      residents: new PostgresResidentRepository(pool, condominiumId),
+      accounts: new PostgresAccountRepository(pool, proofStorage),
+      receipts: new PostgresReceiptRepository(pool, proofStorage),
+      notices: new PostgresNoticeRepository(pool),
+      threads: new PostgresThreadRepository(pool),
+      dashboard: new PostgresDashboardRepository(pool),
+      settings: new PostgresSettingsRepository(pool),
+      categories: new PostgresCategoryRepository(pool),
+      incomes: new PostgresIncomeRepository(pool, proofStorage),
+    }),
     users: new PostgresUserRepository(pool),
-    settings: new PostgresSettingsRepository(pool),
-    categories: new PostgresCategoryRepository(pool),
-    incomes: new PostgresIncomeRepository(pool, proofStorage),
     condos: new PostgresCondoRepository(pool),
   };
 }

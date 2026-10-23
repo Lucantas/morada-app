@@ -1,5 +1,6 @@
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
+import { createTestCondo } from '../../../test-support/condos';
 import { resetPg } from '../../../test-support/pg';
 import { runResidentRepositoryContract } from '../resident-repository.contract';
 
@@ -15,7 +16,13 @@ afterAll(async () => {
   await pool.end();
 });
 
-runResidentRepositoryContract('PostgresResidentRepository', async () => {
+beforeEach(async () => {
   await resetPg(pool);
-  return new PostgresResidentRepository(pool);
+  await createTestCondo(pool, 'condo-a');
+  await createTestCondo(pool, 'condo-b');
 });
+
+runResidentRepositoryContract(
+  'PostgresResidentRepository',
+  async (condominiumId) => new PostgresResidentRepository(pool, condominiumId),
+);
