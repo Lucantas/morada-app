@@ -2,14 +2,21 @@
 
 ## Product
 
-Morada is a condominium-management app for a small building (Condomínio Morada ·
-Bloco 2). An **admin** (síndico) manages residents, accounts/expenses, receipts,
-notices and messages; a **resident** (morador) views their receipts, pays the
-monthly fee, and reads notices. Two roles, one phone-framed UI.
+Morada is a multi-condominium management app. An **organization** administers one
+or more condominiums (the first is Condomínio Morada · Bloco 2). Roles are per
+condominium: **administrador** manages residents, accounts/expenses, receipts,
+notices and messages; **síndico** is a planned delegate (no access yet);
+**morador** views their receipts, pays the monthly fee, and reads notices. An
+organization **owner** is administrador of every condominium of the organization.
+All operational data is condominium-scoped; one phone-framed UI.
 
 **Domain vocabulary (use these exact names, never synonyms):**
 
-- `Session` — the logged-in role: `admin` or `resident`
+- `Session` — the logged-in role: `admin` or `resident` (resolved per condominium)
+- `Organization` — who administers one or more condominiums; owns them
+- `Condominium` — an independent building; every operational row carries its `condominium_id`
+- `OrgMember` — user ↔ organization link, role `owner` or `member`, `active` flag
+- `CondoRole` — user ↔ condominium link, role `administrador` / `sindico` / `morador`, `active` flag
 - `Apartment` — the stable unit and ledger anchor (`Apto 302`); survives resident
   turnover. **The apartment is the key, never the resident's name/login.**
 - `Resident` — a person; belongs to an apartment via an `Occupancy`
