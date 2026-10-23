@@ -20,8 +20,8 @@ runSettingsRepositoryContract('PostgresSettingsRepository', async () => {
   await insertRows(
     pool,
     'condo_settings',
-    ['id', 'monthly_fee_cents', 'due_day'],
-    [{ id: 'default', monthly_fee_cents: 15000, due_day: 15 }],
+    ['condominium_id', 'monthly_fee_cents', 'due_day'],
+    [{ condominium_id: 'condo-legacy', monthly_fee_cents: 15000, due_day: 15 }],
   );
   return new PostgresSettingsRepository(pool);
 });

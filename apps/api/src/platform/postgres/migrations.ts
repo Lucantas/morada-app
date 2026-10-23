@@ -229,4 +229,135 @@ ALTER TABLE accounts ADD COLUMN proof_data_url TEXT;
 ALTER TABLE accounts ADD COLUMN proof_key TEXT;
 `,
   },
+  {
+    // Introduces organizations/condominiums and moves every existing row into
+    // condo-legacy. The condominium_id defaults keep the not-yet-scoped adapters
+    // writing valid rows until 018_drop_legacy_defaults removes them.
+    id: '015_tenancy',
+    sql: `
+CREATE TABLE organizations (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE condominiums (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id),
+  name TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO organizations (id, name) VALUES ('org-legacy', 'Condomínio Morada');
+INSERT INTO condominiums (id, organization_id, name)
+  VALUES ('condo-legacy', 'org-legacy', 'Condomínio Morada · Bloco 2');
+
+ALTER TABLE apartments ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE apartments SET condominium_id = 'condo-legacy';
+ALTER TABLE apartments ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_apartments_condominium_id ON apartments (condominium_id);
+
+ALTER TABLE residents ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE residents SET condominium_id = 'condo-legacy';
+ALTER TABLE residents ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_residents_condominium_id ON residents (condominium_id);
+
+ALTER TABLE accounts ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE accounts SET condominium_id = 'condo-legacy';
+ALTER TABLE accounts ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_accounts_condominium_id ON accounts (condominium_id);
+
+ALTER TABLE receipts ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE receipts SET condominium_id = 'condo-legacy';
+ALTER TABLE receipts ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_receipts_condominium_id ON receipts (condominium_id);
+
+ALTER TABLE notices ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE notices SET condominium_id = 'condo-legacy';
+ALTER TABLE notices ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_notices_condominium_id ON notices (condominium_id);
+
+ALTER TABLE threads ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE threads SET condominium_id = 'condo-legacy';
+ALTER TABLE threads ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_threads_condominium_id ON threads (condominium_id);
+
+ALTER TABLE categories ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE categories SET condominium_id = 'condo-legacy';
+ALTER TABLE categories ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_categories_condominium_id ON categories (condominium_id);
+
+ALTER TABLE incomes ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE incomes SET condominium_id = 'condo-legacy';
+ALTER TABLE incomes ALTER COLUMN condominium_id SET NOT NULL;
+CREATE INDEX idx_incomes_condominium_id ON incomes (condominium_id);
+
+ALTER TABLE condo_settings ADD COLUMN condominium_id TEXT REFERENCES condominiums(id) DEFAULT 'condo-legacy';
+UPDATE condo_settings SET condominium_id = 'condo-legacy';
+ALTER TABLE condo_settings ALTER COLUMN condominium_id SET NOT NULL;
+
+ALTER TABLE apartments DROP CONSTRAINT apartments_label_key;
+ALTER TABLE apartments ADD CONSTRAINT apartments_condominium_label_key UNIQUE (condominium_id, label);
+
+ALTER TABLE condo_settings DROP CONSTRAINT condo_settings_pkey;
+ALTER TABLE condo_settings DROP COLUMN id;
+ALTER TABLE condo_settings ADD PRIMARY KEY (condominium_id);
+
+CREATE TABLE organization_members (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES organizations(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL CHECK (role IN ('owner', 'member')),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (organization_id, user_id)
+);
+
+CREATE TABLE condo_roles (
+  id TEXT PRIMARY KEY,
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL CHECK (role IN ('administrador', 'sindico', 'morador')),
+  resident_id TEXT REFERENCES residents(id),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (condominium_id, user_id, role)
+);
+
+CREATE INDEX idx_condo_roles_user_id ON condo_roles (user_id);
+
+INSERT INTO organization_members (id, organization_id, user_id, role)
+  SELECT gen_random_uuid()::text, 'org-legacy', id, 'owner' FROM users WHERE role = 'admin';
+
+INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+  SELECT gen_random_uuid()::text, 'condo-legacy', id, 'administrador', NULL
+  FROM users WHERE role = 'admin';
+
+INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+  SELECT gen_random_uuid()::text, 'condo-legacy', u.id, 'morador', u.resident_id
+  FROM users u JOIN residents r ON r.id = u.resident_id
+  WHERE u.role = 'resident';
+`,
+  },
+  {
+    // Legacy threads are keyed by the resident id; the apartment comes from the
+    // resident's active occupancy (NULL when there is none).
+    id: '016_thread_links',
+    sql: `
+ALTER TABLE threads ADD COLUMN resident_id TEXT;
+ALTER TABLE threads ADD COLUMN apartment_id TEXT;
+
+UPDATE threads t SET resident_id = r.id FROM residents r WHERE r.id = t.id;
+
+UPDATE threads t SET apartment_id = ar.apartment_id
+  FROM apartment_residents ar
+  WHERE ar.resident_id = t.resident_id AND ar.active;
+`,
+  },
+  {
+    id: '017_account_due_date',
+    sql: `
+ALTER TABLE accounts ADD COLUMN due_date DATE;
+`,
+  },
 ];
