@@ -1,7 +1,7 @@
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
 
-import { Screen, ScreenBody } from '@/shared/ui/app-shell';
-import { Icon } from '@/shared/ui/icon';
+import { Screen, ScreenBody } from './app-shell';
+import { Icon } from './icon';
 
 export function EntryLayout({
   title,

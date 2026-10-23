@@ -9,6 +9,8 @@ import { ForgotPasswordScreen } from '@/features/auth/ui/forgot-password-screen'
 import { PendingConfirmationScreen } from '@/features/auth/ui/pending-confirmation-screen';
 import { ResetPasswordScreen } from '@/features/auth/ui/reset-password-screen';
 import { SignUpScreen } from '@/features/auth/ui/signup-screen';
+import type { InvitationRepository } from '@/features/invitations/domain/invitation-repository';
+import { AcceptInviteScreen } from '@/features/invitations/ui/accept-invite-screen';
 import type { LoginResponse } from '@/features/session/domain/login-response';
 import type { Role } from '@/features/session/domain/session';
 import { LoginScreen } from '@/features/session/ui/login-screen';
@@ -19,6 +21,7 @@ type Entry = 'login' | 'signup' | 'forgot';
 
 type Props = {
   repository: AuthRepository;
+  invitations: InvitationRepository;
   onLanded: (role: Role) => void;
   onSignOut: () => void;
   children: ReactNode;
@@ -33,6 +36,9 @@ function usePublicRoute() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+  useEffect(() => {
+    if (route?.kind === 'convite') clearPublicRoute();
+  }, [route]);
   const leave = useCallback(() => {
     clearPublicRoute();
     setRoute(null);
@@ -40,7 +46,7 @@ function usePublicRoute() {
   return { route, leave };
 }
 
-export function EntryRouter({ repository, onLanded, onSignOut, children }: Props) {
+export function EntryRouter({ repository, invitations, onLanded, onSignOut, children }: Props) {
   const role = useSessionStore((s) => s.role);
   const pendingUser = useSessionStore((s) => s.pendingUser);
   const queryClient = useQueryClient();
@@ -48,6 +54,7 @@ export function EntryRouter({ repository, onLanded, onSignOut, children }: Props
   const [entry, setEntryState] = useState<Entry>('login');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [invitedCondo, setInvitedCondo] = useState<string | null>(null);
 
   const setEntry = useCallback((next: Entry) => {
     setLoginError(null);
@@ -62,12 +69,28 @@ export function EntryRouter({ repository, onLanded, onSignOut, children }: Props
   const enter = (response: LoginResponse) => {
     publicRoute.leave();
     setEntry('login');
+    setInvitedCondo(null);
     queryClient.clear();
     const landed = applyLogin(response);
     if (landed) onLanded(landed);
   };
 
   const { route } = publicRoute;
+
+  if (route?.kind === 'convite') {
+    return (
+      <AcceptInviteScreen
+        key={route.token}
+        token={route.token}
+        repository={invitations}
+        onAccepted={(response, condoName) => {
+          enter(response);
+          setInvitedCondo(condoName);
+        }}
+        onSignIn={() => leavePublicRoute('login')}
+      />
+    );
+  }
 
   if (route?.kind === 'confirmar-email') {
     return (
@@ -104,7 +127,11 @@ export function EntryRouter({ repository, onLanded, onSignOut, children }: Props
         onSignOut={onSignOut}
       />
     ) : (
-      <PendingConfirmationScreen repository={repository} onSignOut={onSignOut} />
+      <PendingConfirmationScreen
+        repository={repository}
+        onSignOut={onSignOut}
+        condoName={invitedCondo ?? undefined}
+      />
     );
   }
 

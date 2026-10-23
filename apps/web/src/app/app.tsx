@@ -21,7 +21,7 @@ import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-fina
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
-import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
+import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
@@ -43,17 +43,15 @@ import {
   dashboardRepository,
   editReceipt,
   ensureMonthlyReceipts,
-  getResidentLogin,
   incomeRepository,
+  invitationRepository,
   issueCharge,
   logout,
   noticeRepository,
   overrideResidentStatus,
-  provisionResidentLogin,
   receiptRepository,
   registerPayment,
   rejectPayment,
-  resetResidentLogin,
   residentRepository,
   settingsRepository,
   authRepository,
@@ -105,6 +103,7 @@ function Router() {
   return (
     <EntryRouter
       repository={authRepository}
+      invitations={invitationRepository}
       onLanded={(role) => go(role === 'admin' ? 'a-home' : 'r-home')}
       onSignOut={handleSignOut}
     >
@@ -184,7 +183,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           receiptRepository={receiptRepository}
           residentId={residentId}
           onBack={() => go('a-residents')}
-          onCreateLogin={residentId ? () => go('a-resident-login', { residentId }) : undefined}
+          onOpenAccess={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           dueDay={dueDay}
           defaultReceiptValueCents={defaultReceiptValueCents}
           issueCharge={issueCharge}
@@ -197,11 +196,10 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
       );
     case 'a-resident-login':
       return residentId !== undefined ? (
-        <CreateLoginScreen
+        <ResidentAccessScreen
           residentId={residentId}
-          provision={provisionResidentLogin}
-          fetchLogin={getResidentLogin}
-          reset={resetResidentLogin}
+          repository={invitationRepository}
+          residents={residentRepository}
           onBack={() => go('a-resident-edit', { residentId })}
         />
       ) : (

@@ -1,6 +1,6 @@
 import { Skeleton, SkeletonButton, SkeletonField, SkeletonScreen } from '@/shared/ui/skeleton';
 
-export function CreateLoginSkeleton() {
+export function ResidentAccessSkeleton() {
   return (
     <SkeletonScreen>
       <div style={{ paddingTop: 2 }}>

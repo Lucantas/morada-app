@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 
-import { CreateLoginSkeleton } from './create-login-skeleton';
+import { ResidentAccessSkeleton } from './resident-access-skeleton';
 
-describe('CreateLoginSkeleton', () => {
+describe('ResidentAccessSkeleton', () => {
   test('renders an accessible busy status with skeleton blocks', () => {
-    render(<CreateLoginSkeleton />);
+    render(<ResidentAccessSkeleton />);
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(document.querySelectorAll('.skeleton').length).toBeGreaterThan(2);
   });

@@ -9,7 +9,7 @@ import { newPasswordSchema, validate } from '../domain/auth-schemas';
 import { authErrorKind } from '../domain/errors';
 
 import { authErrorMessage } from './auth-error-message';
-import { EntryForm, EntryLayout, FormError } from './entry-layout';
+import { EntryForm, EntryLayout, FormError } from '@/shared/ui/entry-layout';
 
 type Props = {
   token: string;

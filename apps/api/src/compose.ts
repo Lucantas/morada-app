@@ -30,7 +30,6 @@ import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
-import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
@@ -145,16 +144,6 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
   api.route('/info', condoInfoRoutes(condos));
-
-  // Admin-only: provision a resident login. Returns the generated temp password
-  // once for the admin to relay; only the hash is ever stored.
-  api.route(
-    '/users',
-    userRoutes(
-      scoped(({ residents }) => ({ users, residents, condos })),
-      hasher,
-    ),
-  );
 
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.

@@ -25,19 +25,17 @@ jest.mock('./container', () => {
     condoInfoRepository: unused,
     dashboardRepository: unused,
     incomeRepository: unused,
+    invitationRepository: unused,
     noticeRepository: unused,
     settingsRepository: unused,
     confirmPayment: jest.fn(),
     editReceipt: jest.fn(),
     ensureMonthlyReceipts: jest.fn(),
-    getResidentLogin: jest.fn(),
     issueCharge: jest.fn(),
     logout: jest.fn(),
     overrideResidentStatus: jest.fn(),
-    provisionResidentLogin: jest.fn(),
     registerPayment: jest.fn(),
     rejectPayment: jest.fn(),
-    resetResidentLogin: jest.fn(),
   };
 });
 

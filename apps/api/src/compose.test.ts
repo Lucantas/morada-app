@@ -1148,86 +1148,18 @@ describe('Morada API — apartments & occupancy', () => {
   });
 });
 
-describe('Morada API — admin provisions resident logins', () => {
-  const adminAuth = adminAuthFor;
-
-  test('an admin creates a login and the new resident can log in with the temp password', async () => {
+describe('Morada API — derived logins are no longer provisioned', () => {
+  test('the resident-login provisioning route is gone', async () => {
     const app = await makeApp();
-    const auth = await adminAuth(app);
+    const auth = await adminAuthFor(app);
 
-    const created = await auth(`${P}/users`, {
+    const res = await auth(`${P}/users`, {
       method: 'POST',
       body: JSON.stringify({ residentId: 'r-3' }),
     });
-    expect(created.status).toBe(201);
-    const body = (await created.json()) as { username: string; tempPassword: string };
-    expect(body.username).toBe('ana202');
-    expect(body.tempPassword).toMatch(/.{8,}/);
-
-    const loginRes = await login(app, 'ana202', body.tempPassword);
-    expect(loginRes.status).toBe(200);
-    expect(await loginRes.json()).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
-      emailVerified: true,
-    });
-  });
-
-  test("cannot provision a login for another condo's resident", async () => {
-    const app = await makeApp();
-    await createTestCondo(pool, 'condo-other');
-    await makePostgresRepositories(pool).forCondo('condo-other').residents.save({
-      id: 'r-foreign',
-      name: 'Forasteiro',
-      apt: 'Apto 900',
-      phone: '',
-      email: '',
-      status: 'em_dia',
-    });
-    const auth = await adminAuth(app);
-
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: 'r-foreign' }),
-    });
 
     expect(res.status).toBe(404);
-    expect(await count("users WHERE resident_id = 'r-foreign'")).toBe(0);
-    expect(await count("condo_roles WHERE resident_id = 'r-foreign'")).toBe(0);
-  });
-
-  test('provisioning a resident login is admin-only', async () => {
-    const app = await makeApp();
-    const auth = await authFor(app, residentCredentials);
-    const res = await app.request(`${P}/users`, {
-      method: 'POST',
-      headers: {
-        Cookie: auth.cookie,
-        'X-CSRF-Token': auth.csrf,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ residentId: 'r-4' }),
-    });
-    expect(res.status).toBe(403);
-  });
-
-  test('provisioning for a nonexistent resident is rejected with 404', async () => {
-    const app = await makeApp();
-    const auth = await adminAuth(app);
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: 'r-does-not-exist' }),
-    });
-    expect(res.status).toBe(404);
-  });
-
-  test('provisioning a login for a resident that already has one is rejected with 409', async () => {
-    const app = await makeApp();
-    const auth = await adminAuth(app);
-    const res = await auth(`${P}/users`, {
-      method: 'POST',
-      body: JSON.stringify({ residentId: residentCredentials.residentId }),
-    });
-    expect(res.status).toBe(409);
+    expect(await count("users WHERE resident_id = 'r-3'")).toBe(0);
   });
 });
 
@@ -1237,18 +1169,15 @@ describe('Morada API — admin reads and resets resident logins', () => {
     const auth = await adminAuthFor(app);
     const res = await auth(`${P}/residents/${residentCredentials.residentId}/login`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      username: residentCredentials.username,
-      suggested: residentCredentials.username,
-    });
+    expect(await res.json()).toEqual({ username: residentCredentials.username });
   });
 
-  test('reading the login of a resident without one returns the derived suggestion', async () => {
+  test('reading the login of a resident without one answers a null username', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     const res = await auth(`${P}/residents/r-3/login`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ username: null, suggested: 'ana202' });
+    expect(await res.json()).toEqual({ username: null });
   });
 
   test('reading the login of a nonexistent resident answers 404', async () => {

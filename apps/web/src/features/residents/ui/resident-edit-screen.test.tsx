@@ -58,6 +58,26 @@ describe('ResidentEditScreen', () => {
     expect(screen.getByLabelText('Número do apartamento')).toHaveValue('202');
   });
 
+  test('opens the resident access from the apartment', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-7', name: 'Diego Reis', apt: 'Apto 202' }),
+    ]);
+    const onOpenAccess = jest.fn();
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-7"
+        onBack={jest.fn()}
+        onOpenAccess={onOpenAccess}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Acesso do morador' }));
+
+    expect(onOpenAccess).toHaveBeenCalled();
+  });
+
   test('archiving a resident deactivates them and navigates back', async () => {
     const repository = new InMemoryResidentRepository([
       buildResident({ id: 'r-7', name: 'Diego Reis', apt: 'Apto 202', active: true }),

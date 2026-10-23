@@ -19,10 +19,12 @@ Env: `PORT`, `JWT_SECRET` (required in production — startup fails without it),
 - `POST /auth/login { username, password }` verifies bcrypt-hashed credentials and
   issues an HS256 JWT with a `role` claim and a `sub` (the resident's own id;
   admins get their user id). 8h expiry. Bad credentials return 401.
-- Residents do **not** self-register. An admin provisions a resident login via
-  `POST /api/users { username, residentId }` (admin-only). The server generates a
-  temp password and returns it **once** in the response for the admin to relay;
-  only the bcrypt hash is stored. Duplicate usernames return 409.
+- Residents join by invitation. An admin creates one via
+  `POST /api/condos/:id/residents/:rid/invitation { email? }` (admin-only), which
+  returns the link and a WhatsApp URL once (and e-mails it when an address is
+  given); the resident accepts it at `POST /auth/invitations/:token/accept`.
+  Derived username logins can no longer be provisioned; existing ones keep the
+  admin reset (`POST /api/residents/:id/login/reset`).
 - `authMiddleware(resolveSessionVersion)` is a factory: it verifies the session JWT
   and rejects it (401) unless its `sv` claim matches the user's stored
   `session_version` (bumped on password reset, e-mail confirmation and admin
@@ -46,9 +48,9 @@ accounts/receipts/notices are created through the app.
 | ----- | -------- | -------------- |
 | Admin | `admin`  | `morada-admin` |
 
-To onboard a resident: the admin creates the resident, provisions a login
-(`POST /api/users`, which returns a one-time temp password), and hands over the
-credentials. The resident then logs in normally.
+To onboard a resident: the admin creates the resident and generates an invitation
+from "Acesso do morador". The resident opens the link, sets a password and lands in
+the app; later logins use the e-mail and that password.
 
 ## Still deferred (post-auth hardening)
 

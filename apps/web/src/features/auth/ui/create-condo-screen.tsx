@@ -8,7 +8,7 @@ import type { AuthRepository } from '../domain/auth-repository';
 import { condoNameSchema, validate } from '../domain/auth-schemas';
 
 import { authErrorMessage } from './auth-error-message';
-import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from './entry-layout';
+import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from '@/shared/ui/entry-layout';
 
 type Props = {
   repository: AuthRepository;

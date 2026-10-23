@@ -64,7 +64,7 @@ type Props = {
   receiptRepository: ReceiptRepository;
   residentId?: string;
   onBack: () => void;
-  onCreateLogin?: () => void;
+  onOpenAccess?: () => void;
   dueDay?: number;
   defaultReceiptValueCents?: number;
   issueCharge?: (input: {
@@ -89,7 +89,7 @@ export function ResidentEditScreen({
   receiptRepository,
   residentId,
   onBack,
-  onCreateLogin,
+  onOpenAccess,
   dueDay = 15,
   defaultReceiptValueCents = 0,
   issueCharge,
@@ -442,9 +442,9 @@ export function ResidentEditScreen({
               </PrimaryButton>
             </div>
 
-            {onCreateLogin && (
-              <button type="button" onClick={onCreateLogin} style={secondaryButtonStyle}>
-                Criar acesso do morador
+            {onOpenAccess && (
+              <button type="button" onClick={onOpenAccess} style={secondaryButtonStyle}>
+                Acesso do morador
               </button>
             )}
           </>

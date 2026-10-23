@@ -72,8 +72,11 @@ charged (so "Fulana"'s receipts never appear under "Siclana").
 1. Register a resident: name + apartment label + contact. → find-or-create the
    apartment by label; create the resident; create an **active** occupancy.
    If the apartment already has an active occupant → `ApartmentOccupiedError`.
-2. Provision the login (`POST /api/users`): issues a temp password; `sub` = the
-   resident's id.
+2. Invite the resident (`POST /api/condos/:id/residents/:rid/invitation`): the
+   resident opens the link, creates (or reuses) an e-mail account and receives the
+   `morador` grant tied to that resident. Derived logins are no longer provisioned;
+   existing legacy logins keep working (and keep the admin password reset) until
+   the invitation is accepted.
 
 ### Turnover (resident leaves, another moves in)
 

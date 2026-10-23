@@ -8,7 +8,7 @@ import type { AuthRepository } from '../domain/auth-repository';
 import { authErrorKind } from '../domain/errors';
 
 import { authErrorMessage } from './auth-error-message';
-import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from './entry-layout';
+import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from '@/shared/ui/entry-layout';
 
 type Props = {
   token: string;

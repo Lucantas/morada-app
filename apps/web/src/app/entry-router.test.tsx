@@ -2,9 +2,11 @@ import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { AuthError } from '@/features/auth/domain/errors';
+import { InvitationError } from '@/features/invitations/domain/errors';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 import { fakeAuthRepository } from '@/test/factories.auth';
+import { fakeInvitationRepository } from '@/test/factories.invitations';
 import { renderWithClient } from '@/test/render';
 
 import { EntryRouter } from './entry-router';
@@ -12,8 +14,8 @@ import { EntryRouter } from './entry-router';
 const TOKEN = 'abcDEF0123456789_-xyzABCDEF0123456789abcde';
 const OTHER_TOKEN = 'zyxDEF0123456789_-xyzABCDEF0123456789abcde';
 
-function renderEntry(repository = fakeAuthRepository()) {
-  const props = { repository, onLanded: jest.fn(), onSignOut: jest.fn() };
+function renderEntry(repository = fakeAuthRepository(), invitations = fakeInvitationRepository()) {
+  const props = { repository, invitations, onLanded: jest.fn(), onSignOut: jest.fn() };
   renderWithClient(
     <EntryRouter {...props}>
       <p>Área logada</p>
@@ -196,10 +198,71 @@ describe('EntryRouter', () => {
     expect(repository.confirmEmail).toHaveBeenCalledWith(OTHER_TOKEN, 'segredo123');
   });
 
+  test('an invite link clears the URL at once and keeps the token for the accept', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    const { invitations, onLanded } = renderEntry();
+    const user = userEvent.setup();
+
+    expect(window.location.hash).toBe('');
+    await user.type(await screen.findByLabelText('E-mail'), 'ana@exemplo.com');
+    await user.type(screen.getByLabelText('Seu nome'), 'Ana Souza');
+    await user.type(screen.getByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    expect(invitations.preview).toHaveBeenCalledWith(TOKEN);
+    expect(invitations.accept).toHaveBeenCalledWith(TOKEN, expect.anything());
+    await waitFor(() => expect(onLanded).toHaveBeenCalledWith('resident'));
+    expect(screen.getByText('Área logada')).toBeInTheDocument();
+  });
+
+  test('an accepted invite awaiting e-mail confirmation shows the pending screen', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    const { onLanded } = renderEntry(
+      fakeAuthRepository(),
+      fakeInvitationRepository({
+        accept: jest.fn().mockResolvedValue({ condos: [], emailVerified: false }),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('E-mail'), 'ana@exemplo.com');
+    await user.type(screen.getByLabelText('Seu nome'), 'Ana Souza');
+    await user.type(screen.getByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    expect(await screen.findByRole('heading', { name: 'Confirme seu e-mail' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Enviamos um link para confirmar seu e-mail. Depois de confirmar, o acesso ao Condomínio Morada é liberado.',
+      ),
+    ).toBeInTheDocument();
+    expect(onLanded).not.toHaveBeenCalled();
+  });
+
+  test('an invalid invite goes back to the login', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    renderEntry(
+      fakeAuthRepository(),
+      fakeInvitationRepository({
+        preview: jest.fn().mockRejectedValue(new InvitationError('invalid-invitation')),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Ir para o login' }));
+
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument();
+  });
+
   test('stops listening to hash changes after unmount', () => {
     const remove = jest.spyOn(window, 'removeEventListener');
     renderWithClient(
-      <EntryRouter repository={fakeAuthRepository()} onLanded={jest.fn()} onSignOut={jest.fn()}>
+      <EntryRouter
+        repository={fakeAuthRepository()}
+        invitations={fakeInvitationRepository()}
+        onLanded={jest.fn()}
+        onSignOut={jest.fn()}
+      >
         <p>Área logada</p>
       </EntryRouter>,
     ).unmount();

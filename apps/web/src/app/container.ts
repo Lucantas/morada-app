@@ -3,6 +3,7 @@ import { HttpAccountRepository } from '@/features/accounts/data/http-account-rep
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
 import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
 import { HttpDashboardRepository } from '@/features/dashboard/data/http-dashboard-repository';
+import { HttpInvitationRepository } from '@/features/invitations/data/http-invitation-repository';
 import { HttpIncomeRepository } from '@/features/income/data/http-income-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
@@ -10,7 +11,7 @@ import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-rep
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
 import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
-import { ApiError, createApiClient } from '@/shared/lib/api-client';
+import { createApiClient } from '@/shared/lib/api-client';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
 // The app always talks to the real API. Point it elsewhere with VITE_API_URL;
@@ -28,6 +29,11 @@ const publicApiClient = createApiClient({ baseUrl: apiUrl });
 signOutIfCondoMissing();
 
 export const authRepository = new HttpAuthRepository({
+  api: apiClient,
+  publicApi: publicApiClient,
+});
+
+export const invitationRepository = new HttpInvitationRepository({
   api: apiClient,
   publicApi: publicApiClient,
 });
@@ -120,45 +126,4 @@ export async function overrideResidentStatus(input: {
   status: 'em_dia' | 'pendente' | 'atrasado' | null;
 }): Promise<void> {
   await residentRepository.setStatusOverride(input.residentId, input.status);
-}
-
-/** Admin-only: provision a resident login. The API derives the username from the
- *  resident's name + apartment and returns the one-time temp password. */
-export async function provisionResidentLogin(input: {
-  residentId: string;
-}): Promise<{ username: string; tempPassword: string }> {
-  const data = (await apiClient.post('/api/users', input)) as {
-    username: string;
-    tempPassword: string;
-  };
-  return { username: data.username, tempPassword: data.tempPassword };
-}
-
-/** Admin-only: fetch a resident's login state — the existing username (null when
- *  none yet) and the login the API would derive. Null when the resident is gone. */
-export async function getResidentLogin(
-  residentId: string,
-): Promise<{ existingUsername: string | null; suggestedUsername: string } | null> {
-  try {
-    const data = (await apiClient.get(`/api/residents/${residentId}/login`)) as {
-      username: string | null;
-      suggested: string;
-    };
-    return { existingUsername: data.username, suggestedUsername: data.suggested };
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) return null;
-    throw err;
-  }
-}
-
-/** Admin-only: reset a resident's login password. The API returns a fresh
- *  one-time temp password. */
-export async function resetResidentLogin(
-  residentId: string,
-): Promise<{ username: string; tempPassword: string }> {
-  const data = (await apiClient.post(`/api/residents/${residentId}/login/reset`, {})) as {
-    username: string;
-    tempPassword: string;
-  };
-  return { username: data.username, tempPassword: data.tempPassword };
 }
