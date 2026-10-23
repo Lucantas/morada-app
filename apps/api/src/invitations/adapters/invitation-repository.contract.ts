@@ -1,6 +1,7 @@
 import type {
   CondoInvitationRepository,
   InvitationTokenRepository,
+  OrgInvitationRepository,
 } from '../domain/invitation-repository';
 
 export const CONTRACT_ADMIN_ID = 'u-admin';
@@ -268,6 +269,81 @@ export function runInvitationRepositoryContract(
       await invitations.create(input('hm'), NOW);
 
       expect(await invitations.latestSindico(NOW)).toBeNull();
+    });
+  });
+}
+
+export const CONTRACT_ORG_ID = 'org-condo-a';
+export const CONTRACT_OTHER_ORG_ID = 'org-condo-b';
+
+function memberInput(tokenHash: string, email = 'equipe@x.com', expiresAt: Date = LATER) {
+  return {
+    organizationId: CONTRACT_ORG_ID,
+    email,
+    orgRole: 'member' as const,
+    tokenHash,
+    expiresAt,
+    createdBy: CONTRACT_ADMIN_ID,
+  };
+}
+
+export function runOrgInvitationRepositoryContract(
+  label: string,
+  makeRepo: () => Promise<OrgInvitationRepository>,
+): void {
+  describe(label, () => {
+    test('create stores a pending membro invitation listed by pending', async () => {
+      const repo = await makeRepo();
+
+      const created = await repo.create(memberInput('hm1'), NOW);
+
+      expect(created).toMatchObject({
+        role: 'membro',
+        organizationId: CONTRACT_ORG_ID,
+        orgRole: 'member',
+        email: 'equipe@x.com',
+        status: 'pendente',
+      });
+      expect(await repo.pending(CONTRACT_ORG_ID, NOW)).toEqual([created]);
+      expect(await repo.pending(CONTRACT_OTHER_ORG_ID, NOW)).toEqual([]);
+    });
+
+    test('creating again for the same e-mail revokes the previous one', async () => {
+      const repo = await makeRepo();
+      const first = await repo.create(memberInput('hm1'), NOW);
+      const other = await repo.create(memberInput('hm2', 'outra@x.com'), NOW);
+
+      const second = await repo.create(memberInput('hm3'), NOW);
+
+      const pending = await repo.pending(CONTRACT_ORG_ID, NOW);
+      expect(pending.map((i) => i.id).sort()).toEqual([other.id, second.id].sort());
+      expect(pending.map((i) => i.id)).not.toContain(first.id);
+    });
+
+    test('pending leaves out expired invitations', async () => {
+      const repo = await makeRepo();
+      await repo.create(memberInput('hm1', 'velha@x.com', EARLIER), NOW);
+
+      expect(await repo.pending(CONTRACT_ORG_ID, NOW)).toEqual([]);
+    });
+
+    test('create in an unknown organization fails', async () => {
+      const repo = await makeRepo();
+
+      await expect(
+        repo.create({ ...memberInput('hm1'), organizationId: 'org-ghost' }, NOW),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    test('revoke is scoped by organization and only touches a pending invitation', async () => {
+      const repo = await makeRepo();
+      const created = await repo.create(memberInput('hm1'), NOW);
+
+      expect(await repo.revoke(CONTRACT_OTHER_ORG_ID, created.id)).toBe(false);
+      expect(await repo.pending(CONTRACT_ORG_ID, NOW)).toHaveLength(1);
+      expect(await repo.revoke(CONTRACT_ORG_ID, created.id)).toBe(true);
+      expect(await repo.revoke(CONTRACT_ORG_ID, created.id)).toBe(false);
+      expect(await repo.pending(CONTRACT_ORG_ID, NOW)).toEqual([]);
     });
   });
 }

@@ -17,11 +17,15 @@ import type { ThreadRepository } from './messages/domain/thread-repository';
 import {
   PostgresInvitationRepository,
   PostgresInvitationTokenRepository,
+  PostgresOrgInvitationRepository,
 } from './invitations/adapters/postgres/invitation-repository';
 import type {
   CondoInvitationRepository,
   InvitationTokenRepository,
+  OrgInvitationRepository,
 } from './invitations/domain/invitation-repository';
+import { PostgresOrganizationRepository } from './organizations/adapters/postgres/organization-repository';
+import type { OrganizationRepository } from './organizations/domain/organization-repository';
 import { PostgresNoticeRepository } from './notices/adapters/postgres/notice-repository';
 import type { NoticeRepository } from './notices/domain/notice-repository';
 import { PostgresReceiptRepository } from './receipts/adapters/postgres/receipt-repository';
@@ -60,6 +64,8 @@ export interface Repositories {
   authTokens: AuthTokenRepository;
   condos: CondoRepository;
   invitationTokens: InvitationTokenRepository;
+  organizations: OrganizationRepository;
+  orgInvitations: OrgInvitationRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -82,6 +88,8 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     authTokens: new PostgresAuthTokenRepository(pool),
     condos: new PostgresCondoRepository(pool),
     invitationTokens: new PostgresInvitationTokenRepository(pool),
+    organizations: new PostgresOrganizationRepository(pool),
+    orgInvitations: new PostgresOrgInvitationRepository(pool),
   };
 }
 

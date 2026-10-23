@@ -1,4 +1,9 @@
-import type { Invitation, MoradorInvitation, SindicoInvitation } from './invitation';
+import type {
+  Invitation,
+  MembroInvitation,
+  MoradorInvitation,
+  SindicoInvitation,
+} from './invitation';
 
 export interface CreateInvitationInput {
   residentId: string;
@@ -13,6 +18,21 @@ export interface CreateSindicoInvitationInput {
   tokenHash: string;
   expiresAt: Date;
   createdBy: string;
+}
+
+export interface CreateMembroInvitationInput {
+  organizationId: string;
+  email: string;
+  orgRole: 'owner' | 'member';
+  tokenHash: string;
+  expiresAt: Date;
+  createdBy: string;
+}
+
+export interface OrgInvitationRepository {
+  pending(organizationId: string, now?: Date): Promise<MembroInvitation[]>;
+  create(input: CreateMembroInvitationInput, now?: Date): Promise<MembroInvitation>;
+  revoke(organizationId: string, id: string): Promise<boolean>;
 }
 
 export interface CondoInvitationRepository {

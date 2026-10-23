@@ -35,3 +35,14 @@ export function sindicoInvitationWhatsappUrl(
     `Olá! Você foi convidado para ser síndico do ${condoName} no Morada: ${link}`,
   );
 }
+
+export function membroInvitationWhatsappUrl(
+  phone: string,
+  organizationName: string,
+  link: string,
+): string {
+  return whatsappUrl(
+    phone,
+    `Olá! Você foi convidado para a equipe ${organizationName} no Morada: ${link}`,
+  );
+}

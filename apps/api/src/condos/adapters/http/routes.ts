@@ -13,7 +13,12 @@ export function meRoutes(deps: {
   auth: MiddlewareHandler<ApiEnv>;
   condos: Pick<
     CondoRepository,
-    'listForUser' | 'ownedOrganization' | 'createOrganization' | 'create' | 'grant'
+    | 'listForUser'
+    | 'ownedOrganization'
+    | 'memberOrganization'
+    | 'createOrganization'
+    | 'create'
+    | 'grant'
   >;
   users: Pick<UserRepository, 'findById'>;
 }) {

@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import {
   InvitationCondoNotFoundError,
+  InvitationOrganizationNotFoundError,
   InvitationResidentNotFoundError,
   PendingInvitationConflictError,
 } from '../../domain/errors';
@@ -19,8 +20,10 @@ import {
 import type {
   CondoInvitationRepository,
   CreateInvitationInput,
+  CreateMembroInvitationInput,
   CreateSindicoInvitationInput,
   InvitationTokenRepository,
+  OrgInvitationRepository,
 } from '../../domain/invitation-repository';
 
 const baseRowSchema = z.object({
@@ -59,7 +62,11 @@ const invitationRowSchema = z.discriminatedUnion('role', [
   membroRowSchema,
 ]);
 
-const ONE_PENDING_INDEXES = ['idx_invitations_one_pending', 'idx_invitations_one_pending_sindico'];
+const ONE_PENDING_INDEXES = [
+  'idx_invitations_one_pending',
+  'idx_invitations_one_pending_sindico',
+  'idx_invitations_one_pending_member',
+];
 
 function isPendingConflict(error: unknown): boolean {
   const { code, constraint } = (error ?? {}) as { code?: unknown; constraint?: unknown };
@@ -121,6 +128,7 @@ function toInvitation(raw: unknown, now: Date): Invitation {
 
 const toMorador = (raw: unknown, now: Date) => fromMoradorRow(moradorRowSchema.parse(raw), now);
 const toSindico = (raw: unknown, now: Date) => fromSindicoRow(sindicoRowSchema.parse(raw), now);
+const toMembro = (raw: unknown, now: Date) => fromMembroRow(membroRowSchema.parse(raw), now);
 
 const REVOKE_PENDING_SINDICO = `UPDATE invitations SET status = 'revogado'
   WHERE condominium_id = $1 AND role = 'sindico' AND status = 'pendente'`;
@@ -284,5 +292,68 @@ export class PostgresInvitationTokenRepository implements InvitationTokenReposit
       [userId],
     );
     return rows.map((row) => toInvitation(row, now));
+  }
+}
+
+const REVOKE_PENDING_MEMBER = `UPDATE invitations SET status = 'revogado'
+  WHERE organization_id = $1 AND email = $2 AND role = 'membro' AND status = 'pendente'`;
+
+export class PostgresOrgInvitationRepository implements OrgInvitationRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async pending(organizationId: string, now: Date = new Date()): Promise<MembroInvitation[]> {
+    const { rows } = await this.pool.query(
+      `SELECT ${COLUMNS} FROM invitations
+       WHERE organization_id = $1 AND role = 'membro' AND status = 'pendente' AND expires_at > $2
+       ORDER BY created_at, id`,
+      [organizationId, now],
+    );
+    return rows.map((row) => toMembro(row, now));
+  }
+
+  async create(
+    input: CreateMembroInvitationInput,
+    now: Date = new Date(),
+  ): Promise<MembroInvitation> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(REVOKE_PENDING_MEMBER, [input.organizationId, input.email]);
+      const { rows } = await client.query(
+        `INSERT INTO invitations
+           (id, organization_id, org_role, role, email, token_hash, status, expires_at, created_by)
+         SELECT $1, o.id, $3, 'membro', $4, $5, 'pendente', $6, $7
+         FROM organizations o WHERE o.id = $2 AND o.active
+         RETURNING ${COLUMNS}`,
+        [
+          randomUUID(),
+          input.organizationId,
+          input.orgRole,
+          input.email,
+          input.tokenHash,
+          input.expiresAt,
+          input.createdBy,
+        ],
+      );
+      const row = rows[0];
+      if (!row) throw new InvitationOrganizationNotFoundError();
+      await client.query('COMMIT');
+      return toMembro(row, now);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (isPendingConflict(error)) throw new PendingInvitationConflictError();
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async revoke(organizationId: string, id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE invitations SET status = 'revogado'
+       WHERE id = $2 AND organization_id = $1 AND role = 'membro' AND status = 'pendente'`,
+      [organizationId, id],
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 }

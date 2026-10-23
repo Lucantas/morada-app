@@ -24,6 +24,7 @@ export type ApiEnv = {
     role: Role;
     sub: string;
     condoId: string;
+    orgId: string;
     condoRole: CondoRoleName;
     permissions: readonly Permission[];
   };

@@ -15,13 +15,14 @@ const verifiedUser: User = {
   sessionVersion: 0,
 };
 
-function fakeCondos(owned: { id: string } | null = null) {
+function fakeCondos(owned: { id: string } | null = null, member: { id: string } | null = null) {
   const calls: string[] = [];
   const repo: Pick<
     CondoRepository,
-    'ownedOrganization' | 'createOrganization' | 'create' | 'grant'
+    'ownedOrganization' | 'memberOrganization' | 'createOrganization' | 'create' | 'grant'
   > = {
     ownedOrganization: async () => owned,
+    memberOrganization: async () => member,
     createOrganization: async (input) => {
       calls.push(`org:${input.name}:${input.ownerUserId}`);
       return { id: 'org-new' };
@@ -75,6 +76,27 @@ describe('createMyCondominium', () => {
 
     expect(summary).toMatchObject({ organizationId: 'org-existing', orgRole: 'owner' });
     expect(calls).toEqual(['create:org-existing:0:10', 'grant:c-1:u-1:administrador']);
+  });
+
+  test('creates the condominium in the organization the user is a member of', async () => {
+    const { repo, calls } = fakeCondos(null, { id: 'org-team' });
+
+    const summary = await createMyCondominium(repo, verifiedUser, { name: 'Terceiro' });
+
+    expect(summary).toMatchObject({
+      organizationId: 'org-team',
+      orgRole: 'member',
+      condoRole: 'administrador',
+    });
+    expect(calls).toEqual(['create:org-team:0:10', 'grant:c-1:u-1:administrador']);
+  });
+
+  test('prefers the owned organization over a membership', async () => {
+    const { repo } = fakeCondos({ id: 'org-own' }, { id: 'org-team' });
+
+    const summary = await createMyCondominium(repo, verifiedUser, { name: 'Quarto' });
+
+    expect(summary).toMatchObject({ organizationId: 'org-own', orgRole: 'owner' });
   });
 
   test('rejects an unconfirmed e-mail', async () => {

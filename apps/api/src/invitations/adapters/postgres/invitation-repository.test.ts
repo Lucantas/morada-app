@@ -8,11 +8,13 @@ import {
   CONTRACT_RESIDENT_A,
   CONTRACT_RESIDENT_B,
   runInvitationRepositoryContract,
+  runOrgInvitationRepositoryContract,
 } from '../invitation-repository.contract';
 
 import {
   PostgresInvitationRepository,
   PostgresInvitationTokenRepository,
+  PostgresOrgInvitationRepository,
 } from './invitation-repository';
 
 const pool = createPool(process.env.DATABASE_URL ?? '');
@@ -54,6 +56,11 @@ runInvitationRepositoryContract('PostgresInvitationRepository', async (condomini
   invitations: new PostgresInvitationRepository(pool, condominiumId),
   tokens: new PostgresInvitationTokenRepository(pool),
 }));
+
+runOrgInvitationRepositoryContract(
+  'PostgresOrgInvitationRepository',
+  async () => new PostgresOrgInvitationRepository(pool),
+);
 
 async function waitForLockWait(): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt += 1) {

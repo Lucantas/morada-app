@@ -17,6 +17,8 @@ import { sindicoRoutes } from './invitations/adapters/http/sindico-routes';
 import { activateClaimedInvitations } from './invitations/app/activate-claimed-invitations';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
+import { orgOwnerMiddleware } from './organizations/adapters/http/org-access';
+import { organizationRoutes } from './organizations/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
 import { condoAccessMiddleware, VIEW_HEADER, type Scoped } from './platform/condo-scope';
 import { csrfMiddleware } from './platform/csrf';
@@ -250,6 +252,23 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   );
 
   app.route('/api/condos/:condoId', api);
+
+  const org = new Hono<ApiEnv>();
+  org.use('*', auth);
+  org.use('*', csrfMiddleware);
+  org.use('*', orgOwnerMiddleware(repos.organizations));
+  org.route(
+    '/',
+    organizationRoutes({
+      organizations: repos.organizations,
+      invitations: repos.orgInvitations,
+      email,
+      appUrl: config.appUrl,
+      now,
+      limiter: invitationCreateLimiter,
+    }),
+  );
+  app.route('/api/orgs/:orgId', org);
 
   return app;
 }

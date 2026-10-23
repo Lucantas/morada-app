@@ -201,6 +201,18 @@ export class PostgresCondoRepository implements CondoRepository {
     return rows[0] ? z.object({ id: z.string() }).parse(rows[0]) : null;
   }
 
+  async memberOrganization(userId: string): Promise<{ id: string } | null> {
+    const { rows } = await this.pool.query(
+      `SELECT o.id FROM organizations o
+       JOIN organization_members m ON m.organization_id = o.id
+       WHERE m.user_id = $1 AND m.active AND o.active
+       ORDER BY o.created_at, o.id
+       LIMIT 1`,
+      [userId],
+    );
+    return rows[0] ? z.object({ id: z.string() }).parse(rows[0]) : null;
+  }
+
   async createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }> {
     const parsed = organizationInputSchema.parse(input);
     const id = randomUUID();
