@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -34,6 +35,7 @@ type Props = {
 };
 
 export function AccountEditScreen({ repository, accountId, onBack }: Props) {
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
   const existing = useQuery({
     queryKey: [...accountsQueryKey, accountId],
     queryFn: () => getAccount(repository, accountId as string),
@@ -200,7 +202,7 @@ export function AccountEditScreen({ repository, accountId, onBack }: Props) {
             </label>
             {existing.data?.hasProof && (
               <a
-                href={`/api/accounts/${accountId}/proof`}
+                href={scopedApiPath(`/api/accounts/${accountId}/proof`, condoId)}
                 target="_blank"
                 rel="noreferrer"
                 style={{

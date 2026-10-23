@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { useCondoScope } from '@/shared/lib/condo-scope';
+
+import type { LoginCondo } from '../domain/login-response';
 import type { Role } from '../domain/session';
 
 type SessionState = {
@@ -16,7 +19,10 @@ export const useSessionStore = create<SessionState>()(
       role: null,
       subject: null,
       authenticate: (role, subject) => set({ role, subject }),
-      signOut: () => set({ role: null, subject: null }),
+      signOut: () => {
+        useCondoScope.getState().setCondo(null);
+        set({ role: null, subject: null });
+      },
     }),
     {
       name: 'morada-session',
@@ -24,3 +30,17 @@ export const useSessionStore = create<SessionState>()(
     },
   ),
 );
+
+export function applyLogin(condos: readonly LoginCondo[]): Role {
+  const [first] = condos;
+  if (!first) throw new Error('Nenhum condomínio disponível');
+  useCondoScope.getState().setCondo({ id: first.id, name: first.name });
+  useSessionStore.getState().authenticate(first.role, null);
+  return first.role;
+}
+
+export function signOutIfCondoMissing(): void {
+  if (useSessionStore.getState().role && !useCondoScope.getState().condo) {
+    useSessionStore.getState().signOut();
+  }
+}

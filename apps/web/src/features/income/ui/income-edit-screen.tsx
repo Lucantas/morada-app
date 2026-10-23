@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 
+import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
   const incomes = useIncomes(repository);
   const existing = incomes.data?.find((income) => income.id === incomeId);
   const save = useSaveIncome(repository);
@@ -162,7 +164,7 @@ export function IncomeEditScreen({ incomeId, repository, onBack }: Props) {
             </label>
             {existing?.hasProof && (
               <a
-                href={`/api/incomes/${existing.id}/proof`}
+                href={scopedApiPath(`/api/incomes/${existing.id}/proof`, condoId)}
                 target="_blank"
                 rel="noreferrer"
                 style={{

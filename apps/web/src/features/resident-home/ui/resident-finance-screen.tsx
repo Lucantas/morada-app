@@ -6,6 +6,7 @@ import type {
   PaidItem,
 } from '@/features/dashboard/domain/dashboard';
 import type { DashboardRepository } from '@/features/dashboard/domain/dashboard-repository';
+import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { IconBadge, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
@@ -98,6 +99,7 @@ function BalanceHero({ balance }: { balance: CondoBalance }) {
 }
 
 function PaidRow({ item }: { item: PaidItem }) {
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
   return (
     <SurfaceCard style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '12px 14px' }}>
       <IconBadge icon={item.icon} />
@@ -106,7 +108,7 @@ function PaidRow({ item }: { item: PaidItem }) {
         <div style={{ fontSize: '.82rem', color: 'var(--ink-500)' }}>{item.dateLabel}</div>
         {item.hasProof && (
           <a
-            href={`/api/accounts/${item.id}/proof`}
+            href={scopedApiPath(`/api/accounts/${item.id}/proof`, condoId)}
             target="_blank"
             rel="noreferrer"
             style={{

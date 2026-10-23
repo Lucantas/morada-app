@@ -30,6 +30,7 @@ import { useCurrentResident } from '@/features/residents/ui/use-current-resident
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
+import { useCondoScope } from '@/shared/lib/condo-scope';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { StatusView } from '@/shared/ui/status-view';
@@ -92,7 +93,7 @@ export function App() {
 
 function Router() {
   const role = useSessionStore((s) => s.role);
-  const subject = useSessionStore((s) => s.subject);
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
@@ -143,7 +144,7 @@ function Router() {
     <ResidentRouter
       view={view}
       residentId={residentId}
-      subject={subject}
+      condoId={condoId}
       go={go}
       signOut={handleSignOut}
     />
@@ -154,7 +155,7 @@ type RouteProps = {
   view: View;
   residentId?: string;
   incomeId?: string;
-  subject?: string | null;
+  condoId?: string | null;
   go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
   signOut: () => void;
 };
@@ -290,8 +291,8 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   );
 }
 
-function ResidentRouter({ view, residentId, subject, go, signOut }: RouteProps) {
-  const currentResident = useCurrentResident(residentRepository, subject ?? null);
+function ResidentRouter({ view, residentId, condoId, go, signOut }: RouteProps) {
+  const currentResident = useCurrentResident(residentRepository, condoId ?? null);
   const nav = <BottomNav items={residentNav(view, go)} />;
 
   if (currentResident.isPending) {

@@ -8,6 +8,9 @@ import type { AccountRepository } from '../domain/account-repository';
 import { InMemoryAccountRepository } from '../data/in-memory-account-repository';
 
 import { AccountEditScreen } from './account-edit-screen';
+import { useCondoScope } from '@/shared/lib/condo-scope';
+
+beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
 
 function makeSpyRepo(): { repo: AccountRepository; saved: unknown[] } {
   const saved: unknown[] = [];
@@ -165,7 +168,7 @@ describe('AccountEditScreen', () => {
     expect(await screen.findByDisplayValue('Energia')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ver comprovante/i })).toHaveAttribute(
       'href',
-      '/api/accounts/a-9/proof',
+      '/api/condos/c1/accounts/a-9/proof',
     );
   });
 

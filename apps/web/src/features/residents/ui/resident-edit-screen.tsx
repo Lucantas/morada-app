@@ -5,6 +5,7 @@ import { apartmentReceiptTotals } from '@/features/receipts/domain/apartment-rec
 import type { Receipt, ReceiptMethod } from '@/features/receipts/domain/receipt';
 import type { ReceiptRepository } from '@/features/receipts/domain/receipt-repository';
 import { sortByDueDateDesc } from '@/features/receipts/domain/sort-by-due-date';
+import { scopedApiPath, useCondoScope } from '@/shared/lib/condo-scope';
 import { formatIsoDate } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { maskPhone } from '@/shared/lib/phone';
@@ -684,6 +685,7 @@ function ReceiptLedgerRow({
   onArchiveReceipt?: ArchiveReceiptHandler;
   isArchiving?: boolean;
 }) {
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
   const [open, setOpen] = useState(false);
   const [paidAt, setPaidAt] = useState('');
   const [confirmPaidAt, setConfirmPaidAt] = useState('');
@@ -761,7 +763,7 @@ function ReceiptLedgerRow({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {receipt.hasProof && (
             <a
-              href={`/api/receipts/${receipt.id}/proof`}
+              href={scopedApiPath(`/api/receipts/${receipt.id}/proof`, condoId)}
               target="_blank"
               rel="noreferrer"
               style={{ ...archiveButtonStyle, textDecoration: 'none' }}
