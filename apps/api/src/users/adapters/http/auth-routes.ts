@@ -3,6 +3,7 @@ import { deleteCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 
 import { signSession, type ApiEnv } from '../../../platform/auth';
+import type { CondoSummary } from '../../../condos/app/condo-access-views';
 import { config } from '../../../platform/config';
 import {
   CSRF_COOKIE,
@@ -35,7 +36,7 @@ function clientIpFrom(c: { req: { header: (name: string) => string | undefined }
 export function authRoutes(deps: {
   users: UserRepository;
   hasher: PasswordHasher;
-  isResidentActive: (residentId: string | null) => Promise<boolean>;
+  condosFor: (userId: string) => Promise<CondoSummary[]>;
   limiter: RateLimiter;
 }) {
   const app = new Hono<ApiEnv>();
@@ -58,16 +59,14 @@ export function authRoutes(deps: {
       throw error;
     }
 
-    if (user.role === 'resident' && !(await deps.isResidentActive(user.residentId))) {
-      throw new InvalidCredentialsError();
-    }
+    const condos = await deps.condosFor(user.id);
+    if (condos.length === 0) throw new InvalidCredentialsError();
 
     deps.limiter.succeed(key);
-    const subject = user.role === 'resident' ? (user.residentId ?? user.id) : user.id;
-    const token = await signSession(user.role, subject);
+    const token = await signSession(user.id);
     setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
     setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
-    return c.json({ role: user.role, subject });
+    return c.json({ condos });
   });
 
   app.post('/logout', csrfMiddleware, (c) => {
