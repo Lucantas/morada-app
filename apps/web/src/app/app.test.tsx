@@ -6,6 +6,7 @@ import { useCondoScope } from '@/shared/lib/condo-scope';
 
 import { App } from './app';
 import { authRepository } from './container';
+import { testCondo } from '@/test/condo';
 
 jest.mock('./container', () => {
   const { InMemoryReceiptRepository } = jest.requireActual(
@@ -50,13 +51,27 @@ describe('App router', () => {
 
   test('renders the resident home for a resident session with a condominium', async () => {
     act(() => {
-      useCondoScope.getState().setCondo({ id: 'c1', name: 'Residencial Ipê' });
+      useCondoScope.getState().setCondo(testCondo({ name: 'Residencial Ipê' }));
       useSessionStore.getState().authenticate('resident', 'r-1');
     });
 
     render(<App />);
 
     expect(await screen.findByText('Olá, Maria')).toBeInTheDocument();
+  });
+
+  test('switches from minha casa to o prédio for a staff person with a home', async () => {
+    const user = userEvent.setup();
+    act(() => {
+      useCondoScope.getState().setCondo(testCondo({ hasHome: true }));
+      useSessionStore.getState().authenticate('resident', null);
+    });
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'O prédio' }));
+
+    expect(useSessionStore.getState().role).toBe('admin');
+    expect(await screen.findByText('Painel do administrador')).toBeInTheDocument();
   });
 
   test('shows the login screen when signed out', () => {

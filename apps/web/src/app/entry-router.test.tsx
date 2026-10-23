@@ -10,6 +10,7 @@ import { fakeInvitationRepository } from '@/test/factories.invitations';
 import { renderWithClient } from '@/test/render';
 
 import { EntryRouter } from './entry-router';
+import { testCondo } from '@/test/condo';
 
 const TOKEN = 'abcDEF0123456789_-xyzABCDEF0123456789abcde';
 const OTHER_TOKEN = 'zyxDEF0123456789_-xyzABCDEF0123456789abcde';
@@ -40,7 +41,7 @@ describe('EntryRouter', () => {
 
   test('renders the signed-in app when a role is set', () => {
     act(() => {
-      useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' });
+      useCondoScope.getState().setCondo(testCondo({ name: 'Morada' }));
       useSessionStore.getState().authenticate('admin', null);
     });
 
@@ -134,7 +135,7 @@ describe('EntryRouter', () => {
 
     await waitFor(() => expect(onLanded).toHaveBeenCalledWith('admin'));
     expect(useSessionStore.getState()).toMatchObject({ role: 'admin', pendingUser: null });
-    expect(useCondoScope.getState().condo).toEqual({ id: 'c9', name: 'Edifício Sol' });
+    expect(useCondoScope.getState().condo).toMatchObject({ id: 'c9', name: 'Edifício Sol' });
   });
 
   test('a confirmation link renders before any session view and lands in the app', async () => {

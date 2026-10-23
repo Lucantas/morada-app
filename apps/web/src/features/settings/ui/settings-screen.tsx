@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { Category, CategoryDraft } from '@/features/categories/domain/category';
 import { useCondoName } from '@/shared/lib/condo-scope';
+import { formatBRL } from '@/shared/lib/money';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -21,10 +22,21 @@ type Props = {
   categoriesReady: boolean;
   savingCategories: boolean;
   onSaveCategories: (drafts: CategoryDraft[]) => Promise<{ reclassified: number }>;
+  canManageFees: boolean;
+  canManageCondo: boolean;
   onBack: () => void;
 };
 
 const MAX_CONDO_NAME_LENGTH = 80;
+
+function ReadOnlyValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: '.82rem', color: 'var(--ink-500)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}
 
 function reclassifiedMessage(count: number): string {
   if (count === 0) return 'Configurações salvas. Nenhuma conta precisou ser reclassificada.';
@@ -42,6 +54,8 @@ export function SettingsScreen({
   categoriesReady,
   savingCategories,
   onSaveCategories,
+  canManageFees,
+  canManageCondo,
   onBack,
 }: Props) {
   const scopeCondoName = useCondoName();
@@ -98,7 +112,7 @@ export function SettingsScreen({
 
   const submit = async () => {
     try {
-      const trimmedName = condoName.trim();
+      const trimmedName = canManageCondo ? condoName.trim() : savedCondoName;
       if (trimmedName === '') {
         setReclassifiedMsg(null);
         setSaveError('Informe o nome do condomínio');
@@ -112,11 +126,13 @@ export function SettingsScreen({
       if (trimmedName !== savedCondoName) {
         await onRenameCondo(trimmedName);
       }
-      const day = Number.parseInt(dueDay, 10);
-      await saveSettings.mutateAsync({
-        monthlyFeeCents: feeCents,
-        dueDay: Number.isFinite(day) ? day : 15,
-      });
+      if (canManageFees) {
+        const day = Number.parseInt(dueDay, 10);
+        await saveSettings.mutateAsync({
+          monthlyFeeCents: feeCents,
+          dueDay: Number.isFinite(day) ? day : 15,
+        });
+      }
       const result = await onSaveCategories(localCategories);
       setSaveError(null);
       setReclassifiedMsg(reclassifiedMessage(result.reclassified));
@@ -167,9 +183,27 @@ export function SettingsScreen({
         {settings.isLoading && <SettingsSkeleton />}
         {settings.isSuccess && (
           <div style={{ paddingTop: 2 }}>
-            <Field label="Nome do condomínio" value={condoName} onChange={setCondoName} />
-            <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
-            <Field label="Dia de vencimento" value={dueDay} onChange={setDueDay} type="number" />
+            {canManageCondo ? (
+              <Field label="Nome do condomínio" value={condoName} onChange={setCondoName} />
+            ) : (
+              <ReadOnlyValue label="Nome do condomínio" value={savedCondoName} />
+            )}
+            {canManageFees ? (
+              <>
+                <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
+                <Field
+                  label="Dia de vencimento"
+                  value={dueDay}
+                  onChange={setDueDay}
+                  type="number"
+                />
+              </>
+            ) : (
+              <>
+                <ReadOnlyValue label="Valor da taxa" value={`R$ ${formatBRL(feeCents)}`} />
+                <ReadOnlyValue label="Dia de vencimento" value={dueDay} />
+              </>
+            )}
           </div>
         )}
 

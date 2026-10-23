@@ -1,7 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type CurrentCondo = { id: string; name: string };
+import type { CondoRole, OrgRole, Permission } from './permissions';
+
+export type CurrentCondo = {
+  id: string;
+  name: string;
+  condoRole: CondoRole;
+  permissions: readonly Permission[];
+  hasHome: boolean;
+  organizationId: string;
+  orgRole: OrgRole | null;
+};
 
 type CondoScopeState = {
   condo: CurrentCondo | null;
@@ -22,6 +32,14 @@ export const useCondoScope = create<CondoScopeState>()(
 
 export function useCondoName(): string {
   return useCondoScope((state) => state.condo?.name ?? '');
+}
+
+export function useCanDo(permission: Permission): boolean {
+  return useCondoScope((state) => state.condo?.permissions.includes(permission) ?? false);
+}
+
+export function useHasHome(): boolean {
+  return useCondoScope((state) => state.condo?.hasHome ?? false);
 }
 
 const API_PREFIX = '/api/';

@@ -20,6 +20,7 @@ type Props = {
   onSeeAccounts: () => void;
   onOpenSettings?: () => void;
   bottomNav: ReactNode;
+  headerAction?: ReactNode;
   ensureMonthlyReceipts?: () => Promise<void>;
 };
 
@@ -29,6 +30,7 @@ export function DashboardScreen({
   onSeeAccounts,
   onOpenSettings,
   bottomNav,
+  headerAction,
   ensureMonthlyReceipts,
 }: Props) {
   const condoName = useCondoName();
@@ -52,7 +54,8 @@ export function DashboardScreen({
         eyebrow={condoName}
         title="Painel do administrador"
         right={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {headerAction}
             <div
               style={{
                 width: 40,

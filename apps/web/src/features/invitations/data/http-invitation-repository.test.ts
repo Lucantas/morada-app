@@ -1,5 +1,6 @@
 import type { ApiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/api-client';
+import { loginCondo } from '@/test/factories.auth';
 
 import { InvitationError } from '../domain/errors';
 
@@ -28,7 +29,7 @@ const PREVIEW = {
   accountExists: false,
 };
 const LOGIN_BODY = {
-  condos: [{ id: 'c1', name: 'Morada', role: 'resident' }],
+  condos: [loginCondo({ role: 'resident', condoRole: 'morador', permissions: [] })],
   emailVerified: true,
 };
 

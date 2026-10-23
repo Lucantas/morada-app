@@ -21,6 +21,8 @@ import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-fina
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
 import { useSessionStore } from '@/features/session/ui/session-store';
+import type { Role } from '@/features/session/domain/session';
+import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
@@ -30,7 +32,7 @@ import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-inf
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
-import { useCondoScope } from '@/shared/lib/condo-scope';
+import { useCanDo, useCondoScope } from '@/shared/lib/condo-scope';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { StatusView } from '@/shared/ui/status-view';
@@ -119,6 +121,18 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
   const go = useNavStore((s) => s.go);
+  const queryClient = useQueryClient();
+  const switchView = useSessionStore((s) => s.switchView);
+
+  const handleSwitch = useCallback(
+    (next: Role) => {
+      queryClient.clear();
+      switchView(next);
+      go(next === 'admin' ? 'a-home' : 'r-home');
+    },
+    [queryClient, switchView, go],
+  );
+  const headerAction = <ViewSwitch onSwitch={handleSwitch} />;
 
   if (role === 'admin') {
     return (
@@ -128,6 +142,7 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
         incomeId={incomeId}
         go={go}
         signOut={signOut}
+        headerAction={headerAction}
       />
     );
   }
@@ -138,6 +153,7 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
       condoId={condoId}
       go={go}
       signOut={signOut}
+      headerAction={headerAction}
     />
   );
 }
@@ -149,9 +165,10 @@ type RouteProps = {
   condoId?: string | null;
   go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
   signOut: () => void;
+  headerAction?: ReactNode;
 };
 
-function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
+function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: RouteProps) {
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
   const defaultReceiptValueCents = settings.data?.monthlyFeeCents ?? 0;
@@ -259,6 +276,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut }: RouteProps) {
           onSeeAccounts={() => go('a-accounts')}
           onOpenSettings={() => go('a-settings')}
           bottomNav={nav}
+          headerAction={headerAction}
           ensureMonthlyReceipts={ensureMonthly}
         />
       );
@@ -270,6 +288,8 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   const saveCategories = useSaveCategories(categoryRepository);
   const condoInfo = useCondoInfo(condoInfoRepository);
   const renameCondo = useRenameCondo(condoInfoRepository);
+  const canManageFees = useCanDo('manage_fees');
+  const canManageCondo = useCanDo('manage_condo');
   return (
     <SettingsScreen
       repository={settingsRepository}
@@ -281,12 +301,14 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
       categoriesReady={categories.isSuccess}
       savingCategories={saveCategories.isPending}
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
+      canManageFees={canManageFees}
+      canManageCondo={canManageCondo}
       onBack={onBack}
     />
   );
 }
 
-function ResidentRouter({ view, residentId, condoId, go, signOut }: RouteProps) {
+function ResidentRouter({ view, residentId, condoId, go, signOut, headerAction }: RouteProps) {
   const currentResident = useCurrentResident(residentRepository, condoId ?? null);
   const nav = <BottomNav items={residentNav(view, go)} />;
 
@@ -345,6 +367,7 @@ function ResidentRouter({ view, residentId, condoId, go, signOut }: RouteProps) 
           onGoFinance={() => go('r-finance')}
           onGoNotices={() => go('r-notices')}
           bottomNav={nav}
+          headerAction={headerAction}
         />
       );
   }

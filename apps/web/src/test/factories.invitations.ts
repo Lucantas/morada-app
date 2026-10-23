@@ -7,6 +7,8 @@ import type {
 import type { InvitationRepository } from '@/features/invitations/domain/invitation-repository';
 import type { LoginResponse } from '@/features/session/domain/login-response';
 
+import { loginCondo } from './factories.auth';
+
 export const PENDING_INVITATION: InvitationView = {
   status: 'pendente',
   email: 'ana@exemplo.com',
@@ -29,7 +31,15 @@ export const OPEN_PREVIEW: InvitationPreview = {
 };
 
 export const RESIDENT_LOGIN: LoginResponse = {
-  condos: [{ id: 'c1', name: 'Condomínio Morada', role: 'resident' }],
+  condos: [
+    loginCondo({
+      id: 'c1',
+      name: 'Condomínio Morada',
+      role: 'resident',
+      condoRole: 'morador',
+      permissions: [],
+    }),
+  ],
   emailVerified: true,
 };
 

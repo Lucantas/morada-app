@@ -2,7 +2,9 @@ import { act } from '@testing-library/react';
 
 import { renderHook } from '@testing-library/react';
 
-import { scopedApiPath, useCondoName, useCondoScope } from './condo-scope';
+import { testCondo } from '@/test/condo';
+
+import { scopedApiPath, useCanDo, useCondoName, useCondoScope } from './condo-scope';
 
 describe('scopedApiPath', () => {
   test('prefixes /api paths with the condominium', () => {
@@ -27,9 +29,9 @@ describe('useCondoScope', () => {
   });
 
   test('setCondo stores it and rename changes only the name', () => {
-    act(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+    act(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
     act(() => useCondoScope.getState().rename('Novo'));
-    expect(useCondoScope.getState().condo).toEqual({ id: 'c1', name: 'Novo' });
+    expect(useCondoScope.getState().condo).toEqual(testCondo({ name: 'Novo' }));
   });
 
   test('rename is a no-op without a condominium', () => {
@@ -42,7 +44,7 @@ describe('useCondoName', () => {
   afterEach(() => act(() => useCondoScope.getState().setCondo(null)));
 
   test('returns the current condominium name', () => {
-    act(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Residencial Ipê' }));
+    act(() => useCondoScope.getState().setCondo(testCondo()));
 
     const { result } = renderHook(() => useCondoName());
 
@@ -53,5 +55,20 @@ describe('useCondoName', () => {
     const { result } = renderHook(() => useCondoName());
 
     expect(result.current).toBe('');
+  });
+});
+
+describe('useCanDo', () => {
+  afterEach(() => act(() => useCondoScope.getState().setCondo(null)));
+
+  test('is true only for permissions the condominium grants', () => {
+    act(() => useCondoScope.getState().setCondo(testCondo({ permissions: ['manage_money'] })));
+
+    expect(renderHook(() => useCanDo('manage_money')).result.current).toBe(true);
+    expect(renderHook(() => useCanDo('manage_fees')).result.current).toBe(false);
+  });
+
+  test('is false without a condominium', () => {
+    expect(renderHook(() => useCanDo('manage_money')).result.current).toBe(false);
   });
 });

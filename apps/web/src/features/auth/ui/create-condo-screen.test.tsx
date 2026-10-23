@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { fakeAuthRepository } from '@/test/factories.auth';
+import { CREATED_CONDO, fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
 import { AuthError } from '../domain/errors';
@@ -45,7 +45,7 @@ describe('CreateCondoScreen', () => {
     await submit('  Edifício Sol ');
 
     expect(repository.createCondo).toHaveBeenCalledWith('Edifício Sol');
-    expect(onCreated).toHaveBeenCalledWith({ id: 'c9', name: 'Edifício Sol', role: 'admin' });
+    expect(onCreated).toHaveBeenCalledWith(CREATED_CONDO);
   });
 
   test('explains an unconfirmed e-mail', async () => {

@@ -6,8 +6,9 @@ import { renderWithClient } from '@/test/render';
 
 import { ResidentFinanceScreen } from './resident-finance-screen';
 import { useCondoScope } from '@/shared/lib/condo-scope';
+import { testCondo } from '@/test/condo';
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+beforeEach(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
 
 function setup() {
   const dashboardRepository = new InMemoryDashboardRepository(buildDashboardSummary());

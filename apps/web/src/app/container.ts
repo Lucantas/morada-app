@@ -22,6 +22,7 @@ const apiClient = createApiClient({
   baseUrl: apiUrl,
   onUnauthorized: () => useSessionStore.getState().signOut(),
   condoId: () => useCondoScope.getState().condo?.id ?? null,
+  view: () => useSessionStore.getState().role,
 });
 
 const publicApiClient = createApiClient({ baseUrl: apiUrl });

@@ -26,16 +26,19 @@ export function createApiClient(opts: {
   baseUrl: string;
   onUnauthorized?: () => void;
   condoId?: () => string | null;
+  view?: () => 'admin' | 'resident' | null;
 }): ApiClient {
   const request = async (method: string, path: string, body?: unknown): Promise<unknown> => {
     const csrf = UNSAFE_METHODS.has(method) ? readCookie('csrf') : null;
     const target = opts.condoId ? scopedApiPath(path, opts.condoId()) : path;
+    const view = opts.view?.() ?? null;
     const res = await fetch(`${opts.baseUrl}${target}`, {
       method,
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        ...(view ? { 'X-Morada-View': view } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

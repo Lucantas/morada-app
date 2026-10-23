@@ -31,10 +31,14 @@ function Harness({
   settings,
   categoryRepo,
   condoInfo = defaultCondoInfo(),
+  canManageFees = true,
+  canManageCondo = true,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
   condoInfo?: CondoInfoRepository;
+  canManageFees?: boolean;
+  canManageCondo?: boolean;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -51,6 +55,8 @@ function Harness({
       categoriesReady={categories.isSuccess}
       savingCategories={saveCategories.isPending}
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
+      canManageFees={canManageFees}
+      canManageCondo={canManageCondo}
       onBack={() => {}}
     />
   );
@@ -62,6 +68,25 @@ function renderScreen(
 ) {
   return renderWithClient(<Harness settings={repo} categoryRepo={categoryRepo} />);
 }
+
+describe('SettingsScreen permissions', () => {
+  test('sindico sees fee fields read-only', async () => {
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    expect(await screen.findByText('R$ 150,00')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Valor da taxa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Nome do condomínio' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Nome da nova categoria')).toBeInTheDocument();
+  });
+});
 
 describe('SettingsScreen', () => {
   test('renames the condominium', async () => {

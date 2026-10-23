@@ -2,6 +2,8 @@ import { act } from '@testing-library/react';
 
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
+import { loginCondo } from '@/test/factories.auth';
+
 import { applyLogin, signOutIfCondoMissing, useSessionStore } from './session-store';
 
 describe('useSessionStore', () => {
@@ -17,6 +19,13 @@ describe('useSessionStore', () => {
     expect(state.role).toBe('admin');
     expect(state.subject).toBe('admin');
     expect('token' in state).toBe(false);
+  });
+
+  test('switchView changes only the role', () => {
+    act(() => useSessionStore.getState().authenticate('admin', 'u-1'));
+    act(() => useSessionStore.getState().switchView('resident'));
+
+    expect(useSessionStore.getState()).toMatchObject({ role: 'resident', subject: 'u-1' });
   });
 
   test('signOut clears role and subject', () => {
@@ -35,25 +44,33 @@ describe('condo-aware session', () => {
   test('login stores the first condo and its role', () => {
     const role = applyLogin({
       condos: [
-        { id: 'c1', name: 'Morada', role: 'resident' },
-        { id: 'c2', name: 'Outro', role: 'admin' },
+        loginCondo({ role: 'resident', condoRole: 'morador', permissions: [] }),
+        loginCondo({ id: 'c2', name: 'Outro' }),
       ],
       emailVerified: true,
     });
 
     expect(role).toBe('resident');
     expect(useSessionStore.getState().role).toBe('resident');
-    expect(useCondoScope.getState().condo).toEqual({ id: 'c1', name: 'Morada' });
+    expect(useCondoScope.getState().condo).toMatchObject({
+      id: 'c1',
+      name: 'Morada',
+      condoRole: 'morador',
+      hasHome: false,
+    });
   });
 
   test('signOut clears the condo', () => {
-    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
+    applyLogin({ condos: [loginCondo()], emailVerified: true });
     act(() => useSessionStore.getState().signOut());
     expect(useCondoScope.getState().condo).toBeNull();
   });
 
   test('signOut never exposes a role without a condo', () => {
-    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'resident' }], emailVerified: true });
+    applyLogin({
+      condos: [loginCondo({ role: 'resident', condoRole: 'morador', permissions: [] })],
+      emailVerified: true,
+    });
     const seen: { role: string | null; condo: unknown }[] = [];
     const record = () =>
       seen.push({
@@ -72,7 +89,7 @@ describe('condo-aware session', () => {
   test('login with condos keeps no pending user', () => {
     applyLogin({ condos: [], emailVerified: false });
 
-    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
+    applyLogin({ condos: [loginCondo()], emailVerified: true });
 
     expect(useSessionStore.getState().pendingUser).toBeNull();
   });
@@ -122,7 +139,7 @@ describe('condo-aware session', () => {
   });
 
   test('boot with a session and a condo keeps the session', () => {
-    applyLogin({ condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true });
+    applyLogin({ condos: [loginCondo()], emailVerified: true });
 
     signOutIfCondoMissing();
 
