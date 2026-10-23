@@ -8,11 +8,13 @@ import {
   invitationViewSchema,
   legacyLoginResetSchema,
   legacyLoginSchema,
+  sindicoViewSchema,
   type AcceptInput,
   type CreatedInvitation,
   type InvitationPreview,
   type InvitationView,
   type LegacyLoginReset,
+  type SindicoView,
 } from '../domain/invitation';
 import type { InvitationRepository } from '../domain/invitation-repository';
 
@@ -112,6 +114,34 @@ export class HttpInvitationRepository implements InvitationRepository {
         ),
       ADMIN_KINDS,
     );
+  }
+
+  sindico(): Promise<SindicoView> {
+    return attempt(
+      async () => sindicoViewSchema.parse(await this.api.get('/api/sindico')),
+      ADMIN_KINDS,
+    );
+  }
+
+  inviteSindico(email: string, phone?: string): Promise<CreatedInvitation> {
+    const body = phone === undefined || phone === '' ? { email } : { email, phone };
+    return attempt(
+      async () =>
+        createdInvitationSchema.parse(await this.api.post('/api/sindico/invitation', body)),
+      ADMIN_KINDS,
+    );
+  }
+
+  revokeSindico(): Promise<void> {
+    return attempt(async () => {
+      await this.api.post('/api/sindico/invitation/revoke');
+    }, ADMIN_KINDS);
+  }
+
+  removeSindico(): Promise<void> {
+    return attempt(async () => {
+      await this.api.post('/api/sindico/remove');
+    }, ADMIN_KINDS);
   }
 
   preview(token: string): Promise<InvitationPreview> {

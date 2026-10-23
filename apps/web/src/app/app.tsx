@@ -23,6 +23,7 @@ import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-prof
 import { useSessionStore } from '@/features/session/ui/session-store';
 import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
+import { SindicoScreen } from '@/features/invitations/ui/sindico-screen';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
@@ -75,6 +76,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-account-edit': 'accounts',
   'a-settings': 'settings',
   'a-activity': 'settings',
+  'a-sindico': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -261,7 +263,15 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
         />
       );
     case 'a-settings':
-      return <AdminSettings onBack={() => go('a-home')} onOpenActivity={() => go('a-activity')} />;
+      return (
+        <AdminSettings
+          onBack={() => go('a-home')}
+          onOpenActivity={() => go('a-activity')}
+          onOpenSindico={() => go('a-sindico')}
+        />
+      );
+    case 'a-sindico':
+      return <SindicoScreen repository={invitationRepository} onBack={() => go('a-settings')} />;
     case 'a-activity':
       return <ActivityScreen repository={activityRepository} onBack={() => go('a-settings')} />;
     case 'a-notice':
@@ -291,9 +301,11 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
 function AdminSettings({
   onBack,
   onOpenActivity,
+  onOpenSindico,
 }: {
   onBack: () => void;
   onOpenActivity: () => void;
+  onOpenSindico: () => void;
 }) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
@@ -315,6 +327,7 @@ function AdminSettings({
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
       canManageFees={canManageFees}
       canManageCondo={canManageCondo}
+      onOpenSindico={canManageCondo ? onOpenSindico : undefined}
       onOpenActivity={canViewActivity ? onOpenActivity : undefined}
       onBack={onBack}
     />

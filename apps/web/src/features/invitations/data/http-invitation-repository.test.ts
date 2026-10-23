@@ -22,6 +22,8 @@ const CREATED = {
   emailSent: true,
 };
 const PREVIEW = {
+  role: 'morador',
+  targetName: 'Morada',
   condoName: 'Morada',
   residentName: 'Ana',
   apt: 'Apto 302',
@@ -126,6 +128,60 @@ describe('HttpInvitationRepository — admin', () => {
   });
 });
 
+describe('HttpInvitationRepository — síndico', () => {
+  test('reads the síndico of the condominium', async () => {
+    const body = { current: { name: 'Carla', email: 'c@x.com' }, invitation: VIEW };
+    const api = fakeApi({ get: jest.fn().mockResolvedValue(body) });
+
+    const result = await repositoryWith(api).sindico();
+
+    expect(api.get).toHaveBeenCalledWith('/api/sindico');
+    expect(result).toEqual(body);
+  });
+
+  test('invites a síndico with e-mail and optional phone', async () => {
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(CREATED) });
+
+    const result = await repositoryWith(api).inviteSindico('c@x.com', '21999990000');
+
+    expect(api.post).toHaveBeenCalledWith('/api/sindico/invitation', {
+      email: 'c@x.com',
+      phone: '21999990000',
+    });
+    expect(result).toEqual(CREATED);
+  });
+
+  test('omits the phone when it is not given', async () => {
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(CREATED) });
+
+    await repositoryWith(api).inviteSindico('c@x.com');
+
+    expect(api.post).toHaveBeenCalledWith('/api/sindico/invitation', { email: 'c@x.com' });
+  });
+
+  test('revokes the pending síndico invitation', async () => {
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(undefined) });
+
+    await repositoryWith(api).revokeSindico();
+
+    expect(api.post).toHaveBeenCalledWith('/api/sindico/invitation/revoke');
+  });
+
+  test('removes the current síndico', async () => {
+    const api = fakeApi({ post: jest.fn().mockResolvedValue(undefined) });
+
+    await repositoryWith(api).removeSindico();
+
+    expect(api.post).toHaveBeenCalledWith('/api/sindico/remove');
+  });
+
+  test('maps API failures to invitation errors', async () => {
+    const api = fakeApi({ post: jest.fn().mockRejectedValue(new ApiError(429, 'x')) });
+
+    expect(await kindOf(repositoryWith(api).inviteSindico('c@x.com'))).toBe('rate-limited');
+  });
+});
+
 describe('HttpInvitationRepository — public', () => {
   test('previews an invitation on the public client', async () => {
     const publicApi = fakeApi({ get: jest.fn().mockResolvedValue(PREVIEW) });
@@ -134,6 +190,19 @@ describe('HttpInvitationRepository — public', () => {
 
     expect(publicApi.get).toHaveBeenCalledWith('/auth/invitations/tok');
     expect(result).toEqual(PREVIEW);
+  });
+
+  test('previews a síndico invitation without resident fields', async () => {
+    const body = {
+      role: 'sindico',
+      targetName: 'Morada',
+      condoName: 'Morada',
+      email: 'c@x.com',
+      accountExists: false,
+    };
+    const publicApi = fakeApi({ get: jest.fn().mockResolvedValue(body) });
+
+    expect(await repositoryWith(fakeApi(), publicApi).preview('tok')).toEqual(body);
   });
 
   test('accepts an invitation on the public client', async () => {

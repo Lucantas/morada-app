@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import {
   OPEN_PREVIEW,
   RESIDENT_LOGIN,
+  SINDICO_PREVIEW,
+  TEAM_PREVIEW,
   fakeInvitationRepository,
 } from '@/test/factories.invitations';
 import { renderWithClient } from '@/test/render';
@@ -38,6 +40,42 @@ describe('AcceptInviteScreen', () => {
       await screen.findByRole('heading', { name: 'Você foi convidado para o Condomínio Morada' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Ana Souza · Apto 302')).toBeInTheDocument();
+  });
+
+  test('síndico invite heading', async () => {
+    renderAccept(withPreview(SINDICO_PREVIEW));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Você foi convidado para ser síndico do Condomínio Morada',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Apto/)).not.toBeInTheDocument();
+  });
+
+  test('team invite heading', async () => {
+    renderAccept(withPreview(TEAM_PREVIEW));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Você foi convidado para a equipe Administradora Aurora',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('a staff invite never sends an e-mail different from the invited one', async () => {
+    const { repository } = renderAccept(withPreview(SINDICO_PREVIEW));
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Seu nome'), 'Carla Lima');
+    await user.type(screen.getByLabelText('Senha'), 'segredo123');
+    await user.type(screen.getByLabelText('Confirme a senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    expect(repository.accept).toHaveBeenCalledWith('tok-123', {
+      name: 'Carla Lima',
+      password: 'segredo123',
+    });
   });
 
   test('an open invite always sends e-mail, name and password', async () => {

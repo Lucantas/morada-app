@@ -34,6 +34,7 @@ function Harness({
   canManageFees = true,
   canManageCondo = true,
   onOpenActivity,
+  onOpenSindico,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
@@ -41,6 +42,7 @@ function Harness({
   canManageFees?: boolean;
   canManageCondo?: boolean;
   onOpenActivity?: () => void;
+  onOpenSindico?: () => void;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -60,6 +62,7 @@ function Harness({
       canManageFees={canManageFees}
       canManageCondo={canManageCondo}
       onOpenActivity={onOpenActivity}
+      onOpenSindico={onOpenSindico}
       onBack={() => {}}
     />
   );
@@ -311,5 +314,27 @@ describe('SettingsScreen', () => {
     );
     await screen.findByLabelText('Nome da nova categoria');
     expect(screen.queryByRole('button', { name: 'Atividade' })).not.toBeInTheDocument();
+  });
+
+  test('shows the Síndico row only when an opener is provided and opens it', async () => {
+    const onOpenSindico = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenSindico={onOpenSindico}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Síndico' }));
+
+    expect(onOpenSindico).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Síndico' })).not.toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ export type View =
   | 'a-income-edit'
   | 'a-settings'
   | 'a-activity'
+  | 'a-sindico'
   | 'a-notice'
   | 'a-messages'
   | 'r-home'

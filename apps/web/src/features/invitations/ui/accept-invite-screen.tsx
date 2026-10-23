@@ -12,6 +12,7 @@ import {
   type AcceptInput,
   type AcceptMode,
   type InvitationPreview,
+  type InvitationRole,
 } from '../domain/invitation';
 import type { InvitationRepository } from '../domain/invitation-repository';
 
@@ -81,6 +82,17 @@ export function AcceptInviteScreen({
   );
 }
 
+function heading(role: InvitationRole, targetName: string): string {
+  if (role === 'sindico') return `Você foi convidado para ser síndico do ${targetName}`;
+  if (role === 'membro') return `Você foi convidado para a equipe ${targetName}`;
+  return `Você foi convidado para o ${targetName}`;
+}
+
+function subtitle(preview: InvitationPreview): string | undefined {
+  if (preview.role !== 'morador') return undefined;
+  return `${preview.residentName ?? ''} · ${preview.apt ?? ''}`;
+}
+
 const INTRO: Record<AcceptMode, string> = {
   open: 'Se você já tem conta no Morada, use o mesmo e-mail e a sua senha.',
   'existing-account': 'Entre com a senha da sua conta',
@@ -108,7 +120,7 @@ function AcceptForm({
   const [invalid, setInvalid] = useState<string | null>(null);
   const accept = useMutation({
     mutationFn: (input: AcceptInput) => repository.accept(token, input),
-    onSuccess: (response) => onAccepted(response, preview.condoName),
+    onSuccess: (response) => onAccepted(response, preview.targetName),
   });
 
   const submit = () => {
@@ -125,10 +137,7 @@ function AcceptForm({
   const asksName = mode !== 'existing-account';
 
   return (
-    <EntryLayout
-      title={`Você foi convidado para o ${preview.condoName}`}
-      intro={`${preview.residentName} · ${preview.apt}`}
-    >
+    <EntryLayout title={heading(preview.role, preview.targetName)} intro={subtitle(preview)}>
       <p style={{ color: 'var(--ink-700)', fontSize: '.95rem', margin: '0 0 18px' }}>
         {INTRO[mode]}
       </p>
