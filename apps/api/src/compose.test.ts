@@ -1,3 +1,5 @@
+import { sign } from 'hono/jwt';
+
 import { buildApp } from './compose';
 import { config } from './platform/config';
 import { migrate } from './platform/postgres/migrate';
@@ -5,7 +7,10 @@ import { createPool } from './platform/postgres/pool';
 import { makePostgresRepositories } from './repositories';
 import { adminCredentials } from './seed-data';
 import { resetPg } from './test-support/pg';
-import { residentCredentials, seedFixtures } from './test-fixtures';
+import { createTestCondo } from './test-support/condos';
+import { residentCredentials, seedFixtures, TEST_CONDO_ID } from './test-fixtures';
+
+const P = `/api/condos/${TEST_CONDO_ID}`;
 
 const pool = createPool(config.databaseUrl);
 
@@ -81,7 +86,7 @@ describe('Morada API', () => {
   test('rejects a mutating request without a matching CSRF token', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
-    const res = await app.request('/api/accounts', {
+    const res = await app.request(`${P}/accounts`, {
       method: 'POST',
       headers: { Cookie: auth.cookie, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -98,7 +103,7 @@ describe('Morada API', () => {
   test('accepts a mutating request with the matching CSRF token', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
-    const res = await app.request('/api/accounts', {
+    const res = await app.request(`${P}/accounts`, {
       method: 'POST',
       headers: {
         Cookie: auth.cookie,
@@ -117,14 +122,14 @@ describe('Morada API', () => {
   });
 
   test('rejects unauthenticated access to protected resources', async () => {
-    const res = await (await makeApp()).request('/api/residents');
+    const res = await (await makeApp()).request(`${P}/residents`);
     expect(res.status).toBe(401);
   });
 
   test('forbids a resident from admin-only resources', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/residents', {
+    const res = await app.request(`${P}/residents`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
@@ -133,7 +138,7 @@ describe('Morada API', () => {
   test('lets an admin list seeded residents', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
-    const res = await app.request('/api/residents', {
+    const res = await app.request(`${P}/residents`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
@@ -144,7 +149,7 @@ describe('Morada API', () => {
   test('an admin can create a resident (201) and read it back', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
-    const create = await app.request('/api/residents', {
+    const create = await app.request(`${P}/residents`, {
       method: 'POST',
       headers: {
         Cookie: auth.cookie,
@@ -163,7 +168,7 @@ describe('Morada API', () => {
     const created = (await create.json()) as { id: string; name: string };
     expect(created.name).toBe('Novo Morador');
 
-    const read = await app.request(`/api/residents/${created.id}`, {
+    const read = await app.request(`${P}/residents/${created.id}`, {
       headers: { Cookie: auth.cookie },
     });
     expect(read.status).toBe(200);
@@ -178,14 +183,14 @@ describe('Morada API', () => {
       'Content-Type': 'application/json',
     };
 
-    const override = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+    const override = await app.request(`${P}/residents/${residentCredentials.residentId}/status`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({ status: 'atrasado' }),
     });
     expect(override.status).toBe(200);
 
-    const clear = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+    const clear = await app.request(`${P}/residents/${residentCredentials.residentId}/status`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({ status: null }),
@@ -196,7 +201,7 @@ describe('Morada API', () => {
   test('overriding a resident status is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request(`/api/residents/${residentCredentials.residentId}/status`, {
+    const res = await app.request(`${P}/residents/${residentCredentials.residentId}/status`, {
       method: 'PUT',
       headers: {
         Cookie: auth.cookie,
@@ -228,7 +233,7 @@ describe('Morada API', () => {
   test('an inactive (moved-out) resident cannot log in', async () => {
     const app = await makeApp();
     const admin = await authFor(app, adminCredentials);
-    const deactivate = await app.request('/api/residents/r-1/deactivate', {
+    const deactivate = await app.request(`${P}/residents/r-1/deactivate`, {
       method: 'POST',
       headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
     });
@@ -241,7 +246,7 @@ describe('Morada API', () => {
   test('an active resident can read their own record', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/residents/me', {
+    const res = await app.request(`${P}/residents/me`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
@@ -251,16 +256,85 @@ describe('Morada API', () => {
     const app = await makeApp();
     const residentAuth = await authFor(app, residentCredentials); // issued while active
     const admin = await authFor(app, adminCredentials);
-    const deactivate = await app.request('/api/residents/r-1/deactivate', {
+    const deactivate = await app.request(`${P}/residents/r-1/deactivate`, {
       method: 'POST',
       headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
     });
     expect(deactivate.ok).toBe(true);
 
-    const res = await app.request('/api/residents/me', {
+    const res = await app.request(`${P}/residents/me`, {
       headers: { Cookie: residentAuth.cookie },
     });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Condomínio não encontrado' });
+  });
+
+  test('a moved-out resident is refused at login and their open session gets 404', async () => {
+    const app = await makeApp();
+    const residentAuth = await authFor(app, residentCredentials);
+    const admin = await authFor(app, adminCredentials);
+    await app.request(`${P}/residents/r-1/deactivate`, {
+      method: 'POST',
+      headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
+    });
+
+    const relogin = await login(app, residentCredentials.username, residentCredentials.password);
+    const next = await app.request(`${P}/receipts`, { headers: { Cookie: residentAuth.cookie } });
+
+    expect(relogin.status).toBe(401);
+    expect(next.status).toBe(404);
+  });
+
+  test("GET /me/condos lists the caller's condos", async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+    const resident = await authFor(app, residentCredentials);
+
+    const adminCondos = await app.request('/me/condos', { headers: { Cookie: admin.cookie } });
+    const residentCondos = await app.request('/me/condos', {
+      headers: { Cookie: resident.cookie },
+    });
+
+    expect(adminCondos.status).toBe(200);
+    expect(await adminCondos.json()).toEqual([
+      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' },
+    ]);
+    expect(await residentCondos.json()).toEqual([
+      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' },
+    ]);
+  });
+
+  test('GET /me/condos requires authentication', async () => {
+    const res = await (await makeApp()).request('/me/condos');
     expect(res.status).toBe(401);
+  });
+
+  test('a condo the caller has no role in answers 404', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const admin = await authFor(app, adminCredentials);
+
+    const res = await app.request('/api/condos/condo-other/residents', {
+      headers: { Cookie: admin.cookie },
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Condomínio não encontrado' });
+  });
+
+  test('a token without uid is rejected with 401', async () => {
+    const app = await makeApp();
+    const now = Math.floor(Date.now() / 1000);
+    const legacy = await sign(
+      { role: 'admin', sub: 'u-admin', iat: now, exp: now + 60 },
+      config.jwtSecret,
+      'HS256',
+    );
+
+    const res = await app.request(`${P}/residents`, { headers: { Cookie: `session=${legacy}` } });
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Sessão inválida' });
   });
 });
 
@@ -278,13 +352,14 @@ describe('Morada API — real credentials', () => {
     expect(csrf).not.toMatch(/HttpOnly/i);
   });
 
-  test('valid demo credentials return a token and role', async () => {
+  test('login returns the condos the user can enter', async () => {
     const res = await login(await makeApp(), adminCredentials.username, adminCredentials.password);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { role: string; subject: string };
+    const body: unknown = await res.json();
     expect(body).not.toHaveProperty('token');
-    expect(body.role).toBe('admin');
-    expect(body.subject).toMatch(/.+/);
+    expect(body).toEqual({
+      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' }],
+    });
   });
 
   test('a wrong password is rejected with 401', async () => {
@@ -324,7 +399,7 @@ describe('Morada API — real credentials', () => {
   test('a resident reads their own record via GET /api/residents/me', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/residents/me', {
+    const res = await app.request(`${P}/residents/me`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(200);
@@ -334,7 +409,7 @@ describe('Morada API — real credentials', () => {
   });
 
   test('GET /api/residents/me still requires authentication', async () => {
-    const res = await (await makeApp()).request('/api/residents/me');
+    const res = await (await makeApp()).request(`${P}/residents/me`);
     expect(res.status).toBe(401);
   });
 
@@ -343,10 +418,10 @@ describe('Morada API — real credentials', () => {
     const resAuth = await authFor(app, residentCredentials);
     const auth = (path: string) => app.request(path, { headers: { Cookie: resAuth.cookie } });
 
-    const own = await auth(`/api/threads/${residentCredentials.residentId}`);
+    const own = await auth(`${P}/threads/${residentCredentials.residentId}`);
     expect(own.status).toBe(200);
 
-    const foreign = await auth('/api/threads/t-2');
+    const foreign = await auth(`${P}/threads/t-2`);
     expect(foreign.status).toBe(403);
   });
 
@@ -395,9 +470,9 @@ describe('Morada API — apartments & occupancy', () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     expect(
-      (await auth('/api/residents', { method: 'POST', body: resident('Apto 999', 'A') })).status,
+      (await auth(`${P}/residents`, { method: 'POST', body: resident('Apto 999', 'A') })).status,
     ).toBe(201);
-    const second = await auth('/api/residents', {
+    const second = await auth(`${P}/residents`, {
       method: 'POST',
       body: resident('Apto 999', 'B'),
     });
@@ -407,15 +482,15 @@ describe('Morada API — apartments & occupancy', () => {
   test('a resident can be moved out, freeing the apartment for the next', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const first = await auth('/api/residents', { method: 'POST', body: resident('Apto 888', 'A') });
+    const first = await auth(`${P}/residents`, { method: 'POST', body: resident('Apto 888', 'A') });
     const { id } = (await first.json()) as { id: string };
 
-    expect((await auth(`/api/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
+    expect((await auth(`${P}/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
     // now the apartment is free again
-    const next = await auth('/api/residents', { method: 'POST', body: resident('Apto 888', 'B') });
+    const next = await auth(`${P}/residents`, { method: 'POST', body: resident('Apto 888', 'B') });
     expect(next.status).toBe(201);
     // the active-residents list shows the new occupant, not the old one
-    const listed = (await (await auth('/api/residents')).json()) as { name: string; apt: string }[];
+    const listed = (await (await auth(`${P}/residents`)).json()) as { name: string; apt: string }[];
     const at888 = listed.filter((r) => r.apt === 'Apto 888');
     expect(at888.map((r) => r.name)).toEqual(['B']);
   });
@@ -423,12 +498,12 @@ describe('Morada API — apartments & occupancy', () => {
   test("an admin reads an apartment's occupant history (current + former, active-first)", async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const first = await auth('/api/residents', { method: 'POST', body: resident('Apto 777', 'A') });
+    const first = await auth(`${P}/residents`, { method: 'POST', body: resident('Apto 777', 'A') });
     const { id, apartmentId } = (await first.json()) as { id: string; apartmentId: string };
-    expect((await auth(`/api/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
-    await auth('/api/residents', { method: 'POST', body: resident('Apto 777', 'B') });
+    expect((await auth(`${P}/residents/${id}/deactivate`, { method: 'POST' })).status).toBe(204);
+    await auth(`${P}/residents`, { method: 'POST', body: resident('Apto 777', 'B') });
 
-    const res = await auth(`/api/apartments/${apartmentId}/residents`);
+    const res = await auth(`${P}/apartments/${apartmentId}/residents`);
     expect(res.status).toBe(200);
     const history = (await res.json()) as { name: string; active: boolean }[];
     expect(history.map((r) => r.name).sort()).toEqual(['A', 'B']);
@@ -439,7 +514,7 @@ describe('Morada API — apartments & occupancy', () => {
   test('the apartment occupant history is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/apartments/apt-r-1/residents', {
+    const res = await app.request(`${P}/apartments/apt-r-1/residents`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
@@ -449,7 +524,7 @@ describe('Morada API — apartments & occupancy', () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
     // fixtures seed r-1 (Apto 302) with receipts under apartment apt-r-1
-    const res = await auth('/api/apartments/apt-r-1/receipts');
+    const res = await auth(`${P}/apartments/apt-r-1/receipts`);
     expect(res.status).toBe(200);
     const receipts = (await res.json()) as { residentId: string }[];
     expect(receipts.length).toBeGreaterThan(0);
@@ -459,7 +534,7 @@ describe('Morada API — apartments & occupancy', () => {
   test('the apartment ledger is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/apartments/apt-r-1/receipts', {
+    const res = await app.request(`${P}/apartments/apt-r-1/receipts`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
@@ -473,7 +548,7 @@ describe('Morada API — admin provisions resident logins', () => {
     const app = await makeApp();
     const auth = await adminAuth(app);
 
-    const created = await auth('/api/users', {
+    const created = await auth(`${P}/users`, {
       method: 'POST',
       body: JSON.stringify({ residentId: 'r-3' }),
     });
@@ -481,16 +556,23 @@ describe('Morada API — admin provisions resident logins', () => {
     const body = (await created.json()) as { username: string; tempPassword: string };
     expect(body.username).toBe('ana202');
     expect(body.tempPassword).toMatch(/.{8,}/);
+    await pool.query(
+      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+       SELECT 'role-ana', $1, id, 'morador', resident_id FROM users WHERE username = 'ana202'`,
+      [TEST_CONDO_ID],
+    );
 
     const loginRes = await login(app, 'ana202', body.tempPassword);
     expect(loginRes.status).toBe(200);
-    expect(((await loginRes.json()) as { role: string }).role).toBe('resident');
+    expect(await loginRes.json()).toEqual({
+      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+    });
   });
 
   test('provisioning a resident login is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/users', {
+    const res = await app.request(`${P}/users`, {
       method: 'POST',
       headers: {
         Cookie: auth.cookie,
@@ -505,7 +587,7 @@ describe('Morada API — admin provisions resident logins', () => {
   test('provisioning for a nonexistent resident is rejected with 404', async () => {
     const app = await makeApp();
     const auth = await adminAuth(app);
-    const res = await auth('/api/users', {
+    const res = await auth(`${P}/users`, {
       method: 'POST',
       body: JSON.stringify({ residentId: 'r-does-not-exist' }),
     });
@@ -515,7 +597,7 @@ describe('Morada API — admin provisions resident logins', () => {
   test('provisioning a login for a resident that already has one is rejected with 409', async () => {
     const app = await makeApp();
     const auth = await adminAuth(app);
-    const res = await auth('/api/users', {
+    const res = await auth(`${P}/users`, {
       method: 'POST',
       body: JSON.stringify({ residentId: residentCredentials.residentId }),
     });
@@ -527,7 +609,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
   test('an admin reads the username of a resident that has a login', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const res = await auth(`/api/residents/${residentCredentials.residentId}/login`);
+    const res = await auth(`${P}/residents/${residentCredentials.residentId}/login`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       username: residentCredentials.username,
@@ -538,7 +620,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
   test('reading the login of a resident without one returns the derived suggestion', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const res = await auth('/api/residents/r-3/login');
+    const res = await auth(`${P}/residents/r-3/login`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ username: null, suggested: 'ana202' });
   });
@@ -546,7 +628,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
   test('reading the login of a nonexistent resident returns null', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const res = await auth('/api/residents/r-does-not-exist/login');
+    const res = await auth(`${P}/residents/r-does-not-exist/login`);
     expect(res.status).toBe(200);
     expect(await res.json()).toBeNull();
   });
@@ -554,7 +636,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
   test('reading a resident login is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request(`/api/residents/${residentCredentials.residentId}/login`, {
+    const res = await app.request(`${P}/residents/${residentCredentials.residentId}/login`, {
       headers: { Cookie: auth.cookie },
     });
     expect(res.status).toBe(403);
@@ -563,7 +645,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
   test('an admin resets a resident password and the resident logs in with the new one', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const reset = await auth(`/api/residents/${residentCredentials.residentId}/login/reset`, {
+    const reset = await auth(`${P}/residents/${residentCredentials.residentId}/login/reset`, {
       method: 'POST',
     });
     expect(reset.status).toBe(200);
@@ -574,13 +656,15 @@ describe('Morada API — admin reads and resets resident logins', () => {
 
     const loginRes = await login(app, residentCredentials.username, body.tempPassword);
     expect(loginRes.status).toBe(200);
-    expect(((await loginRes.json()) as { role: string }).role).toBe('resident');
+    expect(await loginRes.json()).toEqual({
+      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+    });
   });
 
   test('resetting the password of a resident without a login returns 404', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
-    const res = await auth('/api/residents/r-3/login/reset', { method: 'POST' });
+    const res = await auth(`${P}/residents/r-3/login/reset`, { method: 'POST' });
     expect(res.status).toBe(404);
   });
 });
@@ -603,17 +687,17 @@ describe('Morada API — authorization wiring', () => {
 
   test('accounts are admin-only', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/accounts')).status).toBe(403);
+    expect((await resident.auth(`${P}/accounts`)).status).toBe(403);
     const admin = await withCreds(adminCredentials);
-    expect((await admin.auth('/api/accounts')).status).toBe(200);
+    expect((await admin.auth(`${P}/accounts`)).status).toBe(200);
   });
 
   test('incomes are admin-only; an admin can create one', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/incomes')).status).toBe(403);
+    expect((await resident.auth(`${P}/incomes`)).status).toBe(403);
 
     const admin = await withCreds(adminCredentials);
-    const res = await admin.auth('/api/incomes', {
+    const res = await admin.auth(`${P}/incomes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -630,18 +714,18 @@ describe('Morada API — authorization wiring', () => {
 
   test('updating and deleting an income is admin-only', async () => {
     const resident = await withCreds(residentCredentials);
-    const put = await resident.auth('/api/incomes/whatever', {
+    const put = await resident.auth(`${P}/incomes/whatever`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
     expect(put.status).toBe(403);
-    expect((await resident.auth('/api/incomes/whatever', { method: 'DELETE' })).status).toBe(403);
+    expect((await resident.auth(`${P}/incomes/whatever`, { method: 'DELETE' })).status).toBe(403);
   });
 
   test('updating a non-existent income returns 404 instead of creating it', async () => {
     const admin = await withCreds(adminCredentials);
-    const res = await admin.auth('/api/incomes/ghost-id', {
+    const res = await admin.auth(`${P}/incomes/ghost-id`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -652,13 +736,13 @@ describe('Morada API — authorization wiring', () => {
       }),
     });
     expect(res.status).toBe(404);
-    expect((await admin.auth('/api/incomes')).status).toBe(200);
-    expect(await (await admin.auth('/api/incomes')).json()).toEqual([]);
+    expect((await admin.auth(`${P}/incomes`)).status).toBe(200);
+    expect(await (await admin.auth(`${P}/incomes`)).json()).toEqual([]);
   });
 
   test('rejects an income with an impossible date as 400', async () => {
     const admin = await withCreds(adminCredentials);
-    const res = await admin.auth('/api/incomes', {
+    const res = await admin.auth(`${P}/incomes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -673,24 +757,24 @@ describe('Morada API — authorization wiring', () => {
 
   test('settings are admin-only', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/settings')).status).toBe(403);
+    expect((await resident.auth(`${P}/settings`)).status).toBe(403);
     const admin = await withCreds(adminCredentials);
-    const res = await admin.auth('/api/settings');
+    const res = await admin.auth(`${P}/settings`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
   });
 
   test('categories are admin-only; saving reclassifies matching accounts', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/categories')).status).toBe(403);
+    expect((await resident.auth(`${P}/categories`)).status).toBe(403);
 
     const admin = await withCreds(adminCredentials);
-    const list = await admin.auth('/api/categories');
+    const list = await admin.auth(`${P}/categories`);
     expect(list.status).toBe(200);
     expect(await list.json()).toEqual([]);
 
     // fixtures seed account a-1 with description "Água — abril" — matched by keyword "água"
-    const put = await admin.auth('/api/categories', {
+    const put = await admin.auth(`${P}/categories`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([{ name: 'Água', keywords: 'água' }]),
@@ -705,20 +789,20 @@ describe('Morada API — authorization wiring', () => {
     ]);
     expect(body.reclassified).toBe(1);
 
-    const accounts = await admin.auth('/api/accounts');
+    const accounts = await admin.auth(`${P}/accounts`);
     const list2 = (await accounts.json()) as { id: string; category: string }[];
     expect(list2.find((a) => a.id === 'a-1')?.category).toBe('Água');
   });
 
   test('receipts and dashboard are open to any authenticated user', async () => {
     const { auth } = await withCreds(residentCredentials);
-    expect((await auth('/api/receipts')).status).toBe(200);
-    expect((await auth('/api/dashboard')).status).toBe(200);
+    expect((await auth(`${P}/receipts`)).status).toBe(200);
+    expect((await auth(`${P}/dashboard`)).status).toBe(200);
   });
 
   test('a resident lists only their own receipts', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1
-    const res = await auth('/api/receipts');
+    const res = await auth(`${P}/receipts`);
     const receipts = (await res.json()) as { id: string; residentId?: string }[];
     expect(receipts.length).toBeGreaterThan(0);
     expect(receipts.every((r) => r.residentId === 'r-1')).toBe(true);
@@ -727,8 +811,8 @@ describe('Morada API — authorization wiring', () => {
 
   test('a resident cannot read or pay another resident receipt (403)', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1
-    expect((await auth('/api/receipts/rc-5')).status).toBe(403); // rc-5 is r-3's
-    const pay = await auth('/api/receipts/rc-5/pay', {
+    expect((await auth(`${P}/receipts/rc-5`)).status).toBe(403); // rc-5 is r-3's
+    const pay = await auth(`${P}/receipts/rc-5/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ method: 'pix' }),
@@ -738,7 +822,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('a resident cannot pay their own receipt directly (admin-only)', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1
-    const pay = await auth('/api/receipts/rc-1/pay', {
+    const pay = await auth(`${P}/receipts/rc-1/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ method: 'pix' }),
@@ -748,7 +832,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('a resident submits a payment with proof for their own receipt, moving it to em_analise', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1
-    const submit = await auth('/api/receipts/rc-1/submit-payment', {
+    const submit = await auth(`${P}/receipts/rc-1/submit-payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -765,7 +849,7 @@ describe('Morada API — authorization wiring', () => {
   test('an admin issues a charge and the resident then sees it (pending)', async () => {
     const app = await makeApp();
     const admin = await authFor(app, adminCredentials);
-    const issue = await app.request('/api/receipts', {
+    const issue = await app.request(`${P}/receipts`, {
       method: 'POST',
       headers: {
         Cookie: admin.cookie,
@@ -785,7 +869,7 @@ describe('Morada API — authorization wiring', () => {
     expect(created.status).toBe('pendente');
 
     const resident = await authFor(app, residentCredentials);
-    const mine = await app.request('/api/receipts', {
+    const mine = await app.request(`${P}/receipts`, {
       headers: { Cookie: resident.cookie },
     });
     const ids = ((await mine.json()) as { id: string }[]).map((r) => r.id);
@@ -796,7 +880,7 @@ describe('Morada API — authorization wiring', () => {
     const app = await makeApp();
     const admin = await authFor(app, adminCredentials);
     const issue = () =>
-      app.request('/api/receipts', {
+      app.request(`${P}/receipts`, {
         method: 'POST',
         headers: {
           Cookie: admin.cookie,
@@ -822,7 +906,7 @@ describe('Morada API — authorization wiring', () => {
   test('issuing a charge is admin-only', async () => {
     const app = await makeApp();
     const auth = await authFor(app, residentCredentials);
-    const res = await app.request('/api/receipts', {
+    const res = await app.request(`${P}/receipts`, {
       method: 'POST',
       headers: {
         Cookie: auth.cookie,
@@ -843,7 +927,7 @@ describe('Morada API — authorization wiring', () => {
   test('issuing a charge for a nonexistent resident is rejected with 404', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);
-    const res = await app.request('/api/receipts', {
+    const res = await app.request(`${P}/receipts`, {
       method: 'POST',
       headers: {
         Cookie: auth.cookie,
@@ -863,30 +947,30 @@ describe('Morada API — authorization wiring', () => {
 
   test('deleting a receipt is admin-only', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/receipts/rc-2', { method: 'DELETE' })).status).toBe(403);
+    expect((await resident.auth(`${P}/receipts/rc-2`, { method: 'DELETE' })).status).toBe(403);
   });
 
   test('an admin deletes a receipt (204), it disappears from the apartment ledger, and a repeat 404s', async () => {
     const admin = await withCreds(adminCredentials);
-    const del = await admin.auth('/api/receipts/rc-2', { method: 'DELETE' });
+    const del = await admin.auth(`${P}/receipts/rc-2`, { method: 'DELETE' });
     expect(del.status).toBe(204);
 
-    const ledger = await admin.auth('/api/apartments/apt-r-1/receipts');
+    const ledger = await admin.auth(`${P}/apartments/apt-r-1/receipts`);
     const ids = ((await ledger.json()) as { id: string }[]).map((r) => r.id);
     expect(ids).not.toContain('rc-2');
 
-    expect((await admin.auth('/api/receipts/rc-2', { method: 'DELETE' })).status).toBe(404);
+    expect((await admin.auth(`${P}/receipts/rc-2`, { method: 'DELETE' })).status).toBe(404);
   });
 
   test('deleting a paid receipt removes its value from the dashboard balance', async () => {
     const admin = await withCreds(adminCredentials);
-    const before = (await (await admin.auth('/api/dashboard')).json()) as {
+    const before = (await (await admin.auth(`${P}/dashboard`)).json()) as {
       balance: { balanceCents: number };
     };
 
-    await admin.auth('/api/receipts/rc-2', { method: 'DELETE' });
+    await admin.auth(`${P}/receipts/rc-2`, { method: 'DELETE' });
 
-    const after = (await (await admin.auth('/api/dashboard')).json()) as {
+    const after = (await (await admin.auth(`${P}/dashboard`)).json()) as {
       balance: { balanceCents: number };
     };
     expect(after.balance.balanceCents).toBe(before.balance.balanceCents - 45000);
@@ -894,31 +978,31 @@ describe('Morada API — authorization wiring', () => {
 
   test('deleting an account is admin-only', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/accounts/a-1', { method: 'DELETE' })).status).toBe(403);
+    expect((await resident.auth(`${P}/accounts/a-1`, { method: 'DELETE' })).status).toBe(403);
   });
 
   test('an admin deletes an account (204), it disappears from the list, and a repeat 404s', async () => {
     const admin = await withCreds(adminCredentials);
-    const del = await admin.auth('/api/accounts/a-1', { method: 'DELETE' });
+    const del = await admin.auth(`${P}/accounts/a-1`, { method: 'DELETE' });
     expect(del.status).toBe(204);
 
-    const list = await admin.auth('/api/accounts');
+    const list = await admin.auth(`${P}/accounts`);
     const ids = ((await list.json()) as { id: string }[]).map((a) => a.id);
     expect(ids).not.toContain('a-1');
 
-    expect((await admin.auth('/api/accounts/a-1', { method: 'DELETE' })).status).toBe(404);
+    expect((await admin.auth(`${P}/accounts/a-1`, { method: 'DELETE' })).status).toBe(404);
   });
 
   test('deleting an account no longer counts it in the dashboard summary', async () => {
     const admin = await withCreds(adminCredentials);
-    const before = (await (await admin.auth('/api/dashboard')).json()) as {
+    const before = (await (await admin.auth(`${P}/dashboard`)).json()) as {
       recentPaid: { id: string }[];
     };
     expect(before.recentPaid.some((item) => item.id === 'a-1')).toBe(true);
 
-    await admin.auth('/api/accounts/a-1', { method: 'DELETE' });
+    await admin.auth(`${P}/accounts/a-1`, { method: 'DELETE' });
 
-    const after = (await (await admin.auth('/api/dashboard')).json()) as {
+    const after = (await (await admin.auth(`${P}/dashboard`)).json()) as {
       recentPaid: { id: string }[];
     };
     expect(after.recentPaid.some((item) => item.id === 'a-1')).toBe(false);
@@ -926,9 +1010,9 @@ describe('Morada API — authorization wiring', () => {
 
   test('notices are readable by residents but writable only by admins', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/notices')).status).toBe(200);
+    expect((await resident.auth(`${P}/notices`)).status).toBe(200);
     const write = (a: typeof resident.auth) =>
-      a('/api/notices', {
+      a(`${P}/notices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Aviso', body: 'Corpo', kind: 'aviso', audience: 'Todos' }),
@@ -940,24 +1024,24 @@ describe('Morada API — authorization wiring', () => {
 
   test('a resident can dismiss a notice but cannot delete one', async () => {
     const { auth } = await withCreds(residentCredentials);
-    expect((await auth('/api/notices/n-1/dismiss', { method: 'POST' })).status).toBe(200);
-    expect((await auth('/api/notices/n-1', { method: 'DELETE' })).status).toBe(403);
+    expect((await auth(`${P}/notices/n-1/dismiss`, { method: 'POST' })).status).toBe(200);
+    expect((await auth(`${P}/notices/n-1`, { method: 'DELETE' })).status).toBe(403);
   });
 
   test('listing all threads is admin-only, but a resident can read their own thread', async () => {
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth('/api/threads')).status).toBe(403);
-    expect((await resident.auth(`/api/threads/${residentCredentials.residentId}`)).status).toBe(
+    expect((await resident.auth(`${P}/threads`)).status).toBe(403);
+    expect((await resident.auth(`${P}/threads/${residentCredentials.residentId}`)).status).toBe(
       200,
     );
     const admin = await withCreds(adminCredentials);
-    expect((await admin.auth('/api/threads')).status).toBe(200);
+    expect((await admin.auth(`${P}/threads`)).status).toBe(200);
   });
 
   test('a resident cannot read or write another resident thread (IDOR blocked)', async () => {
     const { auth } = await withCreds(residentCredentials);
-    expect((await auth('/api/threads/t-2')).status).toBe(403);
-    const post = await auth('/api/threads/t-2/messages', {
+    expect((await auth(`${P}/threads/t-2`)).status).toBe(403);
+    const post = await auth(`${P}/threads/t-2/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: 'intruso' }),
@@ -967,7 +1051,7 @@ describe('Morada API — authorization wiring', () => {
 
   test('message author is derived from the token role, not the request body', async () => {
     const { auth } = await withCreds(residentCredentials);
-    const res = await auth(`/api/threads/${residentCredentials.residentId}/messages`, {
+    const res = await auth(`${P}/threads/${residentCredentials.residentId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ author: 'admin', text: 'tentativa de spoof' }),
@@ -981,7 +1065,7 @@ describe('Morada API — authorization wiring', () => {
   test('a receipt proof is servable by its owning resident and by an admin', async () => {
     const app = await makeApp();
     const residentAuth = await authFor(app, residentCredentials); // r-1 owns rc-1
-    const submit = await app.request('/api/receipts/rc-1/submit-payment', {
+    const submit = await app.request(`${P}/receipts/rc-1/submit-payment`, {
       method: 'POST',
       headers: {
         Cookie: residentAuth.cookie,
@@ -995,7 +1079,7 @@ describe('Morada API — authorization wiring', () => {
     });
     expect(submit.status).toBe(200);
 
-    const ownerRes = await app.request('/api/receipts/rc-1/proof', {
+    const ownerRes = await app.request(`${P}/receipts/rc-1/proof`, {
       headers: { Cookie: residentAuth.cookie },
     });
     expect(ownerRes.status).toBe(200);
@@ -1003,7 +1087,7 @@ describe('Morada API — authorization wiring', () => {
     expect(new Uint8Array(await ownerRes.arrayBuffer()).length).toBeGreaterThan(0);
 
     const adminAuth = await authFor(app, adminCredentials);
-    const adminRes = await app.request('/api/receipts/rc-1/proof', {
+    const adminRes = await app.request(`${P}/receipts/rc-1/proof`, {
       headers: { Cookie: adminAuth.cookie },
     });
     expect(adminRes.status).toBe(200);
@@ -1012,25 +1096,25 @@ describe('Morada API — authorization wiring', () => {
 
   test('a resident cannot read another resident receipt proof (403)', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1, rc-5 belongs to r-3
-    const res = await auth('/api/receipts/rc-5/proof');
+    const res = await auth(`${P}/receipts/rc-5/proof`);
     expect(res.status).toBe(403);
   });
 
   test('a receipt without a proof returns 404', async () => {
     const { auth } = await withCreds(residentCredentials); // r-1 owns rc-1, no proof yet
-    const res = await auth('/api/receipts/rc-1/proof');
+    const res = await auth(`${P}/receipts/rc-1/proof`);
     expect(res.status).toBe(404);
   });
 
   test('a missing receipt proof route returns 404', async () => {
     const { auth } = await withCreds(adminCredentials);
-    const res = await auth('/api/receipts/ghost-id/proof');
+    const res = await auth(`${P}/receipts/ghost-id/proof`);
     expect(res.status).toBe(404);
   });
 
   test('an income proof is servable by an admin, admin-only, and 404 without one', async () => {
     const admin = await withCreds(adminCredentials);
-    const created = await admin.auth('/api/incomes', {
+    const created = await admin.auth(`${P}/incomes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1044,14 +1128,14 @@ describe('Morada API — authorization wiring', () => {
     expect(created.status).toBe(201);
     const income = (await created.json()) as { id: string };
 
-    const proofRes = await admin.auth(`/api/incomes/${income.id}/proof`);
+    const proofRes = await admin.auth(`${P}/incomes/${income.id}/proof`);
     expect(proofRes.status).toBe(200);
     expect(proofRes.headers.get('Content-Type')).toBe('image/png');
 
     const resident = await withCreds(residentCredentials);
-    expect((await resident.auth(`/api/incomes/${income.id}/proof`)).status).toBe(403);
+    expect((await resident.auth(`${P}/incomes/${income.id}/proof`)).status).toBe(403);
 
-    const withoutProof = await admin.auth('/api/incomes', {
+    const withoutProof = await admin.auth(`${P}/incomes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1062,13 +1146,13 @@ describe('Morada API — authorization wiring', () => {
       }),
     });
     const incomeNoProof = (await withoutProof.json()) as { id: string };
-    expect((await admin.auth(`/api/incomes/${incomeNoProof.id}/proof`)).status).toBe(404);
+    expect((await admin.auth(`${P}/incomes/${incomeNoProof.id}/proof`)).status).toBe(404);
   });
 
   test('an account proof is downloadable by admin and by a resident; 404 without one', async () => {
     const app = await makeApp();
     const adminAuth = await authFor(app, adminCredentials);
-    const put = await app.request('/api/accounts/a-proof', {
+    const put = await app.request(`${P}/accounts/a-proof`, {
       method: 'PUT',
       headers: {
         Cookie: adminAuth.cookie,
@@ -1086,20 +1170,20 @@ describe('Morada API — authorization wiring', () => {
     });
     expect(put.status).toBe(200);
 
-    const adminProof = await app.request('/api/accounts/a-proof/proof', {
+    const adminProof = await app.request(`${P}/accounts/a-proof/proof`, {
       headers: { Cookie: adminAuth.cookie },
     });
     expect(adminProof.status).toBe(200);
     expect(adminProof.headers.get('Content-Type')).toBe('image/png');
 
     const residentAuth = await authFor(app, residentCredentials);
-    const residentProof = await app.request('/api/accounts/a-proof/proof', {
+    const residentProof = await app.request(`${P}/accounts/a-proof/proof`, {
       headers: { Cookie: residentAuth.cookie },
     });
     expect(residentProof.status).toBe(200);
     expect(residentProof.headers.get('Content-Type')).toBe('image/png');
 
-    const noProof = await app.request('/api/accounts/a-plain', {
+    const noProof = await app.request(`${P}/accounts/a-plain`, {
       method: 'PUT',
       headers: {
         Cookie: adminAuth.cookie,
@@ -1116,11 +1200,11 @@ describe('Morada API — authorization wiring', () => {
     });
     expect(noProof.status).toBe(200);
     expect(
-      (await app.request('/api/accounts/a-plain/proof', { headers: { Cookie: adminAuth.cookie } }))
+      (await app.request(`${P}/accounts/a-plain/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
     ).toBe(404);
     expect(
-      (await app.request('/api/accounts/ghost/proof', { headers: { Cookie: adminAuth.cookie } }))
+      (await app.request(`${P}/accounts/ghost/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
     ).toBe(404);
   });

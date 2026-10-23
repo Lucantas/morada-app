@@ -7,14 +7,13 @@ import { SESSION_COOKIE } from './cookies';
 
 export type Role = 'admin' | 'resident';
 
-/** `sub` identifies the resident (their thread id); admins get 'admin'. */
-export type ApiEnv = { Variables: { role: Role; sub: string } };
+export type ApiEnv = { Variables: { uid: string; role: Role; sub: string; condoId: string } };
 
 const EIGHT_HOURS = 60 * 60 * 8;
 
-export async function signSession(role: Role, subject: string): Promise<string> {
+export async function signSession(userId: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ role, sub: subject, iat: now, exp: now + EIGHT_HOURS }, config.jwtSecret, 'HS256');
+  return sign({ uid: userId, iat: now, exp: now + EIGHT_HOURS }, config.jwtSecret, 'HS256');
 }
 
 export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
@@ -22,13 +21,11 @@ export const authMiddleware: MiddlewareHandler<ApiEnv> = async (c, next) => {
   if (!token) return c.json({ error: 'Não autenticado' }, 401);
   try {
     const payload = await verify(token, config.jwtSecret, 'HS256');
-    const role = payload.role;
-    const sub = payload.sub;
-    if ((role !== 'admin' && role !== 'resident') || typeof sub !== 'string') {
+    const uid = payload.uid;
+    if (typeof uid !== 'string' || uid === '') {
       return c.json({ error: 'Sessão inválida' }, 401);
     }
-    c.set('role', role);
-    c.set('sub', sub);
+    c.set('uid', uid);
     await next();
     return;
   } catch {

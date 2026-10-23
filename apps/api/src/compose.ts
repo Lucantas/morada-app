@@ -4,11 +4,14 @@ import { secureHeaders } from 'hono/secure-headers';
 
 import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
+import { meRoutes } from './condos/adapters/http/routes';
+import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
+import { condoAccessMiddleware } from './platform/condo-scope';
 import { csrfMiddleware } from './platform/csrf';
 import { config } from './platform/config';
 import { createRepositories, type Repositories } from './repositories';
@@ -47,8 +50,6 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     condos,
   } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
-  const isResidentActive = async (residentId: string | null): Promise<boolean> =>
-    residentId !== null && (await residents.getById(residentId))?.active === true;
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
   if (!config.isProduction || process.env.SEED_DEMO_DATA === '1') {
@@ -88,18 +89,21 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   app.route('/healthz', healthRoutes());
 
   const loginLimiter = createRateLimiter();
-  app.route('/auth', authRoutes({ users, hasher, isResidentActive, limiter: loginLimiter }));
+  app.route(
+    '/auth',
+    authRoutes({
+      users,
+      hasher,
+      condosFor: (userId) => listMyCondos(condos, userId),
+      limiter: loginLimiter,
+    }),
+  );
+  app.route('/me', meRoutes(condos));
 
   const api = new Hono<ApiEnv>();
   api.use('*', authMiddleware);
   api.use('*', csrfMiddleware);
-
-  api.use('*', async (c, next) => {
-    if (c.get('role') === 'resident' && !(await isResidentActive(c.get('sub')))) {
-      return c.json({ error: 'Sessão inválida' }, 401);
-    }
-    await next();
-  });
+  api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
   // Admin-only: provision a resident login. Returns the generated temp password
   // once for the admin to relay; only the hash is ever stored.
@@ -150,7 +154,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     }),
   );
 
-  app.route('/api', api);
+  app.route('/api/condos/:condoId', api);
 
   return app;
 }
