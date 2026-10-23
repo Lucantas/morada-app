@@ -8,6 +8,7 @@ import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
 import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
+import { invitationRoutes } from './invitations/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
@@ -135,6 +136,14 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     residentRoutes(
       scoped(({ residents, receipts }) => ({ residents, receipts, users })),
       hasher,
+    ),
+  );
+
+  api.route(
+    '/residents',
+    invitationRoutes(
+      scoped(({ residents, invitations }) => ({ residents, invitations })),
+      { condos, email, appUrl: config.appUrl, now },
     ),
   );
 

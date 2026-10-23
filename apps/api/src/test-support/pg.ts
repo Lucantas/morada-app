@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 
 const DATA_TABLES = [
+  'invitations',
   'apartment_residents',
   'apartments',
   'residents',

@@ -405,4 +405,24 @@ CREATE INDEX idx_auth_tokens_user_kind ON auth_tokens (user_id, kind);
 ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0;
 `,
   },
+  {
+    id: '022_invitations',
+    sql: `
+CREATE TABLE invitations (
+  id TEXT PRIMARY KEY,
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  resident_id TEXT NOT NULL REFERENCES residents(id),
+  role TEXT NOT NULL CHECK (role IN ('morador')),
+  email TEXT,
+  token_hash TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL CHECK (status IN ('pendente', 'aceito', 'revogado')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  claimed_by TEXT REFERENCES users(id),
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_invitations_condo_resident ON invitations (condominium_id, resident_id);
+`,
+  },
 ];

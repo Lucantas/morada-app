@@ -2,9 +2,10 @@ import { sign } from 'hono/jwt';
 
 import { buildApp } from './compose';
 import { config } from './platform/config';
-import type { EmailSender } from './platform/email/email-sender';
+import { DisabledEmailSender, type EmailSender } from './platform/email/email-sender';
 import { InMemoryEmailSender } from './platform/email/in-memory-email-sender';
 import { migrate } from './platform/postgres/migrate';
+import { hashToken } from './platform/tokens';
 import { createPool } from './platform/postgres/pool';
 import { makePostgresRepositories } from './repositories';
 import { adminCredentials } from './seed-data';
@@ -2196,5 +2197,267 @@ describe('Morada API — forgot and reset password', () => {
     const res = await app.request('/me', { headers: { Cookie: `session=${legacy}` } });
 
     expect(res.status).toBe(401);
+  });
+});
+
+describe('Resident invitations', () => {
+  const APP_URL = config.appUrl;
+
+  async function adminSession(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf, 'Content-Type': 'application/json' };
+  }
+
+  function post(app: App, path: string, headers: Record<string, string>, body?: unknown) {
+    return app.request(`${P}${path}`, {
+      method: 'POST',
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  function tokenIn(link: string): string {
+    return link.slice(`${APP_URL}/#/convite/`.length);
+  }
+
+  async function setResident(id: string, fields: { phone?: string; email?: string }) {
+    await pool.query(
+      'UPDATE residents SET phone = COALESCE($2, phone), email = COALESCE($3, email) WHERE id = $1',
+      [id, fields.phone ?? null, fields.email ?? null],
+    );
+  }
+
+  test('creates a pending invitation, returns the link once and e-mails the resident', async () => {
+    const sender = new InMemoryEmailSender();
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: sender, now: () => now });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      status: string;
+      email: string;
+      expiresAt: string;
+      link: string;
+      whatsappUrl: string;
+    };
+    expect(body).toMatchObject({
+      status: 'pendente',
+      email: 'maria@email.com',
+      expiresAt: '2026-10-30T12:00:00.000Z',
+    });
+    expect(body.link).toMatch(new RegExp(`^${APP_URL}/#/convite/[\\w-]{43}$`));
+    const mail = sender.lastTo('maria@email.com');
+    expect(mail?.subject).toBe('Você foi convidado para o Condomínio condo-test');
+    expect(mail?.text).toContain(body.link);
+    const { rows } = await pool.query(
+      'SELECT token_hash, created_by, resident_id, condominium_id FROM invitations',
+    );
+    expect(rows).toEqual([
+      {
+        token_hash: hashToken(tokenIn(body.link)),
+        created_by: 'u-admin',
+        resident_id: 'r-1',
+        condominium_id: TEST_CONDO_ID,
+      },
+    ]);
+  });
+
+  test('uses the e-mail from the body, normalized, instead of the stored one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: '  Nova@X.com ' });
+
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { email: string }).email).toBe('nova@x.com');
+    expect(sender.sent.map((m) => m.to)).toEqual(['nova@x.com']);
+  });
+
+  test('rejects an invalid e-mail in the body with 400 and writes nothing', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, { email: 'nope' });
+
+    expect(res.status).toBe(400);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('sends no e-mail when neither the body nor the resident has a valid one', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await setResident('r-1', { email: 'not-an-email' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers);
+
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { email: string | null }).email).toBeNull();
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('whatsappUrl carries the Brazilian country code and the greeting', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await setResident('r-1', { phone: '(11) 98888-7777' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    const body = (await res.json()) as { link: string; whatsappUrl: string };
+    const message = `Olá, Maria! Seu acesso ao Condomínio condo-test no Morada: ${body.link}`;
+    expect(body.whatsappUrl).toBe(
+      `https://wa.me/5511988887777?text=${encodeURIComponent(message)}`,
+    );
+  });
+
+  test('whatsappUrl falls back to the generic link without a phone', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await setResident('r-1', { phone: '' });
+    const headers = await adminSession(app);
+
+    const res = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(((await res.json()) as { whatsappUrl: string }).whatsappUrl).toMatch(
+      /^https:\/\/wa\.me\/\?text=/,
+    );
+  });
+
+  test('the disabled sender fails with 503 when an e-mail is given, and succeeds without one', async () => {
+    const app = await makeApp({ email: new DisabledEmailSender() });
+    await setResident('r-1', { email: '' });
+    const headers = await adminSession(app);
+
+    const withEmail = await post(app, '/residents/r-1/invitation', headers, { email: 'a@x.com' });
+    const without = await post(app, '/residents/r-1/invitation', headers, {});
+
+    expect(withEmail.status).toBe(503);
+    expect(without.status).toBe(201);
+  });
+
+  test('GET returns null, then the status without the link or token', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const headers = await adminSession(app);
+    const none = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, { headers });
+
+    expect(none.status).toBe(200);
+    expect(await none.json()).toBeNull();
+    expect(await res.json()).toEqual({
+      status: 'pendente',
+      email: 'maria@email.com',
+      expiresAt: '2026-10-30T12:00:00.000Z',
+    });
+  });
+
+  test('GET reports expirado once the invitation passes its expiry', async () => {
+    let now = new Date('2026-10-23T12:00:00.000Z');
+    const app = await makeApp({ email: new InMemoryEmailSender(), now: () => now });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+    now = new Date('2026-10-30T12:00:00.000Z');
+
+    const res = await app.request(`${P}/residents/r-1/invitation`, { headers });
+
+    expect(((await res.json()) as { status: string }).status).toBe('expirado');
+  });
+
+  test('inviting again revokes the previous invitation', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const { rows } = await pool.query('SELECT status FROM invitations ORDER BY created_at');
+    expect(rows).toEqual([{ status: 'revogado' }, { status: 'pendente' }]);
+  });
+
+  test('revoke answers 204 and marks the invitation revogado', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const headers = await adminSession(app);
+    await post(app, '/residents/r-1/invitation', headers, {});
+
+    const res = await post(app, '/residents/r-1/invitation/revoke', headers);
+
+    expect(res.status).toBe(204);
+    const status = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    expect(((await status.json()) as { status: string }).status).toBe('revogado');
+  });
+
+  test('a resident session cannot manage invitations', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    const auth = await authFor(app, residentCredentials);
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const create = await post(app, '/residents/r-1/invitation', headers, {});
+    const read = await app.request(`${P}/residents/r-1/invitation`, { headers });
+    const revoke = await post(app, '/residents/r-1/invitation/revoke', headers);
+
+    expect([create.status, read.status, revoke.status]).toEqual([403, 403, 403]);
+    expect(await count('invitations')).toBe(0);
+  });
+
+  test('foreign or unknown residents answer 404 and write nothing', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: 'f@x.com',
+      status: 'em_dia',
+    });
+    const headers = await adminSession(app);
+
+    const create = await post(app, '/residents/r-foreign/invitation', headers, {});
+    const read = await app.request(`${P}/residents/r-foreign/invitation`, { headers });
+    const revoke = await post(app, '/residents/r-foreign/invitation/revoke', headers);
+    const unknown = await post(app, '/residents/ghost/invitation', headers, {});
+
+    expect([create.status, read.status, revoke.status, unknown.status]).toEqual([
+      404, 404, 404, 404,
+    ]);
+    expect(await count('invitations')).toBe(0);
+    expect(sender.sent).toEqual([]);
+  });
+
+  test('condominium B invitations are invisible and untouched by condominium A admin', async () => {
+    const app = await makeApp({ email: new InMemoryEmailSender() });
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    await other.residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: '',
+      status: 'em_dia',
+    });
+    await other.invitations.create({
+      residentId: 'r-foreign',
+      email: null,
+      tokenHash: 'hb',
+      expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+      createdBy: 'u-admin',
+    });
+    const headers = await adminSession(app);
+
+    await post(app, '/residents/r-foreign/invitation/revoke', headers);
+
+    expect((await other.invitations.latestForResident('r-foreign'))?.status).toBe('pendente');
   });
 });
