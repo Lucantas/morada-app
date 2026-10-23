@@ -340,6 +340,19 @@ export async function seedFixtures(pool: Pool): Promise<void> {
   );
   await insertRows(
     pool,
+    'organization_members',
+    ['id', 'organization_id', 'user_id', 'role'],
+    [
+      {
+        id: 'om-test-admin',
+        organization_id: `org-${TEST_CONDO_ID}`,
+        user_id: 'u-admin',
+        role: 'owner',
+      },
+    ],
+  );
+  await insertRows(
+    pool,
     'condo_roles',
     ['id', 'condominium_id', 'user_id', 'role', 'resident_id'],
     [

@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 
 import { createTestCondo } from '../../test-support/condos';
-import { CondoNotFoundError } from '../domain/errors';
+import { CondoGrantValidationError, CondoNotFoundError } from '../domain/errors';
 import type { CondoRepository } from '../domain/condo-repository';
 
 export interface CondoRepositoryHarness {
@@ -13,6 +13,18 @@ async function insertUser(pool: Pool, id: string): Promise<void> {
   await pool.query(
     "INSERT INTO users (id, username, password_hash, role, resident_id) VALUES ($1, $1, 'x', 'admin', NULL)",
     [id],
+  );
+}
+
+async function insertMembership(
+  pool: Pool,
+  organizationId: string,
+  userId: string,
+  role: 'owner' | 'member',
+): Promise<void> {
+  await pool.query(
+    'INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, $4)',
+    [`om-${organizationId}-${userId}`, organizationId, userId, role],
   );
 }
 
@@ -211,16 +223,13 @@ export function runCondoRepositoryContract(
       expect(await repo.listForUser('u-lucia')).toEqual([]);
     });
 
-    test('a morador without a linked resident has no access', async () => {
+    test('a stored morador row without a linked resident has no access', async () => {
       const { repo, pool } = await makeRepo();
       await insertUser(pool, 'u-1');
       await createTestCondo(pool, 'condo-a');
-      await repo.grant({
-        condominiumId: 'condo-a',
-        userId: 'u-1',
-        role: 'morador',
-        residentId: null,
-      });
+      await pool.query(
+        "INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) VALUES ('cr-1', 'condo-a', 'u-1', 'morador', NULL)",
+      );
 
       expect(await repo.accessFor('u-1', 'condo-a')).toBeNull();
     });
@@ -258,6 +267,7 @@ export function runCondoRepositoryContract(
         role: 'administrador' as const,
         residentId: null,
       };
+      await insertMembership(pool, 'org-condo-a', 'u-1', 'member');
       await repo.grant(grant);
       await repo.grant(grant);
       await pool.query('UPDATE condo_roles SET active = FALSE');
@@ -268,6 +278,150 @@ export function runCondoRepositoryContract(
       const { rows } = await pool.query('SELECT active FROM condo_roles');
       expect(rows).toEqual([{ active: true }]);
       expect((await repo.accessFor('u-1', 'condo-a'))?.role).toBe('administrador');
+    });
+
+    test('morador whose resident lives in another condo has no access', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-1');
+      await createTestCondo(pool, 'condo-a');
+      await createTestCondo(pool, 'condo-b');
+      await insertOccupiedResident(pool, 'condo-b', 'r-1');
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-1',
+        role: 'morador',
+        residentId: 'r-1',
+      });
+
+      expect(await repo.accessFor('u-1', 'condo-a')).toBeNull();
+      expect(await repo.listForUser('u-1')).toEqual([]);
+    });
+
+    test('administrador role with an org membership grants access, member or owner', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-member');
+      await createTestCondo(pool, 'condo-a', { name: 'A' });
+      await insertMembership(pool, 'org-condo-a', 'u-member', 'member');
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-member',
+        role: 'administrador',
+        residentId: null,
+      });
+
+      expect(await repo.accessFor('u-member', 'condo-a')).toEqual({
+        condominiumId: 'condo-a',
+        name: 'A',
+        role: 'administrador',
+        residentId: null,
+      });
+    });
+
+    test('administrador role without org membership grants nothing', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-1');
+      await createTestCondo(pool, 'condo-a');
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-1',
+        role: 'administrador',
+        residentId: null,
+      });
+
+      expect(await repo.accessFor('u-1', 'condo-a')).toBeNull();
+      expect(await repo.listForUser('u-1')).toEqual([]);
+    });
+
+    test("deactivating an owner's org membership revokes access even with a condo_roles administrador row", async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+      const condo = await repo.create({
+        organizationId: org.id,
+        name: 'Ipê',
+        monthlyFeeCents: 1000,
+        dueDay: 5,
+      });
+      await repo.grant({
+        condominiumId: condo.id,
+        userId: 'u-owner',
+        role: 'administrador',
+        residentId: null,
+      });
+      expect((await repo.accessFor('u-owner', condo.id))?.role).toBe('administrador');
+
+      await pool.query("UPDATE organization_members SET active = FALSE WHERE user_id = 'u-owner'");
+
+      expect(await repo.accessFor('u-owner', condo.id)).toBeNull();
+      expect(await repo.listForUser('u-owner')).toEqual([]);
+    });
+
+    test('inactive organization grants nothing', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      await insertUser(pool, 'u-sindico');
+      await insertUser(pool, 'u-lucia');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+      const condo = await repo.create({
+        organizationId: org.id,
+        name: 'Ipê',
+        monthlyFeeCents: 1000,
+        dueDay: 5,
+      });
+      await insertOccupiedResident(pool, condo.id, 'r-lucia');
+      await repo.grant({
+        condominiumId: condo.id,
+        userId: 'u-owner',
+        role: 'administrador',
+        residentId: null,
+      });
+      await repo.grant({
+        condominiumId: condo.id,
+        userId: 'u-sindico',
+        role: 'sindico',
+        residentId: null,
+      });
+      await repo.grant({
+        condominiumId: condo.id,
+        userId: 'u-lucia',
+        role: 'morador',
+        residentId: 'r-lucia',
+      });
+
+      await pool.query('UPDATE organizations SET active = FALSE WHERE id = $1', [org.id]);
+
+      for (const userId of ['u-owner', 'u-sindico', 'u-lucia']) {
+        expect(await repo.accessFor(userId, condo.id)).toBeNull();
+        expect(await repo.listForUser(userId)).toEqual([]);
+      }
+    });
+
+    test('grant rejects a morador without a resident', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-1');
+      await createTestCondo(pool, 'condo-a');
+
+      const error = await repo
+        .grant({ condominiumId: 'condo-a', userId: 'u-1', role: 'morador', residentId: null })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(CondoGrantValidationError);
+      expect(error).toMatchObject({ status: 400 });
+      const { rows } = await pool.query('SELECT id FROM condo_roles');
+      expect(rows).toEqual([]);
+    });
+
+    test('grant rejects a resident on an administrador or sindico role', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-1');
+      await createTestCondo(pool, 'condo-a');
+      await insertOccupiedResident(pool, 'condo-a', 'r-1');
+
+      for (const role of ['administrador', 'sindico'] as const) {
+        await expect(
+          repo.grant({ condominiumId: 'condo-a', userId: 'u-1', role, residentId: 'r-1' }),
+        ).rejects.toThrow(CondoGrantValidationError);
+      }
     });
 
     test('rename changes the name; rename of an unknown condo throws CondoNotFoundError', async () => {
