@@ -6,34 +6,41 @@ import {
   type LoginResponse,
 } from '@/features/session/domain/login-response';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import type { SignUpInput } from '../domain/account-schemas';
-import { AccountError, type AccountErrorKind } from '../domain/errors';
+import type { AuthRepository } from '../domain/auth-repository';
+import type { SignUpInput } from '../domain/auth-schemas';
+import { AuthError, type AuthErrorKind } from '../domain/errors';
 
-const KIND_BY_STATUS: Readonly<Record<number, AccountErrorKind>> = {
+const KIND_BY_STATUS: Readonly<Record<number, AuthErrorKind>> = {
   400: 'invalid-input',
   401: 'invalid-credentials',
-  403: 'email-not-confirmed',
+  403: 'session-expired',
   404: 'invalid-link',
   429: 'rate-limited',
   503: 'email-unavailable',
 };
 
-function toAccountError(error: unknown): AccountError {
-  if (error instanceof ApiError)
-    return new AccountError(KIND_BY_STATUS[error.status] ?? 'unavailable');
-  return new AccountError('unavailable');
+const CREATE_CONDO_KINDS: Readonly<Record<number, AuthErrorKind>> = {
+  ...KIND_BY_STATUS,
+  403: 'email-not-confirmed',
+};
+
+function toAuthError(error: unknown, kinds: Readonly<Record<number, AuthErrorKind>>): AuthError {
+  if (error instanceof ApiError) return new AuthError(kinds[error.status] ?? 'unavailable');
+  return new AuthError('unavailable');
 }
 
-async function attempt<T>(run: () => Promise<T>): Promise<T> {
+async function attempt<T>(
+  run: () => Promise<T>,
+  kinds: Readonly<Record<number, AuthErrorKind>> = KIND_BY_STATUS,
+): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    throw toAccountError(error);
+    throw toAuthError(error, kinds);
   }
 }
 
-export class HttpUserAccountRepository implements UserAccountRepository {
+export class HttpAuthRepository implements AuthRepository {
   private readonly api: ApiClient;
   private readonly publicApi: ApiClient;
 
@@ -79,6 +86,9 @@ export class HttpUserAccountRepository implements UserAccountRepository {
   }
 
   createCondo(name: string): Promise<LoginCondo> {
-    return attempt(async () => loginCondoSchema.parse(await this.api.post('/me/condos', { name })));
+    return attempt(
+      async () => loginCondoSchema.parse(await this.api.post('/me/condos', { name })),
+      CREATE_CONDO_KINDS,
+    );
   }
 }

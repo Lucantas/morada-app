@@ -3,13 +3,13 @@ import { useMutation } from '@tanstack/react-query';
 
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import { signUpInputSchema, validate, type SignUpInput } from '../domain/account-schemas';
+import type { AuthRepository } from '../domain/auth-repository';
+import { signUpInputSchema, validate, type SignUpInput } from '../domain/auth-schemas';
 
-import { accountErrorMessage } from './account-error-message';
+import { authErrorMessage } from './auth-error-message';
 import { EntryForm, EntryLayout, FormError, FormNotice, LinkRow, TextLink } from './entry-layout';
 
-type Props = { repository: UserAccountRepository; onBack: () => void };
+type Props = { repository: AuthRepository; onBack: () => void };
 
 export function SignUpScreen({ repository, onBack }: Props) {
   const [name, setName] = useState('');
@@ -41,7 +41,7 @@ export function SignUpScreen({ repository, onBack }: Props) {
     signUp.mutate(result.data);
   };
 
-  const error = invalid ?? (signUp.isError ? accountErrorMessage(signUp.error) : null);
+  const error = invalid ?? (signUp.isError ? authErrorMessage(signUp.error) : null);
 
   return (
     <EntryLayout title="Criar conta" intro="Crie sua conta para administrar seu condomínio.">

@@ -4,16 +4,16 @@ import { useMutation } from '@tanstack/react-query';
 import type { LoginResponse } from '@/features/session/domain/login-response';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import { newPasswordSchema, validate } from '../domain/account-schemas';
-import { accountErrorKind } from '../domain/errors';
+import type { AuthRepository } from '../domain/auth-repository';
+import { newPasswordSchema, validate } from '../domain/auth-schemas';
+import { authErrorKind } from '../domain/errors';
 
-import { accountErrorMessage } from './account-error-message';
+import { authErrorMessage } from './auth-error-message';
 import { EntryForm, EntryLayout, FormError } from './entry-layout';
 
 type Props = {
   token: string;
-  repository: UserAccountRepository;
+  repository: AuthRepository;
   onLoggedIn: (response: LoginResponse) => void;
   onRequestNewLink: () => void;
 };
@@ -27,7 +27,7 @@ export function ResetPasswordScreen({ token, repository, onLoggedIn, onRequestNe
     onSuccess: (response) => onLoggedIn(response),
   });
 
-  if (reset.isError && accountErrorKind(reset.error) === 'invalid-link') {
+  if (reset.isError && authErrorKind(reset.error) === 'invalid-link') {
     return (
       <EntryLayout
         title="Link inválido ou expirado"
@@ -48,13 +48,7 @@ export function ResetPasswordScreen({ token, repository, onLoggedIn, onRequestNe
     reset.mutate(result.data.password);
   };
 
-  const error =
-    invalid ??
-    (reset.isError
-      ? accountErrorMessage(reset.error, {
-          'invalid-input': 'A senha precisa ter pelo menos 8 caracteres.',
-        })
-      : null);
+  const error = invalid ?? (reset.isError ? authErrorMessage(reset.error) : null);
 
   return (
     <EntryLayout title="Redefinir senha" intro="Escolha uma nova senha para a sua conta.">

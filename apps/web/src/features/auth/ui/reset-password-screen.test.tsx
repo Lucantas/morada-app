@@ -1,14 +1,14 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN_LOGIN, fakeUserAccountRepository } from '@/test/factories.account';
+import { ADMIN_LOGIN, fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
 import { ResetPasswordScreen } from './reset-password-screen';
 
-function renderReset(repository = fakeUserAccountRepository()) {
+function renderReset(repository = fakeAuthRepository()) {
   const props = { token: 'tok-9', repository, onLoggedIn: jest.fn(), onRequestNewLink: jest.fn() };
   renderWithClient(<ResetPasswordScreen {...props} />);
   return props;
@@ -52,10 +52,22 @@ describe('ResetPasswordScreen', () => {
     expect(onLoggedIn).toHaveBeenCalledWith(ADMIN_LOGIN);
   });
 
+  test('asks to review the data on a rejected reset', async () => {
+    renderReset(
+      fakeAuthRepository({
+        resetPassword: jest.fn().mockRejectedValue(new AuthError('invalid-input')),
+      }),
+    );
+
+    await submit('novasenha1', 'novasenha1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confira os dados informados.');
+  });
+
   test('explains an invalid link and offers a new one', async () => {
     const { onRequestNewLink } = renderReset(
-      fakeUserAccountRepository({
-        resetPassword: jest.fn().mockRejectedValue(new AccountError('invalid-link')),
+      fakeAuthRepository({
+        resetPassword: jest.fn().mockRejectedValue(new AuthError('invalid-link')),
       }),
     );
 

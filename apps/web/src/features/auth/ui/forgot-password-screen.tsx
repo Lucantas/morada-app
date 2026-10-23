@@ -3,13 +3,13 @@ import { useMutation } from '@tanstack/react-query';
 
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import { emailSchema, validate } from '../domain/account-schemas';
+import type { AuthRepository } from '../domain/auth-repository';
+import { emailSchema, validate } from '../domain/auth-schemas';
 
-import { accountErrorMessage } from './account-error-message';
+import { authErrorMessage } from './auth-error-message';
 import { EntryForm, EntryLayout, FormError, FormNotice, LinkRow, TextLink } from './entry-layout';
 
-type Props = { repository: UserAccountRepository; onBack: () => void };
+type Props = { repository: AuthRepository; onBack: () => void };
 
 export function ForgotPasswordScreen({ repository, onBack }: Props) {
   const [email, setEmail] = useState('');
@@ -28,7 +28,7 @@ export function ForgotPasswordScreen({ repository, onBack }: Props) {
     request.mutate(result.data);
   };
 
-  const error = invalid ?? (request.isError ? accountErrorMessage(request.error) : null);
+  const error = invalid ?? (request.isError ? authErrorMessage(request.error) : null);
 
   return (
     <EntryLayout

@@ -1,10 +1,10 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { fakeUserAccountRepository } from '@/test/factories.account';
+import { fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
 import { SignUpScreen } from './signup-screen';
 
@@ -18,8 +18,8 @@ async function fillAndSubmit(email = 'Ana@Exemplo.com') {
 }
 
 describe('SignUpScreen', () => {
-  test('creates the account and shows where the link was sent', async () => {
-    const repository = fakeUserAccountRepository();
+  test('signs up and shows where the link was sent', async () => {
+    const repository = fakeAuthRepository();
     renderWithClient(<SignUpScreen repository={repository} onBack={jest.fn()} />);
 
     await fillAndSubmit();
@@ -37,7 +37,7 @@ describe('SignUpScreen', () => {
   });
 
   test('rejects an invalid e-mail without calling the API', async () => {
-    const repository = fakeUserAccountRepository();
+    const repository = fakeAuthRepository();
     renderWithClient(<SignUpScreen repository={repository} onBack={jest.fn()} />);
 
     await fillAndSubmit('ana');
@@ -47,8 +47,8 @@ describe('SignUpScreen', () => {
   });
 
   test('explains when e-mail sending is unavailable', async () => {
-    const repository = fakeUserAccountRepository({
-      signUp: jest.fn().mockRejectedValue(new AccountError('email-unavailable')),
+    const repository = fakeAuthRepository({
+      signUp: jest.fn().mockRejectedValue(new AuthError('email-unavailable')),
     });
     renderWithClient(<SignUpScreen repository={repository} onBack={jest.fn()} />);
 
@@ -59,10 +59,21 @@ describe('SignUpScreen', () => {
     );
   });
 
+  test('asks to review the data on a rejected sign-up', async () => {
+    const repository = fakeAuthRepository({
+      signUp: jest.fn().mockRejectedValue(new AuthError('invalid-input')),
+    });
+    renderWithClient(<SignUpScreen repository={repository} onBack={jest.fn()} />);
+
+    await fillAndSubmit();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confira os dados informados.');
+  });
+
   test('goes back to the login', async () => {
     const onBack = jest.fn();
     const user = userEvent.setup();
-    renderWithClient(<SignUpScreen repository={fakeUserAccountRepository()} onBack={onBack} />);
+    renderWithClient(<SignUpScreen repository={fakeAuthRepository()} onBack={onBack} />);
 
     await user.click(screen.getByRole('button', { name: 'Já tenho conta' }));
 

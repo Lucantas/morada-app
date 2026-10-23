@@ -1,13 +1,6 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 
-import { ConfirmEmailScreen } from '@/features/account/ui/confirm-email-screen';
-import { CreateCondoScreen } from '@/features/account/ui/create-condo-screen';
-import { ForgotPasswordScreen } from '@/features/account/ui/forgot-password-screen';
-import { loginErrorMessage } from '@/features/account/ui/account-error-message';
-import { PendingConfirmationScreen } from '@/features/account/ui/pending-confirmation-screen';
-import { ResetPasswordScreen } from '@/features/account/ui/reset-password-screen';
-import { SignUpScreen } from '@/features/account/ui/signup-screen';
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
 import { AccountsScreen } from '@/features/accounts/ui/accounts-screen';
 import { incomeMonthlyTotals } from '@/features/income/domain/income-totals';
@@ -27,9 +20,7 @@ import { useReceipts } from '@/features/receipts/ui/use-receipts';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
-import type { LoginResponse } from '@/features/session/domain/login-response';
-import { LoginScreen } from '@/features/session/ui/login-screen';
-import { applyLogin, useSessionStore } from '@/features/session/ui/session-store';
+import { useSessionStore } from '@/features/session/ui/session-store';
 import { CreateLoginScreen } from '@/features/residents/ui/create-login-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
 import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
@@ -40,7 +31,6 @@ import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
 import { useCondoScope } from '@/shared/lib/condo-scope';
-import { clearPublicRoute, parsePublicRoute, type PublicRoute } from '@/shared/lib/public-route';
 import { BottomNav, type NavItem } from '@/shared/ui/bottom-nav';
 import { AppShell, Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { StatusView } from '@/shared/ui/status-view';
@@ -66,8 +56,9 @@ import {
   resetResidentLogin,
   residentRepository,
   settingsRepository,
-  userAccountRepository,
+  authRepository,
 } from './container';
+import { EntryRouter } from './entry-router';
 import { useNavStore, type View } from './nav-store';
 
 const queryClient = new QueryClient({
@@ -102,109 +93,33 @@ export function App() {
   );
 }
 
-type Entry = 'login' | 'signup' | 'forgot';
-
 function Router() {
-  const role = useSessionStore((s) => s.role);
-  const account = useSessionStore((s) => s.account);
-  const condoId = useCondoScope((s) => s.condo?.id ?? null);
-  const view = useNavStore((s) => s.view);
-  const residentId = useNavStore((s) => s.residentId);
-  const incomeId = useNavStore((s) => s.incomeId);
   const go = useNavStore((s) => s.go);
   const queryClient = useQueryClient();
-  const [publicRoute, setPublicRoute] = useState<PublicRoute | null>(() =>
-    parsePublicRoute(window.location.hash),
-  );
-  const [entry, setEntry] = useState<Entry>('login');
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
 
   const handleSignOut = useCallback(() => {
     queryClient.clear();
     void logout();
   }, [queryClient]);
 
-  const leavePublicRoute = useCallback((next: Entry) => {
-    clearPublicRoute();
-    setPublicRoute(null);
-    setEntry(next);
-  }, []);
-
-  const enter = useCallback(
-    (response: LoginResponse) => {
-      clearPublicRoute();
-      setPublicRoute(null);
-      setEntry('login');
-      queryClient.clear();
-      const landed = applyLogin(response);
-      if (landed) go(landed === 'admin' ? 'a-home' : 'r-home');
-    },
-    [go, queryClient],
+  return (
+    <EntryRouter
+      repository={authRepository}
+      onLanded={(role) => go(role === 'admin' ? 'a-home' : 'r-home')}
+      onSignOut={handleSignOut}
+    >
+      <SessionRouter signOut={handleSignOut} />
+    </EntryRouter>
   );
+}
 
-  if (publicRoute?.kind === 'confirmar-email') {
-    return (
-      <ConfirmEmailScreen
-        token={publicRoute.token}
-        repository={userAccountRepository}
-        onLoggedIn={enter}
-        onSignIn={() => leavePublicRoute('login')}
-        onForgotPassword={() => leavePublicRoute('forgot')}
-      />
-    );
-  }
-
-  if (publicRoute?.kind === 'redefinir-senha') {
-    return (
-      <ResetPasswordScreen
-        token={publicRoute.token}
-        repository={userAccountRepository}
-        onLoggedIn={enter}
-        onRequestNewLink={() => leavePublicRoute('forgot')}
-      />
-    );
-  }
-
-  if (!role && account) {
-    return account.emailVerified ? (
-      <CreateCondoScreen
-        repository={userAccountRepository}
-        onCreated={(condo) => enter({ condos: [condo], emailVerified: true })}
-        onSignOut={handleSignOut}
-      />
-    ) : (
-      <PendingConfirmationScreen repository={userAccountRepository} onSignOut={handleSignOut} />
-    );
-  }
-
-  if (!role) {
-    if (entry === 'signup') {
-      return <SignUpScreen repository={userAccountRepository} onBack={() => setEntry('login')} />;
-    }
-    if (entry === 'forgot') {
-      return (
-        <ForgotPasswordScreen repository={userAccountRepository} onBack={() => setEntry('login')} />
-      );
-    }
-    return (
-      <LoginScreen
-        pending={pending}
-        error={loginError}
-        onSignUp={() => setEntry('signup')}
-        onForgotPassword={() => setEntry('forgot')}
-        onSubmit={(login, password) => {
-          setPending(true);
-          setLoginError(null);
-          userAccountRepository
-            .login(login, password)
-            .then(enter)
-            .catch((err: unknown) => setLoginError(loginErrorMessage(err)))
-            .finally(() => setPending(false));
-        }}
-      />
-    );
-  }
+function SessionRouter({ signOut }: { signOut: () => void }) {
+  const role = useSessionStore((s) => s.role);
+  const condoId = useCondoScope((s) => s.condo?.id ?? null);
+  const view = useNavStore((s) => s.view);
+  const residentId = useNavStore((s) => s.residentId);
+  const incomeId = useNavStore((s) => s.incomeId);
+  const go = useNavStore((s) => s.go);
 
   if (role === 'admin') {
     return (
@@ -213,7 +128,7 @@ function Router() {
         residentId={residentId}
         incomeId={incomeId}
         go={go}
-        signOut={handleSignOut}
+        signOut={signOut}
       />
     );
   }
@@ -223,7 +138,7 @@ function Router() {
       residentId={residentId}
       condoId={condoId}
       go={go}
-      signOut={handleSignOut}
+      signOut={signOut}
     />
   );
 }

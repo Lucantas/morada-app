@@ -4,9 +4,9 @@ import {
   newPasswordSchema,
   signUpInputSchema,
   validate,
-} from './account-schemas';
+} from './auth-schemas';
 
-describe('account schemas', () => {
+describe('auth schemas', () => {
   test('normalizes the e-mail', () => {
     expect(emailSchema.parse('  Ana@Exemplo.COM ')).toBe('ana@exemplo.com');
   });

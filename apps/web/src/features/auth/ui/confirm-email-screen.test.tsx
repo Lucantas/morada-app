@@ -1,14 +1,14 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN_LOGIN, fakeUserAccountRepository } from '@/test/factories.account';
+import { ADMIN_LOGIN, fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
 import { ConfirmEmailScreen } from './confirm-email-screen';
 
-function renderConfirm(repository = fakeUserAccountRepository()) {
+function renderConfirm(repository = fakeAuthRepository()) {
   const props = {
     token: 'tok-123',
     repository,
@@ -39,8 +39,8 @@ describe('ConfirmEmailScreen', () => {
 
   test('keeps the form on a wrong password', async () => {
     const { onLoggedIn } = renderConfirm(
-      fakeUserAccountRepository({
-        confirmEmail: jest.fn().mockRejectedValue(new AccountError('invalid-credentials')),
+      fakeAuthRepository({
+        confirmEmail: jest.fn().mockRejectedValue(new AuthError('invalid-credentials')),
       }),
     );
 
@@ -53,8 +53,8 @@ describe('ConfirmEmailScreen', () => {
 
   test('explains an invalid link and offers a new one', async () => {
     const { onSignIn, onForgotPassword } = renderConfirm(
-      fakeUserAccountRepository({
-        confirmEmail: jest.fn().mockRejectedValue(new AccountError('invalid-link')),
+      fakeAuthRepository({
+        confirmEmail: jest.fn().mockRejectedValue(new AuthError('invalid-link')),
       }),
     );
 
@@ -86,10 +86,22 @@ describe('ConfirmEmailScreen', () => {
     expect(repository.confirmEmail).not.toHaveBeenCalled();
   });
 
+  test('asks to review the data on a rejected confirmation', async () => {
+    renderConfirm(
+      fakeAuthRepository({
+        confirmEmail: jest.fn().mockRejectedValue(new AuthError('invalid-input')),
+      }),
+    );
+
+    await submitPassword();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confira os dados informados.');
+  });
+
   test('shows a connection error for other failures', async () => {
     renderConfirm(
-      fakeUserAccountRepository({
-        confirmEmail: jest.fn().mockRejectedValue(new AccountError('unavailable')),
+      fakeAuthRepository({
+        confirmEmail: jest.fn().mockRejectedValue(new AuthError('unavailable')),
       }),
     );
 

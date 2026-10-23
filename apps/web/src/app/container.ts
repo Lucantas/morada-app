@@ -1,4 +1,4 @@
-import { HttpUserAccountRepository } from '@/features/account/data/http-account-repository';
+import { HttpAuthRepository } from '@/features/auth/data/http-auth-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
 import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
@@ -27,7 +27,7 @@ const publicApiClient = createApiClient({ baseUrl: apiUrl });
 
 signOutIfCondoMissing();
 
-export const userAccountRepository = new HttpUserAccountRepository({
+export const authRepository = new HttpAuthRepository({
   api: apiClient,
   publicApi: publicApiClient,
 });

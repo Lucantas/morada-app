@@ -1,6 +1,6 @@
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
-import { accountErrorMessage, loginErrorMessage } from './account-error-message';
+import { authErrorMessage, loginErrorMessage } from './auth-error-message';
 
 describe('loginErrorMessage', () => {
   test.each([
@@ -8,7 +8,7 @@ describe('loginErrorMessage', () => {
     ['rate-limited', 'Muitas tentativas, tente mais tarde.'],
     ['unavailable', 'Não foi possível entrar. Verifique a conexão com o servidor.'],
   ] as const)('maps %s', (kind, message) => {
-    expect(loginErrorMessage(new AccountError(kind))).toBe(message);
+    expect(loginErrorMessage(new AuthError(kind))).toBe(message);
   });
 
   test('treats an unknown failure as a connection problem', () => {
@@ -18,18 +18,28 @@ describe('loginErrorMessage', () => {
   });
 });
 
-describe('accountErrorMessage', () => {
+describe('authErrorMessage', () => {
   test('prefers the screen-specific message', () => {
     expect(
-      accountErrorMessage(new AccountError('invalid-credentials'), {
+      authErrorMessage(new AuthError('invalid-credentials'), {
         'invalid-credentials': 'Senha incorreta.',
       }),
     ).toBe('Senha incorreta.');
   });
 
   test('falls back to the connection message', () => {
-    expect(accountErrorMessage(new AccountError('invalid-link'))).toBe(
+    expect(authErrorMessage(new AuthError('invalid-link'))).toBe(
       'Não foi possível concluir. Verifique a conexão com o servidor.',
     );
+  });
+
+  test('explains an expired session', () => {
+    expect(authErrorMessage(new AuthError('session-expired'))).toBe(
+      'Sua sessão expirou. Entre novamente.',
+    );
+  });
+
+  test('asks to review the data on invalid input', () => {
+    expect(authErrorMessage(new AuthError('invalid-input'))).toBe('Confira os dados informados.');
   });
 });

@@ -1,9 +1,9 @@
 import type { ApiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/api-client';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
-import { HttpUserAccountRepository } from './http-account-repository';
+import { HttpAuthRepository } from './http-auth-repository';
 
 function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return { get: jest.fn(), post: jest.fn(), put: jest.fn(), del: jest.fn(), ...overrides };
@@ -12,20 +12,20 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
 const LOGIN_BODY = { condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true };
 
 function repositoryWith(publicApi: ApiClient, api: ApiClient = fakeApi()) {
-  return new HttpUserAccountRepository({ api, publicApi });
+  return new HttpAuthRepository({ api, publicApi });
 }
 
 async function kindOf(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
   } catch (error) {
-    if (error instanceof AccountError) return error.kind;
+    if (error instanceof AuthError) return error.kind;
     throw error;
   }
-  throw new Error('expected an AccountError');
+  throw new Error('expected an AuthError');
 }
 
-describe('HttpUserAccountRepository', () => {
+describe('HttpAuthRepository', () => {
   test('login posts login and password on the public client and parses the response', async () => {
     const publicApi = fakeApi({ post: jest.fn().mockResolvedValue(LOGIN_BODY) });
 
@@ -43,28 +43,28 @@ describe('HttpUserAccountRepository', () => {
     [404, 'invalid-link'],
     [429, 'rate-limited'],
     [503, 'email-unavailable'],
-    [403, 'email-not-confirmed'],
+    [403, 'session-expired'],
     [400, 'invalid-input'],
     [500, 'unavailable'],
-  ])('maps an API %i to the %s account error', async (status, kind) => {
+  ])('maps an API %i to the %s auth error', async (status, kind) => {
     const publicApi = fakeApi({ post: jest.fn().mockRejectedValue(new ApiError(status, 'x')) });
 
     expect(await kindOf(repositoryWith(publicApi).login('a', 'b'))).toBe(kind);
   });
 
-  test('maps a network failure to an unavailable account error', async () => {
+  test('maps a network failure to an unavailable auth error', async () => {
     const publicApi = fakeApi({ post: jest.fn().mockRejectedValue(new TypeError('fetch')) });
 
     expect(await kindOf(repositoryWith(publicApi).login('a', 'b'))).toBe('unavailable');
   });
 
-  test('maps a malformed response to an unavailable account error', async () => {
+  test('maps a malformed response to an unavailable auth error', async () => {
     const publicApi = fakeApi({ post: jest.fn().mockResolvedValue({ nope: true }) });
 
     expect(await kindOf(repositoryWith(publicApi).login('a', 'b'))).toBe('unavailable');
   });
 
-  test('signUp posts the account on the public client', async () => {
+  test('signUp posts the new user on the public client', async () => {
     const publicApi = fakeApi({ post: jest.fn().mockResolvedValue({}) });
 
     await repositoryWith(publicApi).signUp({
@@ -98,6 +98,14 @@ describe('HttpUserAccountRepository', () => {
     await repositoryWith(fakeApi(), api).resendConfirmation();
 
     expect(api.post).toHaveBeenCalledWith('/auth/email/resend');
+  });
+
+  test('resendConfirmation maps a rejected CSRF 403 to an expired session', async () => {
+    const api = fakeApi({ post: jest.fn().mockRejectedValue(new ApiError(403, 'CSRF inválido')) });
+
+    expect(await kindOf(repositoryWith(fakeApi(), api).resendConfirmation())).toBe(
+      'session-expired',
+    );
   });
 
   test('requestPasswordReset posts the e-mail on the public client', async () => {

@@ -6,12 +6,12 @@ import { useCondoScope } from '@/shared/lib/condo-scope';
 import type { LoginResponse } from '../domain/login-response';
 import type { Role } from '../domain/session';
 
-export type PendingAccount = { emailVerified: boolean };
+export type PendingUser = { emailVerified: boolean };
 
 type SessionState = {
   role: Role | null;
   subject: string | null;
-  account: PendingAccount | null;
+  pendingUser: PendingUser | null;
   authenticate: (role: Role, subject: string | null) => void;
   signOut: () => void;
 };
@@ -21,10 +21,10 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       role: null,
       subject: null,
-      account: null,
-      authenticate: (role, subject) => set({ role, subject, account: null }),
+      pendingUser: null,
+      authenticate: (role, subject) => set({ role, subject, pendingUser: null }),
       signOut: () => {
-        set({ role: null, subject: null, account: null });
+        set({ role: null, subject: null, pendingUser: null });
         useCondoScope.getState().setCondo(null);
       },
     }),
@@ -33,7 +33,7 @@ export const useSessionStore = create<SessionState>()(
       partialize: (state) => ({
         role: state.role,
         subject: state.subject,
-        account: state.account,
+        pendingUser: state.pendingUser,
       }),
     },
   ),
@@ -43,7 +43,7 @@ export function applyLogin({ condos, emailVerified }: LoginResponse): Role | nul
   const [first] = condos;
   if (!first) {
     useCondoScope.getState().setCondo(null);
-    useSessionStore.setState({ role: null, subject: null, account: { emailVerified } });
+    useSessionStore.setState({ role: null, subject: null, pendingUser: { emailVerified } });
     return null;
   }
   useCondoScope.getState().setCondo({ id: first.id, name: first.name });

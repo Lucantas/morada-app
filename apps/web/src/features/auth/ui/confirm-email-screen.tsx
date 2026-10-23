@@ -4,15 +4,15 @@ import { useMutation } from '@tanstack/react-query';
 import type { LoginResponse } from '@/features/session/domain/login-response';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import { accountErrorKind } from '../domain/errors';
+import type { AuthRepository } from '../domain/auth-repository';
+import { authErrorKind } from '../domain/errors';
 
-import { accountErrorMessage } from './account-error-message';
+import { authErrorMessage } from './auth-error-message';
 import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from './entry-layout';
 
 type Props = {
   token: string;
-  repository: UserAccountRepository;
+  repository: AuthRepository;
   onLoggedIn: (response: LoginResponse) => void;
   onSignIn: () => void;
   onForgotPassword: () => void;
@@ -30,7 +30,7 @@ export function ConfirmEmailScreen({
     mutationFn: (secret: string) => repository.confirmEmail(token, secret),
     onSuccess: (response) => onLoggedIn(response),
   });
-  const invalidLink = confirm.isError && accountErrorKind(confirm.error) === 'invalid-link';
+  const invalidLink = confirm.isError && authErrorKind(confirm.error) === 'invalid-link';
 
   const hint = (
     <LinkRow>
@@ -54,7 +54,7 @@ export function ConfirmEmailScreen({
   }
 
   const error = confirm.isError
-    ? accountErrorMessage(confirm.error, { 'invalid-credentials': 'Senha incorreta.' })
+    ? authErrorMessage(confirm.error, { 'invalid-credentials': 'Senha incorreta.' })
     : null;
 
   return (

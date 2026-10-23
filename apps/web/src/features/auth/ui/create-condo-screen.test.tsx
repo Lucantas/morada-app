@@ -1,14 +1,14 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { fakeUserAccountRepository } from '@/test/factories.account';
+import { fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
 import { CreateCondoScreen } from './create-condo-screen';
 
-function renderCreate(repository = fakeUserAccountRepository()) {
+function renderCreate(repository = fakeAuthRepository()) {
   const props = { repository, onCreated: jest.fn(), onSignOut: jest.fn() };
   renderWithClient(<CreateCondoScreen {...props} />);
   return props;
@@ -50,8 +50,8 @@ describe('CreateCondoScreen', () => {
 
   test('explains an unconfirmed e-mail', async () => {
     renderCreate(
-      fakeUserAccountRepository({
-        createCondo: jest.fn().mockRejectedValue(new AccountError('email-not-confirmed')),
+      fakeAuthRepository({
+        createCondo: jest.fn().mockRejectedValue(new AuthError('email-not-confirmed')),
       }),
     );
 
@@ -59,6 +59,32 @@ describe('CreateCondoScreen', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Confirme seu e-mail antes de criar um condomínio.',
+    );
+  });
+
+  test('asks to review the data on a rejected name', async () => {
+    renderCreate(
+      fakeAuthRepository({
+        createCondo: jest.fn().mockRejectedValue(new AuthError('invalid-input')),
+      }),
+    );
+
+    await submit('Edifício Sol');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confira os dados informados.');
+  });
+
+  test('explains an expired session', async () => {
+    renderCreate(
+      fakeAuthRepository({
+        createCondo: jest.fn().mockRejectedValue(new AuthError('session-expired')),
+      }),
+    );
+
+    await submit('Edifício Sol');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Sua sessão expirou. Entre novamente.',
     );
   });
 

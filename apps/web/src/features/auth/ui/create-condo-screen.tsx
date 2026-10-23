@@ -4,14 +4,14 @@ import { useMutation } from '@tanstack/react-query';
 import type { LoginCondo } from '@/features/session/domain/login-response';
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
-import type { UserAccountRepository } from '../domain/account-repository';
-import { condoNameSchema, validate } from '../domain/account-schemas';
+import type { AuthRepository } from '../domain/auth-repository';
+import { condoNameSchema, validate } from '../domain/auth-schemas';
 
-import { accountErrorMessage } from './account-error-message';
+import { authErrorMessage } from './auth-error-message';
 import { EntryForm, EntryLayout, FormError, LinkRow, TextLink } from './entry-layout';
 
 type Props = {
-  repository: UserAccountRepository;
+  repository: AuthRepository;
   onCreated: (condo: LoginCondo) => void;
   onSignOut: () => void;
 };
@@ -37,8 +37,7 @@ export function CreateCondoScreen({ repository, onCreated, onSignOut }: Props) {
   const error =
     invalid ??
     (create.isError
-      ? accountErrorMessage(create.error, {
-          'invalid-input': 'Confira o nome do condomínio.',
+      ? authErrorMessage(create.error, {
           unavailable: 'Não foi possível criar o condomínio. Tente novamente.',
         })
       : null);

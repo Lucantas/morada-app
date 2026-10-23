@@ -1,10 +1,10 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { fakeUserAccountRepository } from '@/test/factories.account';
+import { fakeAuthRepository } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
-import { AccountError } from '../domain/errors';
+import { AuthError } from '../domain/errors';
 
 import { ForgotPasswordScreen } from './forgot-password-screen';
 
@@ -16,8 +16,8 @@ async function submit(email: string) {
 }
 
 describe('ForgotPasswordScreen', () => {
-  test('always confirms without revealing whether the account exists', async () => {
-    const repository = fakeUserAccountRepository();
+  test('always confirms without revealing whether the e-mail is registered', async () => {
+    const repository = fakeAuthRepository();
     renderWithClient(<ForgotPasswordScreen repository={repository} onBack={jest.fn()} />);
 
     await submit(' Ana@Exemplo.com');
@@ -31,7 +31,7 @@ describe('ForgotPasswordScreen', () => {
   });
 
   test('rejects an invalid e-mail', async () => {
-    const repository = fakeUserAccountRepository();
+    const repository = fakeAuthRepository();
     renderWithClient(<ForgotPasswordScreen repository={repository} onBack={jest.fn()} />);
 
     await submit('ana');
@@ -41,8 +41,8 @@ describe('ForgotPasswordScreen', () => {
   });
 
   test('explains too many attempts', async () => {
-    const repository = fakeUserAccountRepository({
-      requestPasswordReset: jest.fn().mockRejectedValue(new AccountError('rate-limited')),
+    const repository = fakeAuthRepository({
+      requestPasswordReset: jest.fn().mockRejectedValue(new AuthError('rate-limited')),
     });
     renderWithClient(<ForgotPasswordScreen repository={repository} onBack={jest.fn()} />);
 
@@ -56,9 +56,7 @@ describe('ForgotPasswordScreen', () => {
   test('goes back to the login', async () => {
     const onBack = jest.fn();
     const user = userEvent.setup();
-    renderWithClient(
-      <ForgotPasswordScreen repository={fakeUserAccountRepository()} onBack={onBack} />,
-    );
+    renderWithClient(<ForgotPasswordScreen repository={fakeAuthRepository()} onBack={onBack} />);
 
     await user.click(screen.getByRole('button', { name: 'Voltar para o login' }));
 
