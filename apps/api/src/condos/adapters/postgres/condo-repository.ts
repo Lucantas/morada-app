@@ -10,8 +10,13 @@ import type {
   CondoRepository,
   CreateCondominiumInput,
 } from '../../domain/condo-repository';
-import { condominiumSchema, condoRoleNameSchema, type Condominium } from '../../domain/condominium';
-import { CondoNotFoundError } from '../../domain/errors';
+import {
+  condoGrantSchema,
+  condominiumSchema,
+  condoRoleNameSchema,
+  type Condominium,
+} from '../../domain/condominium';
+import { CondoGrantValidationError, CondoNotFoundError } from '../../domain/errors';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Água', keywords: 'água, agua, saneamento, esgoto' },
@@ -23,17 +28,35 @@ const DEFAULT_CATEGORIES = [
 const GRANTS_SQL = `
   SELECT c.id AS condominium_id, c.name, 'administrador' AS role, NULL AS resident_id
   FROM condominiums c
+  JOIN organizations o ON o.id = c.organization_id AND o.active
   JOIN organization_members m ON m.organization_id = c.organization_id
   WHERE m.user_id = $1 AND m.active AND m.role = 'owner' AND c.active
   UNION ALL
   SELECT c.id, c.name, r.role, r.resident_id
   FROM condo_roles r
   JOIN condominiums c ON c.id = r.condominium_id
+  JOIN organizations o ON o.id = c.organization_id AND o.active
   WHERE r.user_id = $1 AND r.active AND c.active
     AND (
-      r.role <> 'morador'
-      OR EXISTS (
-        SELECT 1 FROM apartment_residents ar WHERE ar.resident_id = r.resident_id AND ar.active
+      r.role = 'sindico'
+      OR (
+        r.role = 'administrador'
+        AND EXISTS (
+          SELECT 1 FROM organization_members m
+          WHERE m.organization_id = c.organization_id AND m.user_id = r.user_id AND m.active
+        )
+      )
+      OR (
+        r.role = 'morador'
+        AND EXISTS (
+          SELECT 1
+          FROM apartment_residents ar
+          JOIN apartments a ON a.id = ar.apartment_id
+          JOIN residents res ON res.id = ar.resident_id
+          WHERE ar.resident_id = r.resident_id AND ar.active
+            AND a.condominium_id = r.condominium_id
+            AND res.condominium_id = r.condominium_id
+        )
       )
     )`;
 
@@ -59,13 +82,6 @@ const createInputSchema = condoSettingsSchema.extend({
 const organizationInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   ownerUserId: z.string().min(1),
-});
-
-const grantInputSchema = z.object({
-  condominiumId: z.string().min(1),
-  userId: z.string().min(1),
-  role: condoRoleNameSchema,
-  residentId: z.string().min(1).nullable(),
 });
 
 function toCondominium(row: unknown): Condominium {
@@ -161,7 +177,11 @@ export class PostgresCondoRepository implements CondoRepository {
   }
 
   async grant(input: CondoGrant): Promise<void> {
-    const parsed = grantInputSchema.parse(input);
+    const result = condoGrantSchema.safeParse(input);
+    if (!result.success) {
+      throw new CondoGrantValidationError(result.error.issues.map((i) => i.message).join('; '));
+    }
+    const parsed = result.data;
     await this.pool.query(
       `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
        VALUES ($1, $2, $3, $4, $5)

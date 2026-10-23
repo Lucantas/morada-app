@@ -5,3 +5,11 @@ export class CondoNotFoundError extends Error {
     this.name = 'CondoNotFoundError';
   }
 }
+
+export class CondoGrantValidationError extends Error {
+  readonly status = 400;
+  constructor(message: string) {
+    super(message);
+    this.name = 'CondoGrantValidationError';
+  }
+}
