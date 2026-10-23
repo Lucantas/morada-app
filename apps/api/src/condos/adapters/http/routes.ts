@@ -16,7 +16,7 @@ export function condoInfoRoutes(condos: Pick<CondoRepository, 'getById' | 'renam
   const app = new Hono<ApiEnv>();
   app.get('/', async (c) => c.json(await getCondoInfo(condos, c.get('condoId'))));
   app.put('/', requireRole('admin'), async (c) =>
-    c.json(await renameCondo(condos, c.get('condoId'), await c.req.json())),
+    c.json(await renameCondo(condos, c.get('condoId'), await c.req.json().catch(() => undefined))),
   );
   return app;
 }

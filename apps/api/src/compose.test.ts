@@ -163,6 +163,24 @@ describe('Morada API', () => {
     });
 
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Dados inválidos' });
+  });
+
+  test('renaming the condominium with a malformed body answers 400', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
+
+    const malformed = await app.request(`${P}/info`, { method: 'PUT', headers, body: '{nope' });
+    const empty = await app.request(`${P}/info`, { method: 'PUT', headers, body: '' });
+
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({ error: 'Dados inválidos' });
+    expect(empty.status).toBe(400);
   });
 
   test('resident reads but cannot rename the condominium (403)', async () => {

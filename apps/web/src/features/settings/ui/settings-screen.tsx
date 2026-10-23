@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { Category, CategoryDraft } from '@/features/categories/domain/category';
+import { useCondoName } from '@/shared/lib/condo-scope';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -23,6 +24,8 @@ type Props = {
   onBack: () => void;
 };
 
+const MAX_CONDO_NAME_LENGTH = 80;
+
 function reclassifiedMessage(count: number): string {
   if (count === 0) return 'Configurações salvas. Nenhuma conta precisou ser reclassificada.';
   if (count === 1) return 'Pronto — 1 conta foi reclassificada.';
@@ -31,7 +34,7 @@ function reclassifiedMessage(count: number): string {
 
 export function SettingsScreen({
   repository,
-  condoName: savedCondoName,
+  condoName: loadedCondoName,
   savingCondoName,
   onRenameCondo,
   categories,
@@ -41,6 +44,8 @@ export function SettingsScreen({
   onSaveCategories,
   onBack,
 }: Props) {
+  const scopeCondoName = useCondoName();
+  const savedCondoName = loadedCondoName ?? scopeCondoName;
   const settings = useSettings(repository);
   const saveSettings = useSaveSettings(repository);
 
@@ -60,7 +65,7 @@ export function SettingsScreen({
   }, [settings.data]);
 
   useEffect(() => {
-    if (savedCondoName !== undefined) setCondoName(savedCondoName);
+    setCondoName(savedCondoName);
   }, [savedCondoName]);
 
   useEffect(() => {
@@ -94,7 +99,17 @@ export function SettingsScreen({
   const submit = async () => {
     try {
       const trimmedName = condoName.trim();
-      if (savedCondoName !== undefined && trimmedName !== savedCondoName) {
+      if (trimmedName === '') {
+        setReclassifiedMsg(null);
+        setSaveError('Informe o nome do condomínio');
+        return;
+      }
+      if (trimmedName.length > MAX_CONDO_NAME_LENGTH) {
+        setReclassifiedMsg(null);
+        setSaveError('Nome muito longo');
+        return;
+      }
+      if (trimmedName !== savedCondoName) {
         await onRenameCondo(trimmedName);
       }
       const day = Number.parseInt(dueDay, 10);
@@ -266,7 +281,6 @@ export function SettingsScreen({
           onClick={() => void submit()}
           disabled={
             !settings.isSuccess ||
-            savedCondoName === undefined ||
             !categoriesReady ||
             saveSettings.isPending ||
             savingCondoName ||
