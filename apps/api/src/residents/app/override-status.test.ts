@@ -1,8 +1,10 @@
+import { ResidentNotFoundError } from '../domain/errors';
 import { overrideStatus } from './override-status';
 
 function fakeRepo() {
   const calls: Array<{ id: string; status: unknown }> = [];
   return {
+    getById: async (id: string) => (id === 'missing' ? null : { id }),
     setStatusOverride: async (id: string, status: unknown) => {
       calls.push({ id, status });
     },
@@ -26,5 +28,13 @@ describe('overrideStatus', () => {
   it('rejects an invalid status', async () => {
     const repo = fakeRepo();
     await expect(overrideStatus(repo as never, 'r-1', { status: 'bogus' })).rejects.toBeTruthy();
+  });
+
+  it('rejects an unknown resident without touching the override', async () => {
+    const repo = fakeRepo();
+    await expect(overrideStatus(repo as never, 'missing', { status: 'em_dia' })).rejects.toThrow(
+      ResidentNotFoundError,
+    );
+    expect(repo.calls).toEqual([]);
   });
 });

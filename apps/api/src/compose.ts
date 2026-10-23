@@ -11,10 +11,10 @@ import { incomeRoutes } from './income/adapters/http/routes';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
-import { condoAccessMiddleware } from './platform/condo-scope';
+import { condoAccessMiddleware, type Scoped } from './platform/condo-scope';
 import { csrfMiddleware } from './platform/csrf';
 import { config } from './platform/config';
-import { createRepositories, type Repositories } from './repositories';
+import { createRepositories, type CondoRepositories, type Repositories } from './repositories';
 import { onError } from './platform/http-error';
 import { healthRoutes } from './platform/http/health-routes';
 import { createRateLimiter } from './platform/rate-limit';
@@ -28,6 +28,8 @@ import { authRoutes } from './users/adapters/http/auth-routes';
 import { userRoutes } from './users/adapters/http/routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
+const UNSCOPED_CONDO_ID = 'condo-legacy';
+
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
   const group = new Hono<ApiEnv>();
   group.use('*', requireRole(role));
@@ -36,19 +38,12 @@ function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
 }
 
 export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
-  const {
-    residents,
-    accounts,
-    receipts,
-    notices,
-    threads,
-    dashboard,
-    users,
-    settings,
-    categories,
-    incomes,
-    condos,
-  } = repos;
+  const { users, condos } = repos;
+  const unscoped = repos.forCondo(UNSCOPED_CONDO_ID);
+  const scoped =
+    <T>(pick: (condoRepos: CondoRepositories) => T): Scoped<T> =>
+    (condoId) =>
+      pick(repos.forCondo(condoId));
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
@@ -107,49 +102,70 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
 
   // Admin-only: provision a resident login. Returns the generated temp password
   // once for the admin to relay; only the hash is ever stored.
-  api.route('/users', userRoutes({ users, hasher, residents }));
+  api.route(
+    '/users',
+    userRoutes(
+      scoped(({ residents }) => ({ users, residents })),
+      hasher,
+    ),
+  );
 
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.
-  api.route('/residents', residentRoutes({ residents, receipts, users, hasher }));
+  api.route(
+    '/residents',
+    residentRoutes(
+      scoped(({ residents }) => ({ residents, receipts: unscoped.receipts, users })),
+      hasher,
+    ),
+  );
 
   // Account proof download: any authenticated user (admin or resident) — condo
   // expense proofs are shared building information. Mounted before the
   // admin-only CRUD below so it isn't caught by the admin guard.
-  api.route('/accounts', accountProofRoutes(accounts));
+  api.route('/accounts', accountProofRoutes(unscoped.accounts));
 
   // Admin-only resources.
-  api.route('/accounts', guarded('admin', accountRoutes(accounts)));
-  api.route('/incomes', guarded('admin', incomeRoutes(incomes)));
+  api.route('/accounts', guarded('admin', accountRoutes(unscoped.accounts)));
+  api.route('/incomes', guarded('admin', incomeRoutes(unscoped.incomes)));
   api.route(
     '/categories',
-    guarded('admin', categoryRoutes(categories, { list: () => accounts.list() })),
+    guarded('admin', categoryRoutes(unscoped.categories, { list: () => unscoped.accounts.list() })),
   );
-  api.route('/settings', guarded('admin', settingsRoutes(settings)));
+  api.route('/settings', guarded('admin', settingsRoutes(unscoped.settings)));
 
   // Admin: apartment-scoped views — full receipt ledger and occupant history,
   // across every resident who has occupied the apartment (the resident-facing
   // view stays scoped to their own receipts).
   const apartments = new Hono<ApiEnv>();
-  apartments.route('/', apartmentReceiptRoutes({ receipts }));
-  apartments.route('/', apartmentResidentRoutes({ residents }));
+  apartments.route('/', apartmentReceiptRoutes({ receipts: unscoped.receipts }));
+  apartments.route('/', apartmentResidentRoutes(scoped(({ residents }) => ({ residents }))));
   api.route('/apartments', apartments);
 
   // Any authenticated user (reads are scoped to the caller inside the routes).
-  api.route('/receipts', receiptRoutes({ receipts, residents, settings }));
-  api.route('/dashboard', dashboardRoutes(dashboard));
+  api.route(
+    '/receipts',
+    receiptRoutes(
+      scoped(({ residents }) => ({
+        receipts: unscoped.receipts,
+        residents,
+        settings: unscoped.settings,
+      })),
+    ),
+  );
+  api.route('/dashboard', dashboardRoutes(unscoped.dashboard));
 
   // Notices: reads and per-resident dismiss are open to any authenticated user;
   // creating and deleting notices is admin-only (guarded inside noticeRoutes).
-  api.route('/notices', noticeRoutes(notices));
+  api.route('/notices', noticeRoutes(unscoped.notices));
 
   // Threads: listing all conversations is admin-only (guarded inside threadRoutes);
   // per-thread access stays open. A resident's thread is created lazily from
   // their record on first use.
   api.route(
     '/threads',
-    threadRoutes(threads, async (id) => {
-      const resident = await residents.getById(id);
+    threadRoutes(unscoped.threads, (condoId) => async (id) => {
+      const resident = await repos.forCondo(condoId).residents.getById(id);
       return resident ? { name: resident.name, apt: resident.apt } : null;
     }),
   );

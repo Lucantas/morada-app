@@ -1,4 +1,4 @@
-import { ApartmentOccupiedError } from '../domain/errors';
+import { ApartmentOccupiedError, ResidentNotFoundError } from '../domain/errors';
 import type { ResidentRepository } from '../domain/resident-repository';
 
 const maria = {
@@ -14,11 +14,11 @@ const maria = {
 // the SQLite and Postgres adapters so the two stores stay in lockstep.
 export function runResidentRepositoryContract(
   label: string,
-  makeRepo: () => Promise<ResidentRepository>,
+  makeRepo: (condominiumId: string) => Promise<ResidentRepository>,
 ): void {
   describe(label, () => {
     test('save creates the apartment + active occupancy and getById joins them', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       const saved = await repo.save(maria);
 
       expect(saved).toMatchObject({
@@ -32,7 +32,7 @@ export function runResidentRepositoryContract(
     });
 
     test('reuses the apartment for the same label', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       const first = await repo.save(maria);
       await repo.deactivate('r-1');
       const next = await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
@@ -40,7 +40,7 @@ export function runResidentRepositoryContract(
     });
 
     test('rejects a second active resident in the same apartment', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save(maria);
       await expect(repo.save({ ...maria, id: 'r-9', name: 'Ana' })).rejects.toThrow(
         ApartmentOccupiedError,
@@ -48,7 +48,7 @@ export function runResidentRepositoryContract(
     });
 
     test('deactivate frees the apartment for the next occupant', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save(maria);
       await repo.deactivate('r-1');
       const ana = await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
@@ -59,7 +59,7 @@ export function runResidentRepositoryContract(
     });
 
     test('listByApartment returns the full history of the apartment', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       const mamaria = await repo.save(maria);
       await repo.deactivate('r-1');
       await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
@@ -69,7 +69,7 @@ export function runResidentRepositoryContract(
     });
 
     test('update keeps the id and occupancy, changing person fields', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save(maria);
       const updated = await repo.save({ ...maria, name: 'Maria R.', status: 'pendente' });
 
@@ -83,7 +83,7 @@ export function runResidentRepositoryContract(
     });
 
     test('apartmentOf resolves the resident apartment', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       const saved = await repo.save(maria);
       expect(await repo.apartmentOf('r-1')).toEqual({
         apartmentId: saved.apartmentId,
@@ -92,12 +92,12 @@ export function runResidentRepositoryContract(
     });
 
     test('getById returns null when missing', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       expect(await repo.getById('nope')).toBeNull();
     });
 
     test('setStatusOverride round-trips and clears', async () => {
-      const repo = await makeRepo();
+      const repo = await makeRepo('condo-a');
       await repo.save(maria);
 
       await repo.setStatusOverride('r-1', 'atrasado');
@@ -105,6 +105,34 @@ export function runResidentRepositoryContract(
 
       await repo.setStatusOverride('r-1', null);
       expect((await repo.getById('r-1'))?.statusOverride).toBeNull();
+    });
+
+    test("isolation: condo B never sees or changes condo A's data", async () => {
+      const repoA = await makeRepo('condo-a');
+      const repoB = await makeRepo('condo-b');
+      const saved = await repoA.save(maria);
+
+      expect(await repoB.list()).toEqual([]);
+      expect(await repoB.getById('r-1')).toBeNull();
+      expect(await repoB.listByApartment(saved.apartmentId)).toEqual([]);
+      expect(await repoB.apartmentOf('r-1')).toBeNull();
+      await expect(repoB.save({ ...maria, name: 'Invasor' })).rejects.toThrow(
+        ResidentNotFoundError,
+      );
+      await repoB.deactivate('r-1');
+      await repoB.setStatusOverride('r-1', 'atrasado');
+
+      expect(await repoA.getById('r-1')).toEqual(saved);
+    });
+
+    test('the same apartment label is a separate apartment in each condo', async () => {
+      const repoA = await makeRepo('condo-a');
+      const repoB = await makeRepo('condo-b');
+      const inA = await repoA.save(maria);
+      const inB = await repoB.save({ ...maria, id: 'r-b' });
+
+      expect(inB.apartmentId).not.toBe(inA.apartmentId);
+      expect((await repoB.list()).map((r) => r.id)).toEqual(['r-b']);
     });
   });
 }

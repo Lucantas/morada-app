@@ -48,7 +48,7 @@ function mount(repo: ReceiptRepository, role?: 'admin' | 'resident', sub = 'r-1'
   });
   app.route(
     '/receipts',
-    receiptRoutes({ receipts: repo, residents: fakeResidents, settings: fakeSettings }),
+    receiptRoutes(() => ({ receipts: repo, residents: fakeResidents, settings: fakeSettings })),
   );
   return app;
 }

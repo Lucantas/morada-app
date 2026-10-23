@@ -174,6 +174,39 @@ describe('Morada API', () => {
     expect(read.status).toBe(200);
   });
 
+  test('cross-condo residents access answers 404', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const other = makePostgresRepositories(pool).forCondo('condo-other');
+    const foreign = await other.residents.save({
+      id: 'r-foreign',
+      name: 'Forasteiro',
+      apt: 'Apto 900',
+      phone: '',
+      email: '',
+      status: 'em_dia',
+    });
+    const auth = await authFor(app, adminCredentials);
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/residents/r-foreign`, { headers });
+    const list = await app.request(`${P}/residents`, { headers });
+    const history = await app.request(`${P}/apartments/${foreign.apartmentId}/residents`, {
+      headers,
+    });
+    const override = await app.request(`${P}/residents/r-foreign/status`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'atrasado' }),
+    });
+
+    expect(read.status).toBe(404);
+    expect(((await list.json()) as { id: string }[]).map((r) => r.id)).not.toContain('r-foreign');
+    expect(await history.json()).toEqual([]);
+    expect(override.status).toBe(404);
+    expect((await other.residents.getById('r-foreign'))?.statusOverride).toBeNull();
+  });
+
   test('an admin overrides and then clears a resident status', async () => {
     const app = await makeApp();
     const auth = await authFor(app, adminCredentials);

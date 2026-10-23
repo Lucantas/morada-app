@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ResidentValidationError } from '../domain/errors';
+import { ResidentNotFoundError, ResidentValidationError } from '../domain/errors';
 import { residentStatusSchema } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
 
@@ -13,5 +13,6 @@ export async function overrideStatus(
 ): Promise<void> {
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) throw new ResidentValidationError('Status inválido');
+  if (!(await repo.getById(id))) throw new ResidentNotFoundError(id);
   await repo.setStatusOverride(id, parsed.data.status);
 }

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
 
+import type { Scoped } from '../../../platform/condo-scope';
 import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { ThreadNotFoundError } from '../../domain/errors';
 import type { Thread } from '../../domain/message';
@@ -34,15 +35,15 @@ function denyForeignThread(c: Context<ApiEnv>, threadId: string): Response | nul
   return null;
 }
 
-export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResidentLookup) {
+export function threadRoutes(repo: ThreadRepository, lookupFor: Scoped<ThreadResidentLookup>) {
   const app = new Hono<ApiEnv>();
 
   // A thread is created lazily the first time it is opened/written, so residents
   // start with an empty conversation rather than a 404.
-  async function loadOrEmpty(id: string): Promise<Thread> {
+  async function loadOrEmpty(id: string, condoId: string): Promise<Thread> {
     const existing = await repo.getById(id);
     if (existing) return existing;
-    const resident = await residentLookup(id);
+    const resident = await lookupFor(condoId)(id);
     if (!resident) throw new ThreadNotFoundError(id);
     return { id, residentName: resident.name, apt: resident.apt, unread: false, messages: [] };
   }
@@ -52,14 +53,14 @@ export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResid
   app.get('/:id', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
-    return denied ?? c.json(await loadOrEmpty(id));
+    return denied ?? c.json(await loadOrEmpty(id, c.get('condoId')));
   });
 
   app.post('/:id/messages', async (c) => {
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
-    if (!(await repo.getById(id))) await repo.save(await loadOrEmpty(id));
+    if (!(await repo.getById(id))) await repo.save(await loadOrEmpty(id, c.get('condoId')));
     const { text } = postMessageSchema.parse(await c.req.json());
     const author = c.get('role') ?? 'resident';
     return c.json(await postMessage(repo, id, author, text));
@@ -69,7 +70,9 @@ export function threadRoutes(repo: ThreadRepository, residentLookup: ThreadResid
     const id = c.req.param('id');
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
-    return c.json((await repo.getById(id)) ? await markRead(repo, id) : await loadOrEmpty(id));
+    return c.json(
+      (await repo.getById(id)) ? await markRead(repo, id) : await loadOrEmpty(id, c.get('condoId')),
+    );
   });
 
   return app;
