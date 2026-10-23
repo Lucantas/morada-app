@@ -14,6 +14,25 @@ export function parseR2Config(env: NodeJS.ProcessEnv): R2Config | null {
   return { endpoint, accessKeyId, secretAccessKey, bucket };
 }
 
+export type EmailConfig = {
+  accountId: string;
+  apiToken: string;
+  from: string;
+};
+
+export function parseEmailConfig(env: NodeJS.ProcessEnv): EmailConfig | null {
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = env.CLOUDFLARE_EMAIL_API_TOKEN;
+  const from = env.EMAIL_FROM;
+  if (!accountId || !apiToken || !from) return null;
+  return { accountId, apiToken, from };
+}
+
+export function parseAppUrl(raw: string | undefined, webOrigins: string[]): string {
+  const url = raw?.trim() || webOrigins[0] || '';
+  return url.replace(/\/+$/, '');
+}
+
 export function parseWebOrigins(raw: string | undefined, isProd: boolean): string[] {
   const origins = (raw ?? '')
     .split(',')
@@ -41,12 +60,16 @@ if (!databaseUrl) {
   throw new Error('DATABASE_URL must be set — the API runs on Postgres.');
 }
 
+const webOrigins = parseWebOrigins(process.env.WEB_ORIGIN, isProduction);
+
 export const config = {
   port: Number(process.env.PORT ?? 8787),
   jwtSecret: process.env.JWT_SECRET ?? 'dev-morada-secret-change-me',
   databaseUrl,
-  webOrigins: parseWebOrigins(process.env.WEB_ORIGIN, isProduction),
+  webOrigins,
+  appUrl: parseAppUrl(process.env.APP_URL, webOrigins),
   bcryptCost: Number(process.env.BCRYPT_COST ?? 12),
   isProduction,
   r2: parseR2Config(process.env),
+  email: parseEmailConfig(process.env),
 };
