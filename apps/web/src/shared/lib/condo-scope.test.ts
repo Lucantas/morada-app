@@ -17,6 +17,11 @@ describe('scopedApiPath', () => {
     expect(scopedApiPath('/me/condos', null)).toBe('/me/condos');
   });
 
+  test('leaves organization paths unchanged with or without a condominium', () => {
+    expect(scopedApiPath('/api/orgs/o1', 'c1')).toBe('/api/orgs/o1');
+    expect(scopedApiPath('/api/orgs/o1/invitations', null)).toBe('/api/orgs/o1/invitations');
+  });
+
   test('throws when an /api path has no condominium', () => {
     expect(() => scopedApiPath('/api/residents', null)).toThrow('Nenhum condomínio selecionado');
   });

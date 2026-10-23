@@ -11,6 +11,7 @@ export type View =
   | 'a-settings'
   | 'a-activity'
   | 'a-sindico'
+  | 'a-team'
   | 'a-notice'
   | 'a-messages'
   | 'r-home'

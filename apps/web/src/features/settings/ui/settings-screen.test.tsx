@@ -35,6 +35,7 @@ function Harness({
   canManageCondo = true,
   onOpenActivity,
   onOpenSindico,
+  onOpenTeam,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
@@ -43,6 +44,7 @@ function Harness({
   canManageCondo?: boolean;
   onOpenActivity?: () => void;
   onOpenSindico?: () => void;
+  onOpenTeam?: () => void;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -63,6 +65,7 @@ function Harness({
       canManageCondo={canManageCondo}
       onOpenActivity={onOpenActivity}
       onOpenSindico={onOpenSindico}
+      onOpenTeam={onOpenTeam}
       onBack={() => {}}
     />
   );
@@ -336,5 +339,27 @@ describe('SettingsScreen', () => {
     );
     await screen.findByLabelText('Nome da nova categoria');
     expect(screen.queryByRole('button', { name: 'Síndico' })).not.toBeInTheDocument();
+  });
+
+  test('shows the Equipe row only when an opener is provided and opens it', async () => {
+    const onOpenTeam = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenTeam={onOpenTeam}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Equipe' }));
+
+    expect(onOpenTeam).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Equipe' })).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,8 @@ import { InvitationError } from '@/features/invitations/domain/errors';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 import { fakeAuthRepository } from '@/test/factories.auth';
-import { fakeInvitationRepository } from '@/test/factories.invitations';
+import { TEAM_PREVIEW, fakeInvitationRepository } from '@/test/factories.invitations';
+import { loginCondo } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
 import { EntryRouter } from './entry-router';
@@ -238,6 +239,45 @@ describe('EntryRouter', () => {
       ),
     ).toBeInTheDocument();
     expect(onLanded).not.toHaveBeenCalled();
+  });
+
+  test('accepting a team invite never stores the organization name as a condominium name', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    renderEntry(
+      fakeAuthRepository(),
+      fakeInvitationRepository({
+        preview: jest.fn().mockResolvedValue(TEAM_PREVIEW),
+        accept: jest.fn().mockResolvedValue({ condos: [], emailVerified: false }),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    expect(await screen.findByRole('heading', { name: 'Confirme seu e-mail' })).toBeInTheDocument();
+    expect(screen.queryByText(/Administradora Aurora/)).not.toBeInTheDocument();
+  });
+
+  test('accepting a team invite lands on the real condominium from the response', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    const { onLanded } = renderEntry(
+      fakeAuthRepository(),
+      fakeInvitationRepository({
+        preview: jest.fn().mockResolvedValue(TEAM_PREVIEW),
+        accept: jest.fn().mockResolvedValue({
+          condos: [loginCondo({ id: 'c7', name: 'Edifício Real' })],
+          emailVerified: true,
+        }),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    await waitFor(() => expect(onLanded).toHaveBeenCalledWith('admin'));
+    expect(useCondoScope.getState().condo?.name).toBe('Edifício Real');
   });
 
   test('"Esqueci a senha" on an invite opens the forgot-password screen', async () => {

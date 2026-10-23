@@ -21,7 +21,7 @@ import { INVALID_INVITATION, invitationErrorMessage } from './invitation-error-m
 type Props = {
   token: string;
   repository: Pick<InvitationRepository, 'preview' | 'accept'>;
-  onAccepted: (response: LoginResponse, condoName: string) => void;
+  onAccepted: (response: LoginResponse, condoName: string | null) => void;
   onSignIn: () => void;
   onForgotPassword: () => void;
 };
@@ -82,6 +82,10 @@ export function AcceptInviteScreen({
   );
 }
 
+function acceptedCondoName(preview: InvitationPreview): string | null {
+  return preview.role === 'membro' ? null : preview.targetName;
+}
+
 function heading(role: InvitationRole, targetName: string): string {
   if (role === 'sindico') return `Você foi convidado para ser síndico do ${targetName}`;
   if (role === 'membro') return `Você foi convidado para a equipe ${targetName}`;
@@ -109,7 +113,7 @@ function AcceptForm({
   token: string;
   preview: InvitationPreview;
   repository: Pick<InvitationRepository, 'accept'>;
-  onAccepted: (response: LoginResponse, condoName: string) => void;
+  onAccepted: (response: LoginResponse, condoName: string | null) => void;
   onForgotPassword: () => void;
 }) {
   const mode = acceptMode(preview);
@@ -120,7 +124,7 @@ function AcceptForm({
   const [invalid, setInvalid] = useState<string | null>(null);
   const accept = useMutation({
     mutationFn: (input: AcceptInput) => repository.accept(token, input),
-    onSuccess: (response) => onAccepted(response, preview.targetName),
+    onSuccess: (response) => onAccepted(response, acceptedCondoName(preview)),
   });
 
   const submit = () => {

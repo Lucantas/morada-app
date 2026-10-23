@@ -75,9 +75,10 @@ export function useHasHome(): boolean {
 }
 
 const API_PREFIX = '/api/';
+const ORG_PREFIX = '/api/orgs/';
 
 export function scopedApiPath(path: string, condoId: string | null): string {
-  if (!path.startsWith(API_PREFIX)) return path;
+  if (!path.startsWith(API_PREFIX) || path.startsWith(ORG_PREFIX)) return path;
   if (!condoId) throw new Error('Nenhum condomínio selecionado');
   return `/api/condos/${condoId}/${path.slice(API_PREFIX.length)}`;
 }

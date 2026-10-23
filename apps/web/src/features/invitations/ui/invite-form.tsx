@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Field, PrimaryButton } from '@/shared/ui/primitives';
 
@@ -15,6 +15,7 @@ type Props = {
   description?: string;
   validateEmail?: (email: string) => Validation<string>;
   askPhone?: boolean;
+  extraFields?: ReactNode;
 };
 
 const DEFAULT_DESCRIPTION =
@@ -30,6 +31,7 @@ export function InviteForm({
   description = DEFAULT_DESCRIPTION,
   validateEmail = validateInviteEmail,
   askPhone = false,
+  extraFields,
 }: Props) {
   const [email, setEmail] = useState(initialEmail);
   const [phone, setPhone] = useState('');
@@ -69,6 +71,7 @@ export function InviteForm({
           autoComplete="tel"
         />
       )}
+      {extraFields}
       {message && (
         <p role="alert" style={{ color: 'var(--atraso-700)', margin: '0 0 14px' }}>
           {message}

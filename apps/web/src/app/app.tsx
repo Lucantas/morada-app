@@ -23,6 +23,8 @@ import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-prof
 import { useSessionStore } from '@/features/session/ui/session-store';
 import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
+import { InviteForm } from '@/features/invitations/ui/invite-form';
+import { InviteShare } from '@/features/invitations/ui/invite-share';
 import { SindicoScreen } from '@/features/invitations/ui/sindico-screen';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
 import { ResidentEditScreen } from '@/features/residents/ui/resident-edit-screen';
@@ -31,6 +33,7 @@ import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
 import { ActivityScreen } from '@/features/activity/ui/activity-screen';
+import { TeamScreen } from '@/features/team/ui/team-screen';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
 import { useSettings } from '@/features/settings/ui/use-settings';
 import { useCategories, useSaveCategories } from '@/features/categories/ui/use-categories';
@@ -59,6 +62,7 @@ import {
   rejectPayment,
   residentRepository,
   settingsRepository,
+  teamRepository,
   authRepository,
 } from './container';
 import { EntryRouter } from './entry-router';
@@ -77,6 +81,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-settings': 'settings',
   'a-activity': 'settings',
   'a-sindico': 'settings',
+  'a-team': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -268,10 +273,20 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           onBack={() => go('a-home')}
           onOpenActivity={() => go('a-activity')}
           onOpenSindico={() => go('a-sindico')}
+          onOpenTeam={() => go('a-team')}
         />
       );
     case 'a-sindico':
       return <SindicoScreen repository={invitationRepository} onBack={() => go('a-settings')} />;
+    case 'a-team':
+      return (
+        <TeamScreen
+          repository={teamRepository}
+          inviteForm={InviteForm}
+          inviteShare={InviteShare}
+          onBack={() => go('a-settings')}
+        />
+      );
     case 'a-activity':
       return <ActivityScreen repository={activityRepository} onBack={() => go('a-settings')} />;
     case 'a-notice':
@@ -302,10 +317,12 @@ function AdminSettings({
   onBack,
   onOpenActivity,
   onOpenSindico,
+  onOpenTeam,
 }: {
   onBack: () => void;
   onOpenActivity: () => void;
   onOpenSindico: () => void;
+  onOpenTeam: () => void;
 }) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
@@ -314,6 +331,7 @@ function AdminSettings({
   const canManageFees = useCanDo('manage_fees');
   const canManageCondo = useCanDo('manage_condo');
   const canViewActivity = useCanDo('view_activity');
+  const isOrgOwner = useCondoScope((s) => s.condo?.orgRole === 'owner');
   return (
     <SettingsScreen
       repository={settingsRepository}
@@ -328,6 +346,7 @@ function AdminSettings({
       canManageFees={canManageFees}
       canManageCondo={canManageCondo}
       onOpenSindico={canManageCondo ? onOpenSindico : undefined}
+      onOpenTeam={isOrgOwner ? onOpenTeam : undefined}
       onOpenActivity={canViewActivity ? onOpenActivity : undefined}
       onBack={onBack}
     />

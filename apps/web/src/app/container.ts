@@ -11,6 +11,7 @@ import { HttpNoticeRepository } from '@/features/notices/data/http-notice-reposi
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
+import { HttpTeamRepository } from '@/features/team/data/http-team-repository';
 import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
 import { useCondoScope } from '@/shared/lib/condo-scope';
@@ -51,6 +52,10 @@ export const settingsRepository = new HttpSettingsRepository(apiClient);
 export const condoInfoRepository = new HttpCondoInfoRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
+export const teamRepository = new HttpTeamRepository(
+  apiClient,
+  () => useCondoScope.getState().condo?.organizationId ?? null,
+);
 
 /** Sign out: tell the server to clear the session cookie, then clear local state
  *  regardless of whether the server call succeeds. */
