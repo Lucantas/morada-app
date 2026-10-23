@@ -112,7 +112,14 @@ export function runCondoRepositoryContract(
       await pool.query("UPDATE condo_roles SET active = FALSE WHERE condominium_id = 'condo-b'");
 
       expect(await repo.listForUser('u-1')).toEqual([
-        { condominiumId: 'condo-a', name: 'A', role: 'sindico', residentId: null },
+        {
+          condominiumId: 'condo-a',
+          name: 'A',
+          role: 'sindico',
+          residentId: null,
+          organizationId: 'org-condo-a',
+          orgRole: null,
+        },
       ]);
     });
 
@@ -137,8 +144,22 @@ export function runCondoRepositoryContract(
       const list = await repo.listForUser('u-owner');
 
       expect(list).toEqual([
-        { condominiumId: aurora.id, name: 'Aurora', role: 'administrador', residentId: null },
-        { condominiumId: ipe.id, name: 'Ipê', role: 'administrador', residentId: null },
+        {
+          condominiumId: aurora.id,
+          name: 'Aurora',
+          role: 'administrador',
+          residentId: null,
+          organizationId: org.id,
+          orgRole: 'owner',
+        },
+        {
+          condominiumId: ipe.id,
+          name: 'Ipê',
+          role: 'administrador',
+          residentId: null,
+          organizationId: org.id,
+          orgRole: 'owner',
+        },
       ]);
       expect(await repo.accessFor('u-owner', 'condo-other')).toBeNull();
     });
@@ -215,6 +236,8 @@ export function runCondoRepositoryContract(
         name: 'A',
         role: 'morador',
         residentId: 'r-lucia',
+        organizationId: 'org-condo-a',
+        orgRole: null,
       });
 
       await pool.query("UPDATE apartment_residents SET active = FALSE WHERE id = 'occ-r-lucia'");
@@ -252,7 +275,14 @@ export function runCondoRepositoryContract(
         residentId: null,
       });
 
-      const expected = { condominiumId: 'condo-a', name: 'A', role: 'sindico', residentId: 'r-1' };
+      const expected = {
+        condominiumId: 'condo-a',
+        name: 'A',
+        role: 'sindico',
+        residentId: 'r-1',
+        organizationId: 'org-condo-a',
+        orgRole: null,
+      };
       expect(await repo.accessFor('u-1', 'condo-a')).toEqual(expected);
       expect(await repo.listForUser('u-1')).toEqual([expected]);
     });
@@ -348,6 +378,30 @@ export function runCondoRepositoryContract(
         name: 'A',
         role: 'administrador',
         residentId: null,
+        organizationId: 'org-condo-a',
+        orgRole: 'member',
+      });
+    });
+
+    test('a morador grant carries the active org membership role', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-1');
+      await createTestCondo(pool, 'condo-a', { name: 'A' });
+      await insertOccupiedResident(pool, 'condo-a', 'r-1');
+      await insertMembership(pool, 'org-condo-a', 'u-1', 'member');
+      await repo.grant({
+        condominiumId: 'condo-a',
+        userId: 'u-1',
+        role: 'morador',
+        residentId: 'r-1',
+      });
+      expect((await repo.accessFor('u-1', 'condo-a'))?.orgRole).toBe('member');
+
+      await pool.query("UPDATE organization_members SET active = FALSE WHERE user_id = 'u-1'");
+
+      expect(await repo.accessFor('u-1', 'condo-a')).toMatchObject({
+        role: 'morador',
+        orgRole: null,
       });
     });
 

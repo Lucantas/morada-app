@@ -7,7 +7,27 @@ import { SESSION_COOKIE } from './cookies';
 
 export type Role = 'admin' | 'resident';
 
-export type ApiEnv = { Variables: { uid: string; role: Role; sub: string; condoId: string } };
+export type CondoRoleName = 'administrador' | 'sindico' | 'morador';
+
+export type Permission =
+  | 'view_building'
+  | 'publish_notices'
+  | 'manage_residents'
+  | 'manage_money'
+  | 'manage_fees'
+  | 'manage_condo'
+  | 'view_activity';
+
+export type ApiEnv = {
+  Variables: {
+    uid: string;
+    role: Role;
+    sub: string;
+    condoId: string;
+    condoRole: CondoRoleName;
+    permissions: readonly Permission[];
+  };
+};
 
 const EIGHT_HOURS = 60 * 60 * 8;
 
@@ -58,6 +78,15 @@ export function authMiddleware(
 export function requireRole(role: Role): MiddlewareHandler<ApiEnv> {
   return async (c, next) => {
     if (c.get('role') !== role) return c.json({ error: 'Acesso negado' }, 403);
+    await next();
+  };
+}
+
+export function requirePermission(permission: Permission): MiddlewareHandler<ApiEnv> {
+  return async (c, next) => {
+    if (!c.get('permissions').includes(permission)) {
+      return c.json({ error: 'Acesso negado' }, 403);
+    }
     await next();
   };
 }

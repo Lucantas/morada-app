@@ -14,7 +14,7 @@ import { activateClaimedInvitations } from './invitations/app/activate-claimed-i
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
-import { condoAccessMiddleware, type Scoped } from './platform/condo-scope';
+import { condoAccessMiddleware, VIEW_HEADER, type Scoped } from './platform/condo-scope';
 import { csrfMiddleware } from './platform/csrf';
 import { config } from './platform/config';
 import { createRepositories, type CondoRepositories, type Repositories } from './repositories';
@@ -70,7 +70,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       origin: config.webOrigins,
       credentials: true,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'X-CSRF-Token'],
+      allowHeaders: ['Content-Type', 'X-CSRF-Token', VIEW_HEADER],
     }),
   );
   app.use(

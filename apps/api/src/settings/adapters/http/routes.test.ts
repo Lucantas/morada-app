@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { ApiEnv } from '../../../platform/auth';
+import type { ApiEnv, Permission } from '../../../platform/auth';
 import { onError } from '../../../platform/http-error';
 import type { CondoSettings } from '../../domain/condo-settings';
 import type { SettingsRepository } from '../../domain/settings-repository';
@@ -18,9 +18,13 @@ function makeRepo(initial: CondoSettings): SettingsRepository {
   };
 }
 
-function mount(repo: SettingsRepository) {
+function mount(repo: SettingsRepository, permissions: readonly Permission[] = ['manage_fees']) {
   const app = new Hono<ApiEnv>();
   app.onError(onError);
+  app.use('*', async (c, next) => {
+    c.set('permissions', permissions);
+    await next();
+  });
   app.route(
     '/settings',
     settingsRoutes(() => ({ settings: repo })),
@@ -55,5 +59,17 @@ describe('settings routes', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 31 }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it('PUT without manage_fees answers 403 and keeps the settings', async () => {
+    const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15 });
+    const app = mount(repo, ['manage_money']);
+    const res = await app.request('/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
+    });
+    expect(res.status).toBe(403);
+    expect(await repo.get()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
   });
 });

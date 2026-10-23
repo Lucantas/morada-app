@@ -21,6 +21,36 @@ import { residentCredentials, seedFixtures, TEST_CONDO_ID } from './test-fixture
 
 const P = `/api/condos/${TEST_CONDO_ID}`;
 
+const ADMIN_SUMMARY = {
+  id: TEST_CONDO_ID,
+  name: `Condomínio ${TEST_CONDO_ID}`,
+  role: 'admin',
+  condoRole: 'administrador',
+  permissions: [
+    'view_building',
+    'publish_notices',
+    'manage_residents',
+    'manage_money',
+    'manage_fees',
+    'manage_condo',
+    'view_activity',
+  ],
+  hasHome: false,
+  organizationId: `org-${TEST_CONDO_ID}`,
+  orgRole: 'owner',
+};
+
+const RESIDENT_SUMMARY = {
+  id: TEST_CONDO_ID,
+  name: `Condomínio ${TEST_CONDO_ID}`,
+  role: 'resident',
+  condoRole: 'morador',
+  permissions: [],
+  hasHome: false,
+  organizationId: `org-${TEST_CONDO_ID}`,
+  orgRole: null,
+};
+
 const pool = createPool(config.databaseUrl);
 
 beforeAll(async () => {
@@ -741,12 +771,8 @@ describe('Morada API', () => {
     });
 
     expect(adminCondos.status).toBe(200);
-    expect(await adminCondos.json()).toEqual([
-      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' },
-    ]);
-    expect(await residentCondos.json()).toEqual([
-      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' },
-    ]);
+    expect(await adminCondos.json()).toEqual([ADMIN_SUMMARY]);
+    expect(await residentCondos.json()).toEqual([RESIDENT_SUMMARY]);
   });
 
   test('GET /me/condos requires authentication', async () => {
@@ -803,7 +829,7 @@ describe('Morada API — real credentials', () => {
     const body: unknown = await res.json();
     expect(body).not.toHaveProperty('token');
     expect(body).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' }],
+      condos: [ADMIN_SUMMARY],
       emailVerified: true,
     });
   });
@@ -917,7 +943,15 @@ describe('Morada API — real credentials', () => {
 
     expect(res.status).toBe(201);
     const created = (await res.json()) as { id: string; name: string; role: string };
-    expect(created).toMatchObject({ name: 'Residencial Ipê', role: 'admin' });
+    expect(created).toMatchObject({
+      name: 'Residencial Ipê',
+      role: 'admin',
+      condoRole: 'administrador',
+      permissions: ADMIN_SUMMARY.permissions,
+      hasHome: false,
+      organizationId: expect.any(String),
+      orgRole: 'owner',
+    });
     expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
   });
 
@@ -1287,7 +1321,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
     const loginRes = await login(app, residentCredentials.username, body.tempPassword);
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+      condos: [RESIDENT_SUMMARY],
       emailVerified: true,
     });
   });
@@ -2585,7 +2619,7 @@ describe('Resident invitations', () => {
 
 describe('Accepting an invitation', () => {
   const APP_URL = config.appUrl;
-  const CONDO = { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' };
+  const CONDO = RESIDENT_SUMMARY;
 
   async function adminHeaders(app: App) {
     const auth = await authFor(app, adminCredentials);
@@ -2918,5 +2952,152 @@ describe('Accepting an invitation', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+  });
+});
+
+describe('Síndico access', () => {
+  const sindicoCredentials = { username: 'sindico', password: 'senha-sindico-1' };
+  const SINDICO_RESIDENT_ID = 'r-3';
+
+  async function sindicoApp() {
+    const app = await makeApp();
+    const hasher = new BcryptPasswordHasher(config.bcryptCost);
+    await new PostgresUserRepository(pool).save({
+      id: 'u-sindico',
+      username: sindicoCredentials.username,
+      email: null,
+      name: null,
+      passwordHash: await hasher.hash(sindicoCredentials.password),
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
+    });
+    await pool.query(
+      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) VALUES
+         ('role-sindico', $1, 'u-sindico', 'sindico', NULL),
+         ('role-sindico-home', $1, 'u-sindico', 'morador', $2)`,
+      [TEST_CONDO_ID, SINDICO_RESIDENT_ID],
+    );
+    const sindico = await authFor(app, sindicoCredentials);
+    const request = (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: {
+          ...(init.headers ?? {}),
+          Cookie: sindico.cookie,
+          'X-CSRF-Token': sindico.csrf,
+        },
+      });
+    return { app, request };
+  }
+
+  const json = (method: string, body: unknown): RequestInit => ({
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  test('sindico cannot manage fees or condo', async () => {
+    const { request } = await sindicoApp();
+
+    const settings = await request(`${P}/settings`, json('PUT', { monthlyFeeCents: 1, dueDay: 5 }));
+    const info = await request(`${P}/info`, json('PUT', { name: 'Outro nome' }));
+    const residents = await request(`${P}/residents`);
+    const account = await request(
+      `${P}/accounts`,
+      json('POST', {
+        description: 'Água',
+        category: 'Utilidades',
+        valueCents: 1000,
+        date: '2026-04-05',
+        status: 'pendente',
+      }),
+    );
+    const notice = await request(
+      `${P}/notices`,
+      json('POST', { title: 'Aviso', body: 'Corpo', kind: 'aviso', audience: 'Todos' }),
+    );
+
+    expect(settings.status).toBe(403);
+    expect(await settings.json()).toEqual({ error: 'Acesso negado' });
+    expect(info.status).toBe(403);
+    expect(residents.status).toBe(200);
+    expect(account.status).toBe(201);
+    expect(notice.status).toBe(201);
+  });
+
+  test('the administrador still manages fees', async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+
+    const settings = await app.request(`${P}/settings`, {
+      method: 'PUT',
+      headers: {
+        Cookie: admin.cookie,
+        'X-CSRF-Token': admin.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ monthlyFeeCents: 1, dueDay: 5 }),
+    });
+
+    expect(settings.status).toBe(200);
+  });
+
+  test('/me/condos lists the sindico with a home and four permissions', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request('/me/condos');
+
+    expect(await res.json()).toEqual([
+      {
+        id: TEST_CONDO_ID,
+        name: `Condomínio ${TEST_CONDO_ID}`,
+        role: 'admin',
+        condoRole: 'sindico',
+        permissions: ['view_building', 'publish_notices', 'manage_residents', 'manage_money'],
+        hasHome: true,
+        organizationId: `org-${TEST_CONDO_ID}`,
+        orgRole: null,
+      },
+    ]);
+  });
+
+  test('view header', async () => {
+    const { request } = await sindicoApp();
+
+    const home = await request(`${P}/receipts`, { headers: { 'X-Morada-View': 'resident' } });
+    const building = await request(`${P}/receipts`);
+
+    expect(home.status).toBe(200);
+    const homeReceipts = (await home.json()) as { residentId: string }[];
+    expect(homeReceipts.length).toBeGreaterThan(0);
+    expect(homeReceipts.every((r) => r.residentId === SINDICO_RESIDENT_ID)).toBe(true);
+    const buildingReceipts = (await building.json()) as { residentId: string }[];
+    expect(buildingReceipts.some((r) => r.residentId !== SINDICO_RESIDENT_ID)).toBe(true);
+  });
+
+  test('the resident view drops staff routes even for the sindico', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(`${P}/accounts`, { headers: { 'X-Morada-View': 'resident' } });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('CORS allows the view header', async () => {
+    const origin = config.webOrigins[0] ?? '';
+    const res = await (
+      await makeApp()
+    ).request(`${P}/receipts`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'X-Morada-View',
+      },
+    });
+
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('X-Morada-View');
   });
 });

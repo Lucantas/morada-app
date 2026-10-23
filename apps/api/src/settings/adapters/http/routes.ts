@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { ApiEnv } from '../../../platform/auth';
+import { requirePermission, type ApiEnv } from '../../../platform/auth';
 import type { Scoped } from '../../../platform/condo-scope';
 import { getSettings } from '../../app/get-settings';
 import { updateSettings } from '../../app/update-settings';
@@ -15,7 +15,7 @@ export function settingsRoutes(scope: Scoped<SettingsRoutesDeps>): Hono<ApiEnv> 
 
   app.get('/', async (c) => c.json(await getSettings(scope(c.get('condoId')).settings)));
 
-  app.put('/', async (c) =>
+  app.put('/', requirePermission('manage_fees'), async (c) =>
     c.json(await updateSettings(scope(c.get('condoId')).settings, await c.req.json())),
   );
 

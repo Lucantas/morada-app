@@ -26,16 +26,19 @@ const DEFAULT_CATEGORIES = [
 ] as const;
 
 const GRANTS_SQL = `
-  SELECT c.id AS condominium_id, c.name, 'administrador' AS role, NULL AS resident_id
+  SELECT c.id AS condominium_id, c.name, 'administrador' AS role, NULL AS resident_id,
+    c.organization_id, 'owner' AS org_role
   FROM condominiums c
   JOIN organizations o ON o.id = c.organization_id AND o.active
   JOIN organization_members m ON m.organization_id = c.organization_id
   WHERE m.user_id = $1 AND m.active AND m.role = 'owner' AND c.active
   UNION ALL
-  SELECT c.id, c.name, r.role, r.resident_id
+  SELECT c.id, c.name, r.role, r.resident_id, c.organization_id, om.role
   FROM condo_roles r
   JOIN condominiums c ON c.id = r.condominium_id
   JOIN organizations o ON o.id = c.organization_id AND o.active
+  LEFT JOIN organization_members om
+    ON om.organization_id = c.organization_id AND om.user_id = r.user_id AND om.active
   WHERE r.user_id = $1 AND r.active AND c.active
     AND (
       r.role = 'sindico'
@@ -65,6 +68,8 @@ const grantRowSchema = z.object({
   name: z.string(),
   role: condoRoleNameSchema,
   resident_id: z.string().nullable(),
+  organization_id: z.string(),
+  org_role: z.enum(['owner', 'member']).nullable(),
 });
 
 const condoRowSchema = z.object({
@@ -101,6 +106,8 @@ function toAccess(row: unknown): CondoAccess {
     name: parsed.name,
     role: parsed.role,
     residentId: parsed.resident_id,
+    organizationId: parsed.organization_id,
+    orgRole: parsed.org_role,
   };
 }
 

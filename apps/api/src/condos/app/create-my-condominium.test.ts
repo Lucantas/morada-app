@@ -43,7 +43,24 @@ describe('createMyCondominium', () => {
 
     const summary = await createMyCondominium(repo, verifiedUser, { name: '  Residencial Ipê ' });
 
-    expect(summary).toEqual({ id: 'c-1', name: 'Residencial Ipê', role: 'admin' });
+    expect(summary).toEqual({
+      id: 'c-1',
+      name: 'Residencial Ipê',
+      role: 'admin',
+      condoRole: 'administrador',
+      permissions: [
+        'view_building',
+        'publish_notices',
+        'manage_residents',
+        'manage_money',
+        'manage_fees',
+        'manage_condo',
+        'view_activity',
+      ],
+      hasHome: false,
+      organizationId: 'org-new',
+      orgRole: 'owner',
+    });
     expect(calls).toEqual([
       'org:Residencial Ipê:u-1',
       'create:org-new:0:10',
@@ -54,8 +71,9 @@ describe('createMyCondominium', () => {
   test('reuses the organization the user already owns', async () => {
     const { repo, calls } = fakeCondos({ id: 'org-existing' });
 
-    await createMyCondominium(repo, verifiedUser, { name: 'Segundo' });
+    const summary = await createMyCondominium(repo, verifiedUser, { name: 'Segundo' });
 
+    expect(summary).toMatchObject({ organizationId: 'org-existing', orgRole: 'owner' });
     expect(calls).toEqual(['create:org-existing:0:10', 'grant:c-1:u-1:administrador']);
   });
 

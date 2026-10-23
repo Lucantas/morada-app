@@ -52,6 +52,8 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     name: condominiums.find((c) => c.id === grant.condominiumId)?.name ?? '',
     role: grant.role,
     residentId: grant.residentId,
+    organizationId: condominiums.find((c) => c.id === grant.condominiumId)?.organizationId ?? '',
+    orgRole: null,
   });
   return {
     organizations,
@@ -232,7 +234,14 @@ describe('seedAdmin', () => {
       sessionVersion: 0,
     };
     const condos = fakeCondos([
-      { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
+      {
+        condominiumId: 'condo-legacy',
+        name: 'Legado',
+        role: 'administrador',
+        residentId: null,
+        organizationId: 'org-legacy',
+        orgRole: 'owner',
+      },
     ]);
 
     await seedAdmin(fakeRepo([existingAdmin]), condos, noopHasher);

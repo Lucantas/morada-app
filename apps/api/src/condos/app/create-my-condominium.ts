@@ -4,7 +4,7 @@ import { isEmailVerified, type User } from '../../users/domain/user';
 import { condominiumSchema } from '../domain/condominium';
 import type { CondoRepository } from '../domain/condo-repository';
 import { CondoValidationError, EmailNotConfirmedError } from '../domain/errors';
-import type { CondoSummary } from './condo-access-views';
+import { summaryOf, type CondoSummary } from './condo-access-views';
 
 const DEFAULT_MONTHLY_FEE_CENTS = 0;
 const DEFAULT_DUE_DAY = 10;
@@ -35,5 +35,15 @@ export async function createMyCondominium(
     role: 'administrador',
     residentId: null,
   });
-  return { id: condo.id, name: condo.name, role: 'admin' };
+  return summaryOf(
+    {
+      condominiumId: condo.id,
+      name: condo.name,
+      role: 'administrador',
+      residentId: null,
+      organizationId: organization.id,
+      orgRole: 'owner',
+    },
+    'admin',
+  );
 }
