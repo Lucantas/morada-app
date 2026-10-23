@@ -12,6 +12,7 @@ export interface UserRepository {
   markEmailVerified(id: string, at: Date): Promise<void>;
   setPasswordHash(id: string, passwordHash: string): Promise<void>;
   updateCredentials(id: string, credentials: { name: string; passwordHash: string }): Promise<void>;
+  sessionVersionOf(id: string): Promise<number | null>;
   bumpSessionVersion(id: string): Promise<number>;
   save(user: User): Promise<User>;
 }

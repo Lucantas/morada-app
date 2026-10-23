@@ -1189,6 +1189,18 @@ describe('Morada API — admin reads and resets resident logins', () => {
     expect(res.status).toBe(403);
   });
 
+  test("an admin reset ends the resident's existing sessions", async () => {
+    const app = await makeApp();
+    const resident = await authFor(app, residentCredentials);
+    const meBefore = await app.request('/me', { headers: { Cookie: resident.cookie } });
+    expect(meBefore.status).toBe(200);
+    const auth = await adminAuthFor(app);
+
+    await auth(`${P}/residents/${residentCredentials.residentId}/login/reset`, { method: 'POST' });
+
+    expect((await app.request('/me', { headers: { Cookie: resident.cookie } })).status).toBe(401);
+  });
+
   test('an admin resets a resident password and the resident logs in with the new one', async () => {
     const app = await makeApp();
     const auth = await adminAuthFor(app);
@@ -1798,7 +1810,10 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     const sender = new InMemoryEmailSender();
     const app = await makeApp({ email: sender });
     await signup(app);
-    await postJson(app, '/auth/email/confirm', { token: confirmTokenIn(sender, 'ana@x.com') });
+    await postJson(app, '/auth/email/confirm', {
+      token: confirmTokenIn(sender, 'ana@x.com'),
+      password: signupBody.password,
+    });
 
     const res = await signup(app, { ...signupBody, name: 'Intruso' });
 
@@ -1836,7 +1851,10 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     await signup(app);
     const token = confirmTokenIn(sender, 'ana@x.com');
 
-    const res = await postJson(app, '/auth/email/confirm', { token });
+    const res = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ condos: [], emailVerified: true });
@@ -1846,15 +1864,52 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     ]);
     expect(rows[0]?.email_verified_at).toBeInstanceOf(Date);
 
-    const again = await postJson(app, '/auth/email/confirm', { token });
+    const again = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
     expect(again.status).toBe(404);
     expect(await again.json()).toEqual({ error: 'Link inválido ou expirado' });
+  });
+
+  test('confirming needs the account password; a wrong one is 401 and keeps the link', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app);
+    const token = confirmTokenIn(sender, 'ana@x.com');
+
+    const wrong = await postJson(app, '/auth/email/confirm', { token, password: 'outra-senha-1' });
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({ error: 'Usuário ou senha inválidos' });
+    expect((await postJson(app, '/auth/email/confirm', { token })).status).toBe(400);
+
+    const right = await postJson(app, '/auth/email/confirm', {
+      token,
+      password: signupBody.password,
+    });
+    expect(right.status).toBe(200);
+  });
+
+  test('the owner cannot confirm an account an intruder created with their e-mail', async () => {
+    const sender = new InMemoryEmailSender();
+    const app = await makeApp({ email: sender });
+    await signup(app, { ...signupBody, password: 'senha-do-intruso' });
+
+    const res = await postJson(app, '/auth/email/confirm', {
+      token: confirmTokenIn(sender, 'ana@x.com'),
+      password: signupBody.password,
+    });
+
+    expect(res.status).toBe(401);
+    expect(await count("users WHERE email = 'ana@x.com' AND email_verified_at IS NULL")).toBe(1);
   });
 
   test('an unknown or malformed token is 404', async () => {
     const app = await makeApp({ email: new InMemoryEmailSender() });
 
-    expect((await postJson(app, '/auth/email/confirm', { token: 'nope' })).status).toBe(404);
+    expect(
+      (await postJson(app, '/auth/email/confirm', { token: 'nope', password: 'x' })).status,
+    ).toBe(404);
     expect((await postJson(app, '/auth/email/confirm', {})).status).toBe(404);
   });
 
@@ -1869,7 +1924,10 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
       now: () => new Date('2026-01-03T00:00:00.000Z'),
     });
 
-    expect((await postJson(lateApp, '/auth/email/confirm', { token })).status).toBe(404);
+    expect(
+      (await postJson(lateApp, '/auth/email/confirm', { token, password: signupBody.password }))
+        .status,
+    ).toBe(404);
   });
 
   test('resend needs a session and CSRF, sends a new link and revokes the previous one', async () => {
@@ -1896,8 +1954,14 @@ describe('Morada API — sign-up and e-mail confirmation', () => {
     const second = confirmTokenIn(sender, 'ana@x.com');
     expect(second).not.toBe(first);
 
-    expect((await postJson(app, '/auth/email/confirm', { token: first })).status).toBe(404);
-    const confirmed = await postJson(app, '/auth/email/confirm', { token: second });
+    expect(
+      (await postJson(app, '/auth/email/confirm', { token: first, password: signupBody.password }))
+        .status,
+    ).toBe(404);
+    const confirmed = await postJson(app, '/auth/email/confirm', {
+      token: second,
+      password: signupBody.password,
+    });
     expect(confirmed.status).toBe(200);
     expect(
       (await postJson(app, '/auth/email/resend', {}, { Cookie: cookie, 'X-CSRF-Token': csrf }))
@@ -2085,7 +2149,9 @@ describe('Morada API — forgot and reset password', () => {
   test('confirm rejects a non-string token with 404', async () => {
     const app = await makeApp({ email: new InMemoryEmailSender() });
 
-    expect((await postJson(app, '/auth/email/confirm', { token: 42 })).status).toBe(404);
+    expect((await postJson(app, '/auth/email/confirm', { token: 42, password: 'x' })).status).toBe(
+      404,
+    );
   });
 
   test('sign-up on an unverified e-mail replaces the credentials and ends its sessions', async () => {
@@ -2110,6 +2176,7 @@ describe('Morada API — forgot and reset password', () => {
       401,
     );
     const confirmed = await postJson(app, '/auth/email/confirm', {
+      password: 'senha-da-ana-1',
       token: /confirmar-email\/([\w-]+)/.exec(sender.lastTo('ana@x.com')?.text ?? '')?.[1],
     });
     expect(confirmed.status).toBe(200);

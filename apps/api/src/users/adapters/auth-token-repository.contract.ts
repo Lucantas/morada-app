@@ -64,6 +64,47 @@ export function runAuthTokenRepositoryContract(
       });
     });
 
+    test('peek returns the owner of a valid token without consuming it', async () => {
+      const repo = await makeRepo();
+      await repo.issue({
+        userId: CONTRACT_USER_ID,
+        kind: 'confirm_email',
+        tokenHash: 'h1',
+        expiresAt: LATER,
+      });
+
+      expect(await repo.peek('h1', 'confirm_email', NOW)).toEqual({ userId: CONTRACT_USER_ID });
+      expect(await repo.consume('h1', 'confirm_email', NOW)).toEqual({ userId: CONTRACT_USER_ID });
+    });
+
+    test('peek ignores used, expired, unknown and other-kind tokens', async () => {
+      const repo = await makeRepo();
+      await repo.issue({
+        userId: CONTRACT_USER_ID,
+        kind: 'confirm_email',
+        tokenHash: 'used',
+        expiresAt: LATER,
+      });
+      await repo.consume('used', 'confirm_email', NOW);
+      await repo.issue({
+        userId: CONTRACT_USER_ID,
+        kind: 'confirm_email',
+        tokenHash: 'old',
+        expiresAt: EARLIER,
+      });
+      await repo.issue({
+        userId: CONTRACT_USER_ID,
+        kind: 'reset_password',
+        tokenHash: 'reset',
+        expiresAt: LATER,
+      });
+
+      expect(await repo.peek('used', 'confirm_email', NOW)).toBeNull();
+      expect(await repo.peek('old', 'confirm_email', NOW)).toBeNull();
+      expect(await repo.peek('ghost', 'confirm_email', NOW)).toBeNull();
+      expect(await repo.peek('reset', 'confirm_email', NOW)).toBeNull();
+    });
+
     test('revokeAll invalidates unused tokens of that kind only', async () => {
       const repo = await makeRepo();
       await repo.issue({

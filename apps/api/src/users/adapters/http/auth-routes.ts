@@ -40,7 +40,8 @@ const loginSchema = z
   }));
 
 const tokenBodySchema = z.object({ token: z.string().min(1).max(200) });
-const passwordBodySchema = z.object({ password: z.string().min(8).max(200) });
+const confirmBodySchema = z.object({ password: z.string().min(1).max(200) });
+const resetBodySchema = z.object({ password: z.unknown() });
 
 function tokenFrom(body: unknown): string {
   const parsed = tokenBodySchema.safeParse(body);
@@ -125,14 +126,18 @@ export function authRoutes(deps: {
   });
 
   app.post('/email/confirm', async (c) => {
+    const body = await readJson(c);
+    const token = tokenFrom(body);
+    const { password } = confirmBodySchema.parse(body);
     const user = await confirmEmail(
       {
         users: deps.users,
         tokens: deps.tokens,
+        hasher: deps.hasher,
         now: deps.now,
         afterEmailConfirmed: deps.afterEmailConfirmed,
       },
-      tokenFrom(await readJson(c)),
+      { token, password },
     );
     return sessionResponse(c, user, await deps.condosFor(user.id));
   });
@@ -154,7 +159,8 @@ export function authRoutes(deps: {
 
   app.post('/password/reset', async (c) => {
     const body = await readJson(c);
-    const { password } = passwordBodySchema.parse(body);
+    const token = tokenFrom(body);
+    const { password } = resetBodySchema.parse(body);
     const user = await resetPassword(
       {
         users: deps.users,
@@ -163,7 +169,7 @@ export function authRoutes(deps: {
         now: deps.now,
         afterEmailConfirmed: deps.afterEmailConfirmed,
       },
-      { token: tokenFrom(body), password },
+      { token, password },
     );
     return sessionResponse(c, user, await deps.condosFor(user.id));
   });

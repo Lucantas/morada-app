@@ -23,7 +23,11 @@ Env: `PORT`, `JWT_SECRET` (required in production — startup fails without it),
   `POST /api/users { username, residentId }` (admin-only). The server generates a
   temp password and returns it **once** in the response for the admin to relay;
   only the bcrypt hash is stored. Duplicate usernames return 409.
-- `authMiddleware` verifies the token; `requireRole` guards admin routes.
+- `authMiddleware(resolveSessionVersion)` is a factory: it verifies the session JWT
+  and rejects it (401) unless its `sv` claim matches the user's stored
+  `session_version` (bumped on password reset, e-mail confirmation and admin
+  password reset). `compose.ts` wires it once with the user lookup; `requireRole`
+  guards admin routes.
 - Authorization: residents/accounts/user-provisioning are **admin-only**;
   receipts/dashboard are any authenticated user; notices are read-any /
   **write-admin**; thread listing is **admin-only** and per-thread access is

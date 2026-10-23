@@ -23,5 +23,6 @@ export async function resetResidentPassword(
     ...existing,
     passwordHash: await hasher.hash(parsed.data),
   });
-  return repo.save(user);
+  const saved = await repo.save(user);
+  return { ...saved, sessionVersion: await repo.bumpSessionVersion(saved.id) };
 }

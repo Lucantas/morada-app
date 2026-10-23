@@ -38,9 +38,9 @@ async function takeOverUnverified(
   owner: { id: string; email: string },
   credentials: { name: string; passwordHash: string },
 ): Promise<void> {
+  await deps.users.bumpSessionVersion(owner.id);
   await deps.users.updateCredentials(owner.id, credentials);
   await deps.tokens.revokeAll(owner.id, 'confirm_email', deps.now());
-  await deps.users.bumpSessionVersion(owner.id);
   await issueConfirmation(deps, owner);
 }
 

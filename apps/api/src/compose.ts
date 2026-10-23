@@ -28,7 +28,6 @@ import { seedAdmin } from './seed-data';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
 import { userRoutes } from './users/adapters/http/routes';
-import { sessionVersionOf } from './users/app/session-version';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
 
 function guarded(role: Role, routes: Hono<ApiEnv>): Hono<ApiEnv> {
@@ -92,7 +91,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
 
   app.route('/healthz', healthRoutes());
 
-  const auth = authMiddleware(sessionVersionOf(users));
+  const auth = authMiddleware((userId) => users.sessionVersionOf(userId));
   const loginLimiter = createRateLimiter();
   app.route(
     '/auth',

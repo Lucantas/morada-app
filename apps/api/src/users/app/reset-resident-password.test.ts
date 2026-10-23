@@ -14,7 +14,11 @@ function fakeRepo(users: User[] = []): UserRepository {
     markEmailVerified: async () => undefined,
     setPasswordHash: async () => undefined,
     updateCredentials: async () => undefined,
-    bumpSessionVersion: async () => 1,
+    sessionVersionOf: async (id) => list.find((u) => u.id === id)?.sessionVersion ?? null,
+    bumpSessionVersion: async (id) => {
+      list = list.map((u) => (u.id === id ? { ...u, sessionVersion: u.sessionVersion + 1 } : u));
+      return list.find((u) => u.id === id)?.sessionVersion ?? 0;
+    },
     findByUsername: async (username) => list.find((u) => u.username === username) ?? null,
     findByResidentId: async (residentId) => list.find((u) => u.residentId === residentId) ?? null,
     existsByUsername: async (username) => list.some((u) => u.username === username),
@@ -33,6 +37,31 @@ const hasher: PasswordHasher = {
 };
 
 describe('resetResidentPassword', () => {
+  test('ends the existing sessions of the resident', async () => {
+    const bumpSessionVersion = jest.fn(async () => 7);
+    const repo: UserRepository = {
+      ...fakeRepo([
+        {
+          id: 'u-1',
+          username: 'maria302',
+          passwordHash: 'hash:old-secret',
+          role: 'resident',
+          residentId: 'r-1',
+          email: null,
+          name: null,
+          emailVerifiedAt: null,
+          sessionVersion: 6,
+        },
+      ]),
+      bumpSessionVersion,
+    };
+
+    const user = await resetResidentPassword(repo, hasher, 'r-1', 'nova-s3nha');
+
+    expect(bumpSessionVersion).toHaveBeenCalledWith('u-1');
+    expect(user.sessionVersion).toBe(7);
+  });
+
   test('resets the hash for an existing resident login, keeping identity fields', async () => {
     const repo = fakeRepo([
       {

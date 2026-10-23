@@ -14,6 +14,7 @@ function fakeRepo(users: User[] = []): UserRepository {
     markEmailVerified: async () => undefined,
     setPasswordHash: async () => undefined,
     updateCredentials: async () => undefined,
+    sessionVersionOf: async () => 0,
     bumpSessionVersion: async () => 1,
     findByUsername: async (username) => map.get(username) ?? null,
     findByResidentId: async (residentId) =>

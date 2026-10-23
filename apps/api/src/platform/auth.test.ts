@@ -53,6 +53,26 @@ describe('authMiddleware', () => {
     expect(await res.json()).toEqual({ error: 'Sessão inválida' });
   });
 
+  test('a failing version lookup never reaches the handler', async () => {
+    const reached = jest.fn();
+    const app = new Hono<ApiEnv>();
+    app.use(
+      '*',
+      authMiddleware(async () => {
+        throw new Error('db down');
+      }),
+    );
+    app.get('/', (c) => {
+      reached();
+      return c.json({});
+    });
+
+    const res = await requestWith(app, await signSession('u-1', 0));
+
+    expect(res.ok).toBe(false);
+    expect(reached).not.toHaveBeenCalled();
+  });
+
   test('rejects a missing cookie and a forged token', async () => {
     const app = appWith({ 'u-1': 0 });
 

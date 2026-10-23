@@ -34,7 +34,7 @@ export function confirmEmailMessage(to: string, link: string): EmailMessage {
   return compose(
     to,
     'Confirme seu e-mail no Morada',
-    'Bem-vindo ao Morada! Confirme seu e-mail para ativar sua conta. O link vale por 24 horas.',
+    'Bem-vindo ao Morada! Confirme seu e-mail para ativar sua conta. O link vale por 24 horas. Se não foi você, ignore este e-mail.',
     'Confirmar e-mail',
     link,
   );

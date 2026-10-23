@@ -16,6 +16,19 @@ export class PostgresAuthTokenRepository implements AuthTokenRepository {
     );
   }
 
+  async peek(
+    tokenHash: string,
+    kind: AuthTokenKind,
+    now: Date,
+  ): Promise<{ userId: string } | null> {
+    const { rows } = await this.pool.query<{ user_id: string }>(
+      `SELECT user_id FROM auth_tokens
+       WHERE token_hash = $1 AND kind = $2 AND used_at IS NULL AND expires_at > $3`,
+      [tokenHash, kind, now],
+    );
+    return rows[0] ? { userId: rows[0].user_id } : null;
+  }
+
   async consume(
     tokenHash: string,
     kind: AuthTokenKind,

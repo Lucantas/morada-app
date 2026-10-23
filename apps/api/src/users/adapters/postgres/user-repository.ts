@@ -111,6 +111,14 @@ export class PostgresUserRepository implements UserRepository {
     ]);
   }
 
+  async sessionVersionOf(id: string): Promise<number | null> {
+    const { rows } = await this.pool.query<{ session_version: number }>(
+      'SELECT session_version FROM users WHERE id = $1',
+      [id],
+    );
+    return rows[0]?.session_version ?? null;
+  }
+
   async bumpSessionVersion(id: string): Promise<number> {
     const { rows } = await this.pool.query<{ session_version: number }>(
       'UPDATE users SET session_version = session_version + 1 WHERE id = $1 RETURNING session_version',

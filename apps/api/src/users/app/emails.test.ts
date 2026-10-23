@@ -21,6 +21,7 @@ describe('e-mail templates', () => {
     expect(message.subject).toBe('Confirme seu e-mail no Morada');
     expect(message.text).toContain('https://app.x/#/confirmar-email/tok');
     expect(message.html).toContain('href="https://app.x/#/confirmar-email/tok"');
+    expect(message.text).toContain('Se não foi você, ignore este e-mail.');
   });
 
   test('reset uses the exact subject', () => {

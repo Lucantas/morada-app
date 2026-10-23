@@ -24,6 +24,7 @@ export function inMemoryUsers(initial: User[] = []): UserRepository & { all: () 
     updateCredentials: async (id, { name, passwordHash }) => {
       list = list.map((u) => (u.id === id ? { ...u, name, passwordHash } : u));
     },
+    sessionVersionOf: async (id) => list.find((u) => u.id === id)?.sessionVersion ?? null,
     bumpSessionVersion: async (id) => {
       const found = list.find((u) => u.id === id);
       if (!found) throw new Error(`User not found: ${id}`);
@@ -44,18 +45,24 @@ interface StoredToken extends IssueAuthToken {
 
 export function inMemoryAuthTokens(): AuthTokenRepository {
   let tokens: StoredToken[] = [];
+  const usable = (tokenHash: string, kind: AuthTokenKind, now: Date) =>
+    tokens.find(
+      (t) =>
+        t.tokenHash === tokenHash &&
+        t.kind === kind &&
+        t.usedAt === null &&
+        t.expiresAt.getTime() > now.getTime(),
+    );
   return {
     issue: async (token) => {
       tokens = [...tokens, { ...token, usedAt: null }];
     },
+    peek: async (tokenHash: string, kind: AuthTokenKind, now: Date) => {
+      const found = usable(tokenHash, kind, now);
+      return found ? { userId: found.userId } : null;
+    },
     consume: async (tokenHash: string, kind: AuthTokenKind, now: Date) => {
-      const found = tokens.find(
-        (t) =>
-          t.tokenHash === tokenHash &&
-          t.kind === kind &&
-          t.usedAt === null &&
-          t.expiresAt.getTime() > now.getTime(),
-      );
+      const found = usable(tokenHash, kind, now);
       if (!found) return null;
       tokens = tokens.map((t) => (t === found ? { ...t, usedAt: now } : t));
       return { userId: found.userId };

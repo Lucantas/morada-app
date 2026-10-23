@@ -9,6 +9,7 @@ export interface IssueAuthToken {
 
 export interface AuthTokenRepository {
   issue(token: IssueAuthToken): Promise<void>;
+  peek(tokenHash: string, kind: AuthTokenKind, now: Date): Promise<{ userId: string } | null>;
   consume(tokenHash: string, kind: AuthTokenKind, now: Date): Promise<{ userId: string } | null>;
   revokeAll(userId: string, kind: AuthTokenKind, now: Date): Promise<void>;
 }

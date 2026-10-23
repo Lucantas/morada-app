@@ -120,6 +120,35 @@ describe('resetPassword', () => {
     expect(await users.findById('u-ana')).toEqual(ana);
   });
 
+  test('a short password is rejected before the token is used', async () => {
+    const { tokens, deps } = setup();
+    const token = await issue(tokens);
+
+    await expect(resetPassword(deps, { token, password: 'curta' })).rejects.toThrow();
+
+    expect((await resetPassword(deps, { token, password: 'nova-senha-1' })).sessionVersion).toBe(3);
+  });
+
+  test('ends old sessions before replacing the password', async () => {
+    const { users, tokens, deps } = setup();
+    const token = await issue(tokens);
+    const failing = {
+      ...deps,
+      users: {
+        ...users,
+        setPasswordHash: async () => {
+          throw new Error('db down');
+        },
+      },
+    };
+
+    await expect(resetPassword(failing, { token, password: 'nova-senha-1' })).rejects.toThrow(
+      'db down',
+    );
+
+    expect((await users.findById('u-ana'))?.sessionVersion).toBe(3);
+  });
+
   test('a token whose user is gone is invalid', async () => {
     const { tokens, deps } = setup();
     const token = generateToken();

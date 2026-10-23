@@ -164,6 +164,15 @@ export function runUserRepositoryContract(
       expect((await repo.findById('u-ana'))?.sessionVersion).toBe(2);
     });
 
+    test('sessionVersionOf reads the stored version, or null for an unknown user', async () => {
+      const repo = await makeRepo();
+      await repo.save(ana);
+      await repo.bumpSessionVersion('u-ana');
+
+      expect(await repo.sessionVersionOf('u-ana')).toBe(1);
+      expect(await repo.sessionVersionOf('u-ghost')).toBeNull();
+    });
+
     test('bumpSessionVersion rejects an unknown user', async () => {
       const repo = await makeRepo();
       await expect(repo.bumpSessionVersion('u-ghost')).rejects.toThrow();
