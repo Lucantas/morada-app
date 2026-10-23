@@ -854,6 +854,116 @@ describe('Morada API — real credentials', () => {
     });
   });
 
+  async function verifiedEmailAuth(app: App, email: string): Promise<Auth> {
+    await insertEmailUser(email, 'senha-segura-1');
+    await pool.query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email]);
+    const res = await loginWith(app, { login: email, password: 'senha-segura-1' });
+    const cookies = res.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    return { cookie: `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`, csrf };
+  }
+
+  async function createCondo(app: App, auth: Auth, body: unknown): Promise<Response> {
+    return app.request('/me/condos', {
+      method: 'POST',
+      headers: {
+        Cookie: auth.cookie,
+        'X-CSRF-Token': auth.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  test('POST /me/condos refuses an unconfirmed e-mail', async () => {
+    const app = await makeApp();
+    await insertEmailUser('ana@x.com', 'senha-segura-1');
+    const login1 = await loginWith(app, { login: 'ana@x.com', password: 'senha-segura-1' });
+    const cookies = login1.headers.getSetCookie();
+    const csrf = parseCookie(cookies, 'csrf');
+    const auth = { cookie: `session=${parseCookie(cookies, 'session')}; csrf=${csrf}`, csrf };
+
+    const res = await createCondo(app, auth, { name: 'Ipê' });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Confirme seu e-mail antes de criar um condomínio' });
+  });
+
+  test('POST /me/condos requires CSRF and a session', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const noCsrf = await app.request('/me/condos', {
+      method: 'POST',
+      headers: { Cookie: auth.cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Ipê' }),
+    });
+    const anonymous = await app.request('/me/condos', { method: 'POST' });
+
+    expect(noCsrf.status).toBe(403);
+    expect(anonymous.status).toBe(401);
+  });
+
+  test('a verified user creates a condominium, listed in /me as admin', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const res = await createCondo(app, auth, { name: '  Residencial Ipê ' });
+    const me = await app.request('/me', { headers: { Cookie: auth.cookie } });
+
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string; name: string; role: string };
+    expect(created).toMatchObject({ name: 'Residencial Ipê', role: 'admin' });
+    expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
+  });
+
+  test('a second condominium reuses the same organization', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    await createCondo(app, auth, { name: 'Primeiro' });
+    const second = await createCondo(app, auth, { name: 'Segundo' });
+
+    expect(second.status).toBe(201);
+    const { rows } = await pool.query<{ n: number }>(
+      `SELECT count(DISTINCT c.organization_id)::int AS n FROM condominiums c
+       JOIN condo_roles r ON r.condominium_id = c.id WHERE r.user_id = 'u-ana'`,
+    );
+    expect(rows[0]?.n).toBe(1);
+  });
+
+  test('a blank name answers 400 and creates nothing', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const before = await count('organizations');
+
+    const res = await createCondo(app, auth, { name: '   ' });
+
+    expect(res.status).toBe(400);
+    expect(await count('organizations')).toBe(before);
+  });
+
+  test('a user who is only a morador elsewhere gets their own organization', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    await pool.query(
+      "INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) SELECT 'cr-ana', $1, 'u-ana', 'morador', id FROM residents WHERE condominium_id = $1 LIMIT 1",
+      [TEST_CONDO_ID],
+    );
+
+    const res = await createCondo(app, auth, { name: 'Meu Prédio' });
+    const { rows } = await pool.query<{ organization_id: string }>(
+      "SELECT organization_id FROM condominiums WHERE name = 'Meu Prédio'",
+    );
+
+    expect(res.status).toBe(201);
+    expect(rows[0]?.organization_id).not.toBe(`org-${TEST_CONDO_ID}`);
+    const { rows: members } = await pool.query(
+      "SELECT 1 FROM organization_members WHERE user_id = 'u-ana' AND role = 'owner'",
+    );
+    expect(members).toHaveLength(1);
+  });
+
   test('GET /me requires a session', async () => {
     const res = await (await makeApp()).request('/me');
     expect(res.status).toBe(401);

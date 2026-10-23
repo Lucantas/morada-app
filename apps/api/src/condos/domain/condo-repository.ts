@@ -22,6 +22,7 @@ export interface CondoRepository {
   isOperational(condominiumId: string): Promise<boolean>;
   rename(condominiumId: string, name: string): Promise<Condominium>;
   create(input: CreateCondominiumInput): Promise<Condominium>;
+  ownedOrganization(userId: string): Promise<{ id: string } | null>;
   createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }>;
   grant(input: CondoGrant): Promise<void>;
   deactivateResidentGrants(

@@ -79,6 +79,7 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
       condominiums.push(condo);
       return condo;
     },
+    ownedOrganization: async () => null,
     createOrganization: async (input) => {
       const org = { id: `org-${organizations.length + 1}`, ...input };
       organizations.push(org);

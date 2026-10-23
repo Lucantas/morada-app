@@ -21,3 +21,11 @@ export class CondoValidationError extends Error {
     this.name = 'CondoValidationError';
   }
 }
+
+export class EmailNotConfirmedError extends Error {
+  readonly status = 403;
+  constructor() {
+    super('Confirme seu e-mail antes de criar um condomínio');
+    this.name = 'EmailNotConfirmedError';
+  }
+}

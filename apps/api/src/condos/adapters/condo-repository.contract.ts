@@ -485,6 +485,34 @@ export function runCondoRepositoryContract(
       expect(await repo.isOperational('condo-missing')).toBe(false);
     });
 
+    test('ownedOrganization returns the first active organization the user owns', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      await insertUser(pool, 'u-other');
+      const first = await repo.createOrganization({ name: 'Primeira', ownerUserId: 'u-owner' });
+      await repo.createOrganization({ name: 'Segunda', ownerUserId: 'u-owner' });
+      await repo.createOrganization({ name: 'Alheia', ownerUserId: 'u-other' });
+
+      expect(await repo.ownedOrganization('u-owner')).toEqual({ id: first.id });
+      expect(await repo.ownedOrganization('u-nobody')).toBeNull();
+    });
+
+    test('ownedOrganization ignores members, inactive memberships and inactive organizations', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      await insertUser(pool, 'u-member');
+      const orgA = await repo.createOrganization({ name: 'A', ownerUserId: 'u-owner' });
+      await insertMembership(pool, orgA.id, 'u-member', 'member');
+      expect(await repo.ownedOrganization('u-member')).toBeNull();
+
+      await pool.query("UPDATE organization_members SET active = FALSE WHERE user_id = 'u-owner'");
+      expect(await repo.ownedOrganization('u-owner')).toBeNull();
+
+      await pool.query("UPDATE organization_members SET active = TRUE WHERE user_id = 'u-owner'");
+      await pool.query('UPDATE organizations SET active = FALSE WHERE id = $1', [orgA.id]);
+      expect(await repo.ownedOrganization('u-owner')).toBeNull();
+    });
+
     test('getById returns null when missing', async () => {
       const { repo } = await makeRepo();
       expect(await repo.getById('condo-missing')).toBeNull();
