@@ -116,6 +116,78 @@ The full dump includes the `_migrations` bookkeeping rows, so after a restore th
 API's `release_command` migration is a no-op — schema and data land exactly as they
 were.
 
+## Migrating to multi-condomínio
+
+Migrations `015`–`018` restructure the schema around condominiums. They run on
+release (`release_command`), so back up first.
+
+1. **Take a `pg_dump` BEFORE deploying** (see Database backup & restore above):
+
+   ```bash
+   docker exec -e PGPASSWORD=morada morada-postgres \
+     pg_dump -U morada -d morada --no-owner --no-privileges > backups/morada-pre-multicondo-$(date +%Y%m%d-%H%M%S).sql
+   ```
+
+   For Neon, dump with the direct URL the same way and keep the file.
+
+2. **What the migrations do**
+   - `015_tenancy`: creates `organizations`, `condominiums`, `organization_members`,
+     `condo_roles`; seeds `org-legacy` and `condo-legacy` ("Condomínio Morada · Bloco 2");
+     adds `condominium_id` (backfilled to `condo-legacy`, then `NOT NULL`, indexed) to
+     `apartments`, `residents`, `accounts`, `receipts`, `notices`, `threads`, `categories`,
+     `incomes`, `condo_settings`; makes `apartments.label` unique per condominium; drops
+     `condo_settings.id` (primary key becomes `condominium_id`); makes each existing admin
+     user `owner` of `org-legacy` and `administrador` of `condo-legacy`, and each resident
+     user `morador` there.
+   - `016_thread_links`: adds `threads.resident_id` / `threads.apartment_id` and backfills them.
+   - `017_account_due_date`: adds nullable `accounts.due_date`.
+   - `018_drop_legacy_defaults`: drops the temporary `'condo-legacy'` column defaults.
+
+3. **Rollback = restore the `pg_dump`.** Reverting the app image alone is NOT safe:
+   `015` drops `condo_settings.id`, so the old code cannot run against the new schema.
+   Restore the dump (including `_migrations`) and redeploy the previous image.
+
+4. **Sessions:** the JWT shape changed, so login sessions issued before the deploy are
+   invalidated and everyone has to log in again.
+
+5. **Post-deploy verification** (run with `psql` against the target database):
+
+   ```sql
+   SELECT 'apartments' t, condominium_id, count(*) FROM apartments GROUP BY 2
+   UNION ALL SELECT 'residents', condominium_id, count(*) FROM residents GROUP BY 2
+   UNION ALL SELECT 'accounts', condominium_id, count(*) FROM accounts GROUP BY 2
+   UNION ALL SELECT 'receipts', condominium_id, count(*) FROM receipts GROUP BY 2
+   UNION ALL SELECT 'notices', condominium_id, count(*) FROM notices GROUP BY 2
+   UNION ALL SELECT 'threads', condominium_id, count(*) FROM threads GROUP BY 2
+   UNION ALL SELECT 'categories', condominium_id, count(*) FROM categories GROUP BY 2
+   UNION ALL SELECT 'incomes', condominium_id, count(*) FROM incomes GROUP BY 2
+   UNION ALL SELECT 'condo_settings', condominium_id, count(*) FROM condo_settings GROUP BY 2
+   ORDER BY 1, 2;
+   ```
+
+   Counts per table must equal the pre-deploy counts, all under `condo-legacy`. Zero
+   NULL `condominium_id` (the columns are `NOT NULL`, so this also confirms the
+   constraint held):
+
+   ```sql
+   SELECT count(*) FROM apartments WHERE condominium_id IS NULL;
+   SELECT count(*) FROM receipts WHERE condominium_id IS NULL;
+   ```
+
+   Repeat for the other tables; every result must be `0`. Legacy memberships:
+
+   ```sql
+   SELECT u.username, u.role AS user_role, r.role AS condo_role
+   FROM condo_roles r JOIN users u ON u.id = r.user_id
+   WHERE r.condominium_id = 'condo-legacy' ORDER BY 1;
+
+   SELECT u.username, m.role FROM organization_members m
+   JOIN users u ON u.id = m.user_id WHERE m.organization_id = 'org-legacy';
+   ```
+
+   Expected: the admin is `owner` of `org-legacy` and `administrador` of `condo-legacy`;
+   each resident user is `morador` of `condo-legacy`.
+
 ## CI auto-deploy
 
 `.github/workflows/deploy.yml` (API → Fly) and `deploy-web.yml` (web → Cloudflare
