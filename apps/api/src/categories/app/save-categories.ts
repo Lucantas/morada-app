@@ -18,8 +18,13 @@ export async function saveCategories(
 ): Promise<{ categories: Category[]; reclassified: number }> {
   const parsed = z.array(categoryDraftSchema).safeParse(input);
   if (!parsed.success) throw new CategoryValidationError('Categorias inválidas');
+  const ownIds = new Set((await repo.list()).map((category) => category.id));
   const categories = parsed.data.map((category, index) =>
-    categorySchema.parse({ ...category, id: category.id ?? randomUUID(), position: index }),
+    categorySchema.parse({
+      ...category,
+      id: category.id !== undefined && ownIds.has(category.id) ? category.id : randomUUID(),
+      position: index,
+    }),
   );
   const current = await accounts.list();
   const { changed, reclassified } = reclassifyAccounts(categories, current);

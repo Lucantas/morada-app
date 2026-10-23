@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
+import type { CondoRepository } from '../../condos/domain/condo-repository';
 import { deriveResidentLogin } from '../../residents/domain/login';
 import type { Resident } from '../../residents/domain/resident';
 import {
@@ -17,6 +18,7 @@ import type { UserRepository } from '../domain/user-repository';
 const inputSchema = z.object({
   password: z.string().min(8).max(200),
   residentId: z.string().min(1).max(64),
+  condominiumId: z.string().min(1).max(64),
 });
 
 /** Loads the target resident (compose wires this to the resident repo) so the
@@ -26,13 +28,14 @@ export type ResidentLookup = (residentId: string) => Promise<Resident | null>;
 
 export async function createResidentLogin(
   repo: UserRepository,
+  condos: Pick<CondoRepository, 'grant'>,
   hasher: PasswordHasher,
   getResident: ResidentLookup,
   input: unknown,
 ): Promise<User> {
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) throw new UserValidationError('Dados de acesso inválidos');
-  const { password, residentId } = parsed.data;
+  const { password, residentId, condominiumId } = parsed.data;
 
   const resident = await getResident(residentId);
   if (!resident) throw new UnknownResidentError(residentId);
@@ -55,5 +58,7 @@ export async function createResidentLogin(
     role: 'resident',
     residentId,
   });
-  return repo.save(user);
+  const saved = await repo.save(user);
+  await condos.grant({ condominiumId, userId: saved.id, role: 'morador', residentId });
+  return saved;
 }

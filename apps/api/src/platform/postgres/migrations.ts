@@ -360,4 +360,18 @@ UPDATE threads t SET apartment_id = ar.apartment_id
 ALTER TABLE accounts ADD COLUMN due_date DATE;
 `,
   },
+  {
+    id: '018_drop_legacy_defaults',
+    sql: `
+ALTER TABLE apartments ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE residents ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE accounts ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE receipts ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE notices ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE threads ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE categories ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE incomes ALTER COLUMN condominium_id DROP DEFAULT;
+ALTER TABLE condo_settings ALTER COLUMN condominium_id DROP DEFAULT;
+`,
+  },
 ];

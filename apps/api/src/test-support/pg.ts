@@ -23,12 +23,6 @@ const DATA_TABLES = [
 // contract test starts from a clean, isolated Postgres state.
 export async function resetPg(pool: Pool): Promise<void> {
   await pool.query(`TRUNCATE ${DATA_TABLES.join(', ')} CASCADE`);
-  await pool.query(
-    "INSERT INTO organizations (id, name) VALUES ('org-legacy', 'Condomínio Morada')",
-  );
-  await pool.query(
-    "INSERT INTO condominiums (id, organization_id, name) VALUES ('condo-legacy', 'org-legacy', 'Condomínio Morada · Bloco 2')",
-  );
 }
 
 // Parameterised bulk insert used to seed the test fixtures. Values are taken from

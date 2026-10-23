@@ -102,7 +102,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   api.route(
     '/users',
     userRoutes(
-      scoped(({ residents }) => ({ users, residents })),
+      scoped(({ residents }) => ({ users, residents, condos })),
       hasher,
     ),
   );

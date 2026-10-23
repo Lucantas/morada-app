@@ -12,6 +12,7 @@ import { getResident } from '../../app/get-resident';
 import { listResidents } from '../../app/list-residents';
 import { overrideStatus } from '../../app/override-status';
 import { saveResident } from '../../app/save-resident';
+import { ResidentNotFoundError } from '../../domain/errors';
 import { deriveResidentLogin } from '../../domain/login';
 import { residentDraftSchema } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
@@ -33,13 +34,14 @@ export function residentRoutes(scope: Scoped<ResidentRoutesDeps>, hasher: Passwo
   });
 
   // Admin-only: read a resident's login state — the existing username (never the
-  // hash) and the login derived from name + apartment. Null when the resident is
-  // gone. Registered before '/:id' below or they would be shadowed by its param.
+  // hash) and the login derived from name + apartment. The resident is resolved
+  // through the condo-scoped repo first, so another condo's resident is a 404.
+  // Registered before '/:id' below or they would be shadowed by its param.
   app.get('/:id/login', requireRole('admin'), async (c) => {
     const { residents, users } = scope(c.get('condoId'));
     const id = c.req.param('id');
     const resident = await residents.getById(id);
-    if (!resident) return c.json(null);
+    if (!resident) throw new ResidentNotFoundError(id);
     const user = await users.findByResidentId(id);
     return c.json({
       username: user ? user.username : null,
@@ -47,9 +49,11 @@ export function residentRoutes(scope: Scoped<ResidentRoutesDeps>, hasher: Passwo
     });
   });
   app.post('/:id/login/reset', requireRole('admin'), async (c) => {
-    const { users } = scope(c.get('condoId'));
+    const { residents, users } = scope(c.get('condoId'));
+    const id = c.req.param('id');
+    if (!(await residents.getById(id))) throw new ResidentNotFoundError(id);
     const tempPassword = generateTempPassword();
-    const user = await resetResidentPassword(users, hasher, c.req.param('id'), tempPassword);
+    const user = await resetResidentPassword(users, hasher, id, tempPassword);
     return c.json({ username: user.username, tempPassword });
   });
 

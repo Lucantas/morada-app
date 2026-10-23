@@ -40,7 +40,7 @@ afterAll(async () => {
   await pool.end();
 });
 
-const LEGACY = 'condo-legacy';
+const CONDO = 'condo-a';
 
 describe('PostgresReceiptRepository — contract', () => {
   beforeEach(async () => {
@@ -64,10 +64,12 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
     'value_cents',
     'status',
     'resident_id',
+    'condominium_id',
   ];
 
   beforeEach(async () => {
     await resetPg(pool);
+    await createTestCondo(pool, CONDO);
   });
 
   test('migration archives duplicate visible condo-fee receipts, keeping the pago one', async () => {
@@ -76,7 +78,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
     // pre-migration duplicate state, then reruns the exact dedupe step the
     // migration performs before recreating the index — proving the ranking
     // rule (pago > em_analise > rest, tie-break lowest id) end to end.
-    await pool.query('DROP INDEX idx_receipts_condo_fee_month');
+    await pool.query('DROP INDEX IF EXISTS idx_receipts_condo_fee_month');
     await insertRows(pool, 'receipts', RECEIPT_COLUMNS, [
       {
         id: 'dup-pendente',
@@ -86,6 +88,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         value_cents: 15000,
         status: 'pendente',
         resident_id: 'r-1',
+        condominium_id: CONDO,
       },
       {
         id: 'dup-pago',
@@ -95,6 +98,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         value_cents: 15000,
         status: 'pago',
         resident_id: 'r-1',
+        condominium_id: CONDO,
       },
     ]);
 
@@ -118,7 +122,7 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         ON receipts (resident_id, ref) WHERE visible AND title = 'Taxa condominial'
     `);
 
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     expect(await repo.getById('dup-pago')).not.toBeNull();
     expect(await repo.getById('dup-pendente')).toBeNull();
   });
@@ -133,19 +137,20 @@ describe('PostgresReceiptRepository — monthly condo-fee uniqueness', () => {
         value_cents: 15000,
         status: 'pendente',
         resident_id: 'r-1',
+        condominium_id: CONDO,
       },
     ]);
 
     await expect(
       pool.query(
-        `INSERT INTO receipts (${RECEIPT_COLUMNS.join(', ')}) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        ['second', '07/2026', 'Taxa condominial', '2026-07-15', 15000, 'pendente', 'r-1'],
+        `INSERT INTO receipts (${RECEIPT_COLUMNS.join(', ')}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        ['second', '07/2026', 'Taxa condominial', '2026-07-15', 15000, 'pendente', 'r-1', CONDO],
       ),
     ).rejects.toMatchObject({ code: '23505', constraint: 'idx_receipts_condo_fee_month' });
   });
 
   test('save throws MonthlyReceiptExistsError when it collides with the unique index', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     await repo.save({
       id: 'first',
       ref: '07/2026',
@@ -187,23 +192,24 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
 
   beforeEach(async () => {
     await resetPg(pool);
+    await createTestCondo(pool, CONDO);
   });
 
   test('save offloads a fresh data URL to storage, persisting proof_key (not the base64) and hasProof: true', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresReceiptRepository(pool, LEGACY, storage);
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
 
     const saved = await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     expect(saved.hasProof).toBe(true);
     expect(saved.proofDataUrl).toBeUndefined();
-    expect(storage.has(`condos/${LEGACY}/receipts/rc-1`)).toBe(true);
+    expect(storage.has(`condos/${CONDO}/receipts/rc-1`)).toBe(true);
 
     const { rows } = await pool.query(
       'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
       ['rc-1'],
     );
-    expect(rows[0].proof_key).toBe(`condos/${LEGACY}/receipts/rc-1`);
+    expect(rows[0].proof_key).toBe(`condos/${CONDO}/receipts/rc-1`);
     expect(rows[0].proof_data_url).toBeNull();
 
     const fetched = await repo.getById('rc-1');
@@ -212,7 +218,7 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
   });
 
   test('save falls back to storing the base64 inline when storage is null, still reporting hasProof: true', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
 
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
@@ -230,7 +236,7 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
 
   test('getProof returns bytes from storage when proof_key is set', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresReceiptRepository(pool, LEGACY, storage);
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     const proof = await repo.getProof('rc-1');
@@ -240,7 +246,7 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
   });
 
   test('getProof decodes legacy base64 when only proof_data_url is set', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     const proof = await repo.getProof('rc-1');
@@ -250,20 +256,20 @@ describe('PostgresReceiptRepository — proof offload/serve', () => {
   });
 
   test('getProof returns null when the receipt has no proof', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     await repo.save({ ...BASE_RECEIPT, status: 'pendente', proofDataUrl: undefined });
 
     expect(await repo.getProof('rc-1')).toBeNull();
   });
 
   test('getProof returns null for an unknown id', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     expect(await repo.getProof('nope')).toBeNull();
   });
 
   test('list/listByApartment/listByResident carry hasProof, never proofDataUrl', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresReceiptRepository(pool, LEGACY, storage);
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     for (const items of [
@@ -296,10 +302,11 @@ describe('PostgresReceiptRepository — proof preservation on proof-less re-save
 
   beforeEach(async () => {
     await resetPg(pool);
+    await createTestCondo(pool, CONDO);
   });
 
   test('confirm-payment style re-save (proofDataUrl: undefined, base64 fallback mode) preserves the existing proof', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -325,7 +332,7 @@ describe('PostgresReceiptRepository — proof preservation on proof-less re-save
 
   test('confirm-payment style re-save (proofDataUrl: undefined, storage mode) preserves the existing proof_key', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresReceiptRepository(pool, LEGACY, storage);
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -341,7 +348,7 @@ describe('PostgresReceiptRepository — proof preservation on proof-less re-save
       'SELECT proof_key, proof_data_url FROM receipts WHERE id = $1',
       ['rc-1'],
     );
-    expect(rows[0].proof_key).toBe(`condos/${LEGACY}/receipts/rc-1`);
+    expect(rows[0].proof_key).toBe(`condos/${CONDO}/receipts/rc-1`);
     expect(rows[0].proof_data_url).toBeNull();
 
     const proof = await repo.getProof('rc-1');
@@ -351,7 +358,7 @@ describe('PostgresReceiptRepository — proof preservation on proof-less re-save
 
   test('reject-payment style re-save (proofDataUrl: null) explicitly clears the proof', async () => {
     const storage = new FakeProofStorage();
-    const repo = new PostgresReceiptRepository(pool, LEGACY, storage);
+    const repo = new PostgresReceiptRepository(pool, CONDO, storage);
     await repo.save({ ...BASE_RECEIPT, proofDataUrl: DATA_URL });
 
     const resaved = await repo.save({
@@ -375,7 +382,7 @@ describe('PostgresReceiptRepository — proof preservation on proof-less re-save
   });
 
   test('brand-new insert with proofDataUrl: undefined succeeds with hasProof: false', async () => {
-    const repo = new PostgresReceiptRepository(pool, LEGACY, null);
+    const repo = new PostgresReceiptRepository(pool, CONDO, null);
 
     const saved = await repo.save({
       id: 'rc-new',

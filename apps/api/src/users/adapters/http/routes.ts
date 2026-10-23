@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 
+import type { CondoRepository } from '../../../condos/domain/condo-repository';
 import type { Scoped } from '../../../platform/condo-scope';
 import { requireRole, type ApiEnv } from '../../../platform/auth';
 import { generateTempPassword } from '../../../platform/temp-password';
@@ -16,18 +17,21 @@ const provisionSchema = z.object({
 interface UserRoutesDeps {
   users: UserRepository;
   residents: ResidentRepository;
+  condos: Pick<CondoRepository, 'grant'>;
 }
 
 export function userRoutes(scope: Scoped<UserRoutesDeps>, hasher: PasswordHasher) {
   const app = new Hono<ApiEnv>();
 
   app.post('/', requireRole('admin'), async (c) => {
-    const deps = scope(c.get('condoId'));
+    const condominiumId = c.get('condoId');
+    const { users, residents, condos } = scope(condominiumId);
     const { residentId } = provisionSchema.parse(await c.req.json());
     const tempPassword = generateTempPassword();
-    const user = await createResidentLogin(deps.users, hasher, (id) => deps.residents.getById(id), {
+    const user = await createResidentLogin(users, condos, hasher, (id) => residents.getById(id), {
       password: tempPassword,
       residentId,
+      condominiumId,
     });
     return c.json(
       { id: user.id, username: user.username, residentId: user.residentId, tempPassword },
