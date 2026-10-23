@@ -1,3 +1,6 @@
+import type { CondoAccess } from './condos/domain/condo-access';
+import type { CondoGrant, CondoRepository } from './condos/domain/condo-repository';
+import type { Condominium } from './condos/domain/condominium';
 import type { PasswordHasher } from './users/domain/password-hasher';
 import type { User } from './users/domain/user';
 import type { UserRepository } from './users/domain/user-repository';
@@ -27,6 +30,58 @@ function fakeRepo(users: User[] = []): UserRepository {
   };
 }
 
+interface FakeCondos extends CondoRepository {
+  organizations: { id: string; name: string; ownerUserId: string }[];
+  condominiums: (Condominium & { monthlyFeeCents: number; dueDay: number })[];
+  grants: CondoGrant[];
+}
+
+function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
+  const organizations: FakeCondos['organizations'] = [];
+  const condominiums: FakeCondos['condominiums'] = [];
+  const grants: CondoGrant[] = [];
+  const accessOf = (grant: CondoGrant): CondoAccess => ({
+    condominiumId: grant.condominiumId,
+    name: condominiums.find((c) => c.id === grant.condominiumId)?.name ?? '',
+    role: grant.role,
+    residentId: grant.residentId,
+  });
+  return {
+    organizations,
+    condominiums,
+    grants,
+    listForUser: async (userId) => [
+      ...initial,
+      ...grants.filter((g) => g.userId === userId).map(accessOf),
+    ],
+    accessFor: async () => null,
+    getById: async (id) => condominiums.find((c) => c.id === id) ?? null,
+    rename: async () => {
+      throw new Error('not used');
+    },
+    create: async (input) => {
+      const condo = {
+        id: `condo-${condominiums.length + 1}`,
+        organizationId: input.organizationId,
+        name: input.name,
+        active: true,
+        monthlyFeeCents: input.monthlyFeeCents,
+        dueDay: input.dueDay,
+      };
+      condominiums.push(condo);
+      return condo;
+    },
+    createOrganization: async (input) => {
+      const org = { id: `org-${organizations.length + 1}`, ...input };
+      organizations.push(org);
+      return { id: org.id };
+    },
+    grant: async (grant) => {
+      grants.push(grant);
+    },
+  };
+}
+
 const noopHasher: PasswordHasher = {
   hash: (plain) => Promise.resolve(`hash:${plain}`),
   verify: (plain, hash) => Promise.resolve(hash === `hash:${plain}`),
@@ -47,7 +102,7 @@ describe('seedAdmin', () => {
 
   test('seeds the admin when no user exists yet (non-production)', async () => {
     const repo = fakeRepo([]);
-    await seedAdmin(repo, noopHasher);
+    await seedAdmin(repo, fakeCondos(), noopHasher);
     expect(await repo.findByUsername(adminCredentials.username)).not.toBeNull();
   });
 
@@ -60,20 +115,20 @@ describe('seedAdmin', () => {
       residentId: null,
     };
     const repo = fakeRepo([existingAdmin]);
-    await seedAdmin(repo, noopHasher);
+    await seedAdmin(repo, fakeCondos(), noopHasher);
     expect(await repo.findByUsername(adminCredentials.username)).toEqual(existingAdmin);
   });
 
   test('seeds the admin alongside other users when not in production', async () => {
     const repo = fakeRepo([existingResident]);
-    await seedAdmin(repo, noopHasher);
+    await seedAdmin(repo, fakeCondos(), noopHasher);
     expect(await repo.findByUsername(adminCredentials.username)).not.toBeNull();
   });
 
   test('seeds normally in production when the database is empty', async () => {
     (config as { isProduction: boolean }).isProduction = true;
     const repo = fakeRepo([]);
-    await seedAdmin(repo, noopHasher);
+    await seedAdmin(repo, fakeCondos(), noopHasher);
     expect(await repo.findByUsername(adminCredentials.username)).not.toBeNull();
   });
 
@@ -87,7 +142,7 @@ describe('seedAdmin', () => {
       residentId: null,
     };
     const repo = fakeRepo([existingAdmin]);
-    await seedAdmin(repo, noopHasher);
+    await seedAdmin(repo, fakeCondos(), noopHasher);
     expect(await repo.findByUsername(adminCredentials.username)).toEqual(existingAdmin);
   });
 
@@ -105,9 +160,66 @@ describe('seedAdmin', () => {
       save: saveSpy,
     };
 
-    await expect(seedAdmin(repo, noopHasher)).rejects.toThrow(
+    await expect(seedAdmin(repo, fakeCondos(), noopHasher)).rejects.toThrow(
       'Refusing to seed demo admin into a populated production database',
     );
     expect(saveSpy).not.toHaveBeenCalled();
+  });
+
+  test('seeds a demo condominium the admin administers when the admin has none', async () => {
+    const condos = fakeCondos();
+
+    await seedAdmin(fakeRepo([]), condos, noopHasher);
+
+    expect(condos.organizations).toEqual([
+      { id: 'org-1', name: 'Morada Demo', ownerUserId: 'u-admin' },
+    ]);
+    expect(condos.condominiums).toEqual([
+      {
+        id: 'condo-1',
+        organizationId: 'org-1',
+        name: 'Condomínio Demo',
+        active: true,
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+      },
+    ]);
+    expect(condos.grants).toEqual([
+      { condominiumId: 'condo-1', userId: 'u-admin', role: 'administrador', residentId: null },
+    ]);
+  });
+
+  test('does not seed a demo condominium when the admin already administers one', async () => {
+    const existingAdmin: User = {
+      id: 'u-admin',
+      username: adminCredentials.username,
+      passwordHash: 'existing-hash',
+      role: 'admin',
+      residentId: null,
+    };
+    const condos = fakeCondos([
+      { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
+    ]);
+
+    await seedAdmin(fakeRepo([existingAdmin]), condos, noopHasher);
+
+    expect(condos.organizations).toEqual([]);
+    expect(condos.condominiums).toEqual([]);
+    expect(condos.grants).toEqual([]);
+  });
+
+  test('seeds the demo condominium for an existing admin without one', async () => {
+    const existingAdmin: User = {
+      id: 'u-admin',
+      username: adminCredentials.username,
+      passwordHash: 'existing-hash',
+      role: 'admin',
+      residentId: null,
+    };
+    const condos = fakeCondos();
+
+    await seedAdmin(fakeRepo([existingAdmin]), condos, noopHasher);
+
+    expect(condos.grants).toHaveLength(1);
   });
 });

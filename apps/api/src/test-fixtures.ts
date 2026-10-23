@@ -2,11 +2,18 @@ import bcrypt from 'bcryptjs';
 import type { Pool } from 'pg';
 
 import { config } from './platform/config';
+import { adminCredentials } from './seed-data';
+import { createTestCondo } from './test-support/condos';
 import { insertRows } from './test-support/pg';
 
 // Rich demo data for the test suite ONLY. Production seeds just the admin login
 // (see seed-data.ts). Residents are modelled as person + apartment + occupancy;
 // each apartment id here is `apt-<residentId>` and each occupancy `occ-<residentId>`.
+
+export const TEST_CONDO_ID = 'condo-test';
+
+const inTestCondo = <T extends object>(rows: T[]): (T & { condominium_id: string })[] =>
+  rows.map((row) => ({ ...row, condominium_id: TEST_CONDO_ID }));
 
 // A pre-provisioned resident login, seeded only for tests.
 export const residentCredentials = {
@@ -249,17 +256,20 @@ const threads = [
 ];
 
 export async function seedFixtures(pool: Pool): Promise<void> {
+  await createTestCondo(pool, TEST_CONDO_ID);
   await insertRows(
     pool,
     'apartments',
-    ['id', 'label'],
-    people.map((p) => ({ id: apartmentId(p.id), label: p.apt })),
+    ['id', 'label', 'condominium_id'],
+    inTestCondo(people.map((p) => ({ id: apartmentId(p.id), label: p.apt }))),
   );
   await insertRows(
     pool,
     'residents',
-    ['id', 'name', 'phone', 'email', 'status'],
-    people.map(({ id, name, phone, email, status }) => ({ id, name, phone, email, status })),
+    ['id', 'name', 'phone', 'email', 'status', 'condominium_id'],
+    inTestCondo(
+      people.map(({ id, name, phone, email, status }) => ({ id, name, phone, email, status })),
+    ),
   );
   await insertRows(
     pool,
@@ -278,6 +288,13 @@ export async function seedFixtures(pool: Pool): Promise<void> {
     ['id', 'username', 'password_hash', 'role', 'resident_id'],
     [
       {
+        id: 'u-admin',
+        username: adminCredentials.username,
+        password_hash: bcrypt.hashSync(adminCredentials.password, config.bcryptCost),
+        role: 'admin',
+        resident_id: null,
+      },
+      {
         id: 'u-maria',
         username: residentCredentials.username,
         password_hash: bcrypt.hashSync(residentCredentials.password, config.bcryptCost),
@@ -289,8 +306,8 @@ export async function seedFixtures(pool: Pool): Promise<void> {
   await insertRows(
     pool,
     'accounts',
-    ['id', 'description', 'category', 'date', 'value_cents', 'status'],
-    accounts,
+    ['id', 'description', 'category', 'date', 'value_cents', 'status', 'condominium_id'],
+    inTestCondo(accounts),
   );
   await insertRows(
     pool,
@@ -305,14 +322,41 @@ export async function seedFixtures(pool: Pool): Promise<void> {
       'method',
       'resident_id',
       'apartment_id',
+      'condominium_id',
     ],
-    receipts,
+    inTestCondo(receipts),
   );
   await insertRows(
     pool,
     'notices',
-    ['id', 'title', 'body', 'kind', 'audience', 'date_label'],
-    notices,
+    ['id', 'title', 'body', 'kind', 'audience', 'date_label', 'condominium_id'],
+    inTestCondo(notices),
   );
-  await insertRows(pool, 'threads', ['id', 'resident_name', 'apt', 'unread', 'messages'], threads);
+  await insertRows(
+    pool,
+    'threads',
+    ['id', 'resident_name', 'apt', 'unread', 'messages', 'condominium_id'],
+    inTestCondo(threads),
+  );
+  await insertRows(
+    pool,
+    'condo_roles',
+    ['id', 'condominium_id', 'user_id', 'role', 'resident_id'],
+    [
+      {
+        id: 'role-test-admin',
+        condominium_id: TEST_CONDO_ID,
+        user_id: 'u-admin',
+        role: 'administrador',
+        resident_id: null,
+      },
+      {
+        id: 'role-test-maria',
+        condominium_id: TEST_CONDO_ID,
+        user_id: 'u-maria',
+        role: 'morador',
+        resident_id: residentCredentials.residentId,
+      },
+    ],
+  );
 }

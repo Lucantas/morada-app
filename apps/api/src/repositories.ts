@@ -4,6 +4,8 @@ import { PostgresAccountRepository } from './accounts/adapters/postgres/account-
 import type { AccountRepository } from './accounts/domain/account-repository';
 import { PostgresCategoryRepository } from './categories/adapters/postgres/category-repository';
 import type { CategoryRepository } from './categories/domain/category-repository';
+import { PostgresCondoRepository } from './condos/adapters/postgres/condo-repository';
+import type { CondoRepository } from './condos/domain/condo-repository';
 import { PostgresDashboardRepository } from './dashboard/adapters/postgres/dashboard-repository';
 import type { DashboardRepository } from './dashboard/domain/dashboard-repository';
 import { PostgresIncomeRepository } from './income/adapters/postgres/income-repository';
@@ -39,6 +41,7 @@ export interface Repositories {
   settings: SettingsRepository;
   categories: CategoryRepository;
   incomes: IncomeRepository;
+  condos: CondoRepository;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -54,6 +57,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     settings: new PostgresSettingsRepository(pool),
     categories: new PostgresCategoryRepository(pool),
     incomes: new PostgresIncomeRepository(pool, proofStorage),
+    condos: new PostgresCondoRepository(pool),
   };
 }
 

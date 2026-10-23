@@ -44,6 +44,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
     settings,
     categories,
     incomes,
+    condos,
   } = repos;
   const hasher = new BcryptPasswordHasher(config.bcryptCost);
   const isResidentActive = async (residentId: string | null): Promise<boolean> =>
@@ -51,7 +52,7 @@ export async function buildApp(repos: Repositories): Promise<Hono<ApiEnv>> {
   // The seeded admin uses a weak, public password — never auto-seed it into a
   // real production database. Opt in explicitly with SEED_DEMO_DATA when needed.
   if (!config.isProduction || process.env.SEED_DEMO_DATA === '1') {
-    await seedAdmin(users, hasher);
+    await seedAdmin(users, condos, hasher);
   }
 
   const app = new Hono<ApiEnv>();
