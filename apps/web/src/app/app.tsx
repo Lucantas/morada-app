@@ -57,6 +57,7 @@ import {
   logout,
   noticeRepository,
   overrideResidentStatus,
+  pixRepository,
   receiptRepository,
   registerPayment,
   rejectPayment,
@@ -385,6 +386,7 @@ function ResidentRouter({ view, residentId, condoId, go, signOut, headerAction }
       return residentId !== undefined ? (
         <PayScreen
           repository={receiptRepository}
+          pixRepository={pixRepository}
           receiptId={residentId}
           onDone={() => go('r-receipts')}
         />

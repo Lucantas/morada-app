@@ -8,7 +8,9 @@ import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 
+import { EMPTY_PIX_DRAFT, draftFromPix, pixUpdateFor, type PixDraft } from '../domain/pix-draft';
 import type { SettingsRepository } from '../domain/settings-repository';
+import { PixSection } from './pix-section';
 import { useSettings, useSaveSettings } from './use-settings';
 import { SettingsSkeleton } from './settings-skeleton';
 
@@ -101,6 +103,7 @@ export function SettingsScreen({
   const [condoName, setCondoName] = useState('');
   const [feeCents, setFeeCents] = useState(0);
   const [dueDay, setDueDay] = useState('15');
+  const [pixDraft, setPixDraft] = useState<PixDraft>(EMPTY_PIX_DRAFT);
   const [localCategories, setLocalCategories] = useState<CategoryDraft[]>([]);
   const [newCat, setNewCat] = useState<CategoryDraft>({ name: '', keywords: '' });
   const [reclassifiedMsg, setReclassifiedMsg] = useState<string | null>(null);
@@ -110,6 +113,7 @@ export function SettingsScreen({
     if (settings.data) {
       setFeeCents(settings.data.monthlyFeeCents);
       setDueDay(String(settings.data.dueDay));
+      setPixDraft(draftFromPix(settings.data.pix));
     }
   }, [settings.data]);
 
@@ -147,6 +151,8 @@ export function SettingsScreen({
 
   const submit = async () => {
     try {
+      const pixUpdate =
+        canManageFees && settings.data ? pixUpdateFor(settings.data.pix, pixDraft) : undefined;
       const trimmedName = condoName.trim();
       if (canManageCondo && trimmedName === '') {
         setReclassifiedMsg(null);
@@ -166,6 +172,7 @@ export function SettingsScreen({
         await saveSettings.mutateAsync({
           monthlyFeeCents: feeCents,
           dueDay: Number.isFinite(day) ? day : 15,
+          ...(pixUpdate === undefined ? {} : { pix: pixUpdate }),
         });
       }
       const result = await onSaveCategories(localCategories);
@@ -243,6 +250,16 @@ export function SettingsScreen({
               </>
             )}
           </div>
+        )}
+
+        {settings.isSuccess && (
+          <PixSection
+            editable={canManageFees}
+            stored={settings.data.pix}
+            draft={pixDraft}
+            onChange={setPixDraft}
+            onRemove={() => setPixDraft(EMPTY_PIX_DRAFT)}
+          />
         )}
 
         <SectionLabel>Categorias de contas</SectionLabel>

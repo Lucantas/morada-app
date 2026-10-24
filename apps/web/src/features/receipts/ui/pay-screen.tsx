@@ -10,34 +10,47 @@ import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton } from '@/shared/ui/primitives';
 
 import { getReceipt } from '../domain/get-receipt';
-import { pixCopyPaste } from '../domain/pix-code';
+import { brCode } from '../domain/pix-code';
 import { fileToDataUrl, isAllowedProof } from '../domain/proof';
 import type { ReceiptMethod } from '../domain/receipt';
+import type { PixRepository } from '../domain/pix-repository';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
 import { methodLabel } from './receipt-status-view';
-import { receiptsQueryKey, useSubmitPayment } from './use-receipts';
+import { pixQueryKey, receiptsQueryKey, useSubmitPayment } from './use-receipts';
 import { PaySkeleton } from './pay-skeleton';
 
 const METHODS: ReceiptMethod[] = ['dinheiro', 'pix'];
 
 type Props = {
   repository: ReceiptRepository;
+  pixRepository: PixRepository;
   receiptId: string;
   onDone: () => void;
 };
 
-export function PayScreen({ repository, receiptId, onDone }: Props) {
+export function PayScreen({ repository, pixRepository, receiptId, onDone }: Props) {
   const condoName = useCondoName();
   const receipt = useQuery({
     queryKey: [...receiptsQueryKey, receiptId],
     queryFn: () => getReceipt(repository, receiptId),
   });
+  const pix = useQuery({ queryKey: pixQueryKey, queryFn: () => pixRepository.get() });
   const submitPayment = useSubmitPayment(repository);
   const [method, setMethod] = useState<ReceiptMethod>('pix');
   const [pixCopied, setPixCopied] = useState(false);
   const [proofDataUrl, setProofDataUrl] = useState<string | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
+
+  const pixCode =
+    receipt.data && pix.data?.configured
+      ? brCode({
+          key: pix.data.key,
+          receiverName: pix.data.receiverName,
+          city: pix.data.city,
+          amountCents: receipt.data.valueCents,
+        })
+      : null;
 
   const confirm = () => {
     if (!proofDataUrl) return;
@@ -45,8 +58,8 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
   };
 
   const copyPix = async () => {
-    if (!receipt.data) return;
-    await navigator.clipboard.writeText(pixCopyPaste(receipt.data));
+    if (!pixCode) return;
+    await navigator.clipboard.writeText(pixCode);
     setPixCopied(true);
   };
 
@@ -181,7 +194,19 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
               })}
             </div>
 
-            {method === 'pix' && receipt.data && (
+            {method === 'pix' && pix.isError && (
+              <p style={{ color: 'var(--atraso-700)', marginBottom: 18, fontSize: '.88rem' }}>
+                Não foi possível carregar o Pix deste condomínio.
+              </p>
+            )}
+
+            {method === 'pix' && pix.data?.configured === false && (
+              <p style={{ color: 'var(--ink-500)', marginBottom: 18, fontSize: '.9rem' }}>
+                O Pix deste condomínio ainda não foi configurado.
+              </p>
+            )}
+
+            {method === 'pix' && pixCode && (
               <div
                 style={{
                   display: 'flex',
@@ -199,7 +224,7 @@ export function PayScreen({ repository, receiptId, onDone }: Props) {
                     background: '#fff',
                   }}
                 >
-                  <QRCodeSVG value={pixCopyPaste(receipt.data)} size={136} />
+                  <QRCodeSVG value={pixCode} size={136} role="img" aria-label="QR Code Pix" />
                 </div>
                 <button
                   type="button"

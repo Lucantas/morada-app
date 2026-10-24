@@ -1,16 +1,41 @@
-import { pixCopyPaste } from './pix-code';
+import { brCode } from './pix-code';
 
-describe('pixCopyPaste', () => {
-  test('encodes the receipt amount in reais', () => {
-    const code = pixCopyPaste({ valueCents: 45000, ref: '04/2026' });
-    expect(code).toContain('5406450.00');
+describe('brCode', () => {
+  test('matches the Bacen manual example', () => {
+    const code = brCode({
+      key: '123e4567-e12b-12d1-a456-426655440000',
+      receiverName: 'Fulano de Tal',
+      city: 'BRASILIA',
+    });
+
+    expect(code).toBe(
+      '00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***63041D3D',
+    );
   });
 
-  test('embeds a txid derived from the receipt ref', () => {
-    expect(pixCopyPaste({ valueCents: 45000, ref: '04/2026' })).toContain('MORADA042026');
+  test('includes the amount and strips accents', () => {
+    const code = brCode({
+      key: 'a@b.com',
+      receiverName: 'Condomínio',
+      city: 'São Paulo',
+      amountCents: 35000,
+    });
+
+    expect(code).toContain('5406350.00');
+    expect(code).toContain('6009Sao Paulo');
+    expect(code).toContain('5910Condominio');
   });
 
-  test('starts with the Pix BR Code payload format indicator', () => {
-    expect(pixCopyPaste({ valueCents: 1000, ref: '01/2026' })).toMatch(/^000201/);
+  test('omits the amount when it is zero or absent', () => {
+    const base = { key: 'a@b.com', receiverName: 'X', city: 'Y' };
+
+    expect(brCode({ ...base, amountCents: 0 })).not.toContain('54');
+    expect(brCode(base)).not.toMatch(/5303986540/);
+  });
+
+  test('uses the given txid', () => {
+    const code = brCode({ key: 'a@b.com', receiverName: 'X', city: 'Y', txid: 'ABC123' });
+
+    expect(code).toContain('62100506ABC123');
   });
 });

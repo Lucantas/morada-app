@@ -8,6 +8,7 @@ import { HttpInvitationRepository } from '@/features/invitations/data/http-invit
 import { HttpIncomeRepository } from '@/features/income/data/http-income-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
+import { HttpPixRepository } from '@/features/receipts/data/http-pix-repository';
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
@@ -44,6 +45,7 @@ export const invitationRepository = new HttpInvitationRepository({
 export const residentRepository = new HttpResidentRepository(apiClient);
 export const accountRepository = new HttpAccountRepository(apiClient);
 export const receiptRepository = new HttpReceiptRepository(apiClient);
+export const pixRepository = new HttpPixRepository(apiClient);
 export const activityRepository = new HttpActivityRepository(apiClient);
 export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);

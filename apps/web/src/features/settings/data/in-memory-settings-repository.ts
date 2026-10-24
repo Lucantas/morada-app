@@ -1,10 +1,15 @@
-import { condoSettingsSchema, type CondoSettings } from '../domain/condo-settings';
+import {
+  condoSettingsSchema,
+  type CondoSettings,
+  type CondoSettingsInput,
+  type CondoSettingsUpdate,
+} from '../domain/condo-settings';
 import type { SettingsRepository } from '../domain/settings-repository';
 
 export class InMemorySettingsRepository implements SettingsRepository {
   private current: CondoSettings;
 
-  constructor(initial: CondoSettings) {
+  constructor(initial: CondoSettingsInput) {
     this.current = condoSettingsSchema.parse(initial);
   }
 
@@ -12,8 +17,11 @@ export class InMemorySettingsRepository implements SettingsRepository {
     return this.current;
   }
 
-  async save(settings: CondoSettings): Promise<CondoSettings> {
-    this.current = condoSettingsSchema.parse(settings);
+  async save(settings: CondoSettingsUpdate): Promise<CondoSettings> {
+    this.current = condoSettingsSchema.parse({
+      ...settings,
+      pix: settings.pix === undefined ? this.current.pix : settings.pix,
+    });
     return this.current;
   }
 

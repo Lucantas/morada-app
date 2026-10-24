@@ -246,7 +246,9 @@ describe('SettingsScreen', () => {
     fireEvent.change(screen.getByLabelText('Valor da taxa'), { target: { value: '20000' } });
     fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
 
-    await waitFor(() => expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15 }));
+    await waitFor(() =>
+      expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15, pix: null }),
+    );
   });
 
   test('adds a category and shows the reclassified count after saving', async () => {
@@ -361,5 +363,101 @@ describe('SettingsScreen', () => {
     );
     await screen.findByLabelText('Nome da nova categoria');
     expect(screen.queryByRole('button', { name: 'Equipe' })).not.toBeInTheDocument();
+  });
+});
+
+describe('SettingsScreen Pix', () => {
+  const storedPix = {
+    keyType: 'email' as const,
+    key: 'a@b.com',
+    receiverName: 'Condominio Morada',
+    city: 'Sao Paulo',
+  };
+
+  test('a fee-only save never erases the stored Pix key', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderScreen(settings);
+
+    await screen.findByDisplayValue('a@b.com');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toEqual(storedPix);
+  });
+
+  test('saves a new Pix key with normalization', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderScreen(settings);
+
+    await user.selectOptions(await screen.findByLabelText('Tipo de chave Pix'), 'cpf');
+    await user.type(screen.getByLabelText('Chave Pix'), '529.982.247-25');
+    await user.type(screen.getByLabelText('Nome do recebedor'), 'Condominio Morada');
+    await user.type(screen.getByLabelText('Cidade'), 'Sao Paulo');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toEqual({
+      keyType: 'cpf',
+      key: '52998224725',
+      receiverName: 'Condominio Morada',
+      city: 'Sao Paulo',
+    });
+  });
+
+  test('shows the validation message for an invalid key and does not save', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderScreen(settings);
+
+    await user.type(await screen.findByLabelText('Chave Pix'), '123');
+    await user.type(screen.getByLabelText('Nome do recebedor'), 'Morada');
+    await user.type(screen.getByLabelText('Cidade'), 'Sao Paulo');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    expect(await screen.findByText('Chave Pix inválida')).toBeInTheDocument();
+    expect(settings.snapshot().pix).toBeNull();
+  });
+
+  test('Remover chave clears the stored Pix on save', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderScreen(settings);
+
+    await screen.findByDisplayValue('a@b.com');
+    await user.click(screen.getByRole('button', { name: 'Remover chave' }));
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toBeNull();
+  });
+
+  test('the síndico sees the Pix key read-only', async () => {
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    expect(await screen.findByText('a@b.com')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Chave Pix')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remover chave' })).not.toBeInTheDocument();
   });
 });
