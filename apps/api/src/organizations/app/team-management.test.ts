@@ -196,6 +196,15 @@ describe('organization team', () => {
     expect(calls).toEqual([]);
   });
 
+  test('assignCondos refuses an inactive member and writes nothing', async () => {
+    const { repo, calls } = fakeOrganizations({ 'u-member': { ...member, active: false } });
+
+    await expect(
+      assignCondos(repo, ORG.id, 'u-member', { condoIds: ['c-1'] }),
+    ).rejects.toBeInstanceOf(OrgMemberNotFoundError);
+    expect(calls).toEqual([]);
+  });
+
   test('inviteMember stores the invite, e-mails it and builds the whatsapp link', async () => {
     const sender = new InMemoryEmailSender();
     const invitations = fakeInvitations();

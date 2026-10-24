@@ -14,7 +14,7 @@ export async function assignCondos(
 ): Promise<{ condoIds: string[] }> {
   const { condoIds } = assignBodySchema.parse(input);
   const membership = await organizations.member(organizationId, userId);
-  if (!membership) throw new OrgMemberNotFoundError();
+  if (!membership?.active) throw new OrgMemberNotFoundError();
   if (membership.role === 'owner') throw new OwnerCondosError();
   return { condoIds: await organizations.assignCondos(organizationId, userId, condoIds) };
 }
