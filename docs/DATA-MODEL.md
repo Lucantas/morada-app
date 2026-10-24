@@ -127,7 +127,7 @@ Nothing is granted when the condominium or its organization is inactive.
   organization grants `administrador` on every active condominium of it.
 - **`administrador`:** needs an active `condo_roles` row **and** an active
   `organization_members` row (any role) in the owning organization.
-- **`sindico`:** the grant exists but resolves to no access in SP1.
+- **`sindico`:** needs an active `condo_roles` row; resolves to the permissions listed under Roles, activity and Pix.
 - **`morador`:** needs an active `condo_roles` row **and** an active occupancy
   whose apartment and resident both belong to that same condominium.
 
@@ -173,7 +173,7 @@ An admin's invite for a resident to take over a `morador` grant in one condomini
 | -------------------------- | --------------------------------------------------------------------------------- |
 | `condominium_id`           | → `condominiums.id`; cross-condo access answers 404                               |
 | `resident_id`              | → `residents.id`                                                                  |
-| `role`                     | `morador` only in SP2                                                             |
+| `role`                     | `morador` \| `sindico` \| `membro` (025); see the shapes below                    |
 | `email`                    | optional target address                                                           |
 | `token_hash`               | unique SHA-256 hex; the raw token is shown once at creation (7 days)              |
 | `status`                   | `pendente` \| `aceito` \| `revogado`; `expirado` is derived from `expires_at`     |
@@ -187,3 +187,56 @@ change `status`.
 Accepting retires the resident's legacy derived-login grant (`condo_roles.active`
 flips to 0). A claimed WhatsApp invite activates on e-mail confirmation and is
 retried at login.
+
+## Roles, activity and Pix (migrations 024-026)
+
+### Permissions
+
+Defined in `apps/api/src/condos/domain/permissions.ts`; `requirePermission` guards routes.
+
+| Role            | Permissions                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `administrador` | `view_building`, `publish_notices`, `manage_residents`, `manage_money`, `manage_fees`, `manage_condo`, `view_activity` |
+| `sindico`       | `view_building`, `publish_notices`, `manage_residents`, `manage_money`                                                 |
+| `morador`       | none                                                                                                                   |
+
+A staff user (`administrador` or `sindico`) who also holds a `morador` grant in the
+same condominium has `hasHome`; the web sends `X-Morada-View: admin | resident` to pick
+the "O prédio" or "Minha casa" view.
+
+### ActivityEntry (`activity_log`, 024)
+
+| Column           | Notes                                                          |
+| ---------------- | -------------------------------------------------------------- |
+| `id`             | primary key                                                    |
+| `condominium_id` | → `condominiums.id`; indexed with `created_at DESC`            |
+| `actor_user_id`  | → `users.id`                                                   |
+| `action`         | e.g. `account.created`, `receipt.confirmed`, `resident.status` |
+| `subject_id`     | nullable id of the affected row                                |
+| `created_at`     |                                                                |
+
+Written for successful writes on accounts, incomes, categories, receipts and the
+resident status override. `receipt.monthly` is recorded only when receipts were
+actually created. Read by `GET /api/condos/:id/activity` (`view_activity`).
+
+### Invitation shapes (025)
+
+`invitations_shape_check` allows exactly three shapes:
+
+| `role`    | Set                                                       | Null                             |
+| --------- | --------------------------------------------------------- | -------------------------------- |
+| `morador` | `condominium_id`, `resident_id`                           | `organization_id`                |
+| `sindico` | `condominium_id`, `email`                                 | `resident_id`, `organization_id` |
+| `membro`  | `organization_id`, `email`, `org_role` (`owner`/`member`) | `condominium_id`, `resident_id`  |
+
+One pending `sindico` invitation per condominium and one pending `membro` invitation
+per organization + e-mail. Accepting a `sindico` invitation replaces the previous
+active síndico atomically; nothing is deleted.
+
+### Pix (`condo_settings`, 026)
+
+`pix_key_type` (`cpf` \| `cnpj` \| `email` \| `telefone` \| `aleatoria`), `pix_key`,
+`pix_receiver_name`, `pix_city`: all four set or all four null
+(`condo_settings_pix_all_or_none`). The key is normalized by type. The web builds a
+static EMV BR Code (txid `***`) from `GET /api/condos/:id/pix`, sanitizing the receiver
+name and city to printable ASCII.

@@ -5,10 +5,18 @@
 Morada is a multi-condominium management app. An **organization** administers one
 or more condominiums (the first is Condomínio Morada · Bloco 2). Roles are per
 condominium: **administrador** manages residents, accounts/expenses, receipts,
-notices and messages; **síndico** is a planned delegate (no access yet);
+notices and messages; **síndico** is a delegate with limited permissions (see Roles);
 **morador** views their receipts, pays the monthly fee, and reads notices. An
 organization **owner** is administrador of every condominium of the organization.
 All operational data is condominium-scoped; one phone-framed UI.
+
+**Roles.** `administrador` has every permission (`view_building`,
+`publish_notices`, `manage_residents`, `manage_money`, `manage_fees`,
+`manage_condo`, `view_activity`). `sindico` has `view_building`,
+`publish_notices`, `manage_residents` and `manage_money`: no fee value, condo
+rename, síndico/team management or activity log. `morador` has none. A staff
+person who is also a resident of the same condominium switches between **"O
+prédio"** and **"Minha casa"** (the web sends `X-Morada-View: admin|resident`).
 
 **Domain vocabulary (use these exact names, never synonyms):**
 
@@ -19,7 +27,8 @@ All operational data is condominium-scoped; one phone-framed UI.
 - `CondoRole` — user ↔ condominium link, role `administrador` / `sindico` / `morador`, `active` flag
 - `User` — a login; signs in by e-mail (legacy derived logins keep a `username`
   until the resident accepts an invitation). Never call it `Account`.
-- `Invitation` — an admin's invite for a resident to take a `morador` grant;
+- `Invitation` — an invite with role `morador` (admin invites a resident),
+  `sindico` (one active per condominium) or `membro` (organization team);
   `pendente` / `aceito` / `expirado` / `revogado`, one pending per resident
 - `AuthToken` — a single-use e-mailed link (`confirm_email` or `reset_password`)
 - `Apartment` — the stable unit and ledger anchor (`Apto 302`); survives resident
@@ -32,6 +41,8 @@ All operational data is condominium-scoped; one phone-framed UI.
   charged (`pago` / `pendente`); listable per-resident (own) or per-apartment (history)
 - `Notice` — a communication the admin sends to residents (`aviso`)
 - `Message` — a resident→admin message in the admin inbox
+- `ActivityEntry` — a row of the condominium activity log (`activity_log`):
+  who did which write, when; visible to `administrador` in Ajustes → "Atividade"
 - `CondoBalance` — condominium financial summary (saldo, entradas, contas pagas)
 
 The web identity flows (login, sign-up, confirmation, reset, invitation accept)

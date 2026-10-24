@@ -354,6 +354,15 @@ GitHub repo secrets (`Lucantas/morada-app`):
 > pnpm dlx wrangler@4 pages deploy apps/web/dist --project-name=morada --branch=main
 > ```
 
+## Roles, activity and Pix release
+
+Migrations `024` (`activity_log`), `025` (staff invitations) and `026` (Pix columns on
+`condo_settings`) are additive: existing rows stay valid and the Fly `release_command`
+applies them on the next deploy. No new secrets are needed.
+
+Manual `wrangler pages deploy` runs leave `.wrangler/` bundles at the repo root; the
+directory is git-ignored.
+
 ## Verify
 
 ```bash
