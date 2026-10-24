@@ -1864,7 +1864,7 @@ describe('Morada API — authorization wiring', () => {
         status: 'pago',
       }),
     });
-    expect(noProof.status).toBe(200);
+    expect(noProof.status).toBe(201);
     expect(
       (await app.request(`${P}/accounts/a-plain/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
