@@ -41,8 +41,8 @@ export const useSessionStore = create<SessionState>()(
   ),
 );
 
-export function applyLogin({ condos, emailVerified }: LoginResponse): Role | null {
-  const [first] = condos;
+export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginResponse): Role | null {
+  const first = condos.find((condo) => condo.id === invitedCondoId) ?? condos[0];
   if (!first) {
     useCondoScope.getState().setCondo(null);
     useSessionStore.setState({ role: null, subject: null, pendingUser: { emailVerified } });

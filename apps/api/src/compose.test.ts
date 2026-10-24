@@ -2692,7 +2692,11 @@ describe('Accepting an invitation', () => {
     const res = await accept(app, token, newAccount);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await res.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
     const me = await app.request('/me', { headers: { Cookie: cookieOf(res) } });
     expect(me.status).toBe(200);
     expect(await count("invitations WHERE status = 'aceito'")).toBe(1);
@@ -2740,7 +2744,11 @@ describe('Accepting an invitation', () => {
     const right = await accept(app, token, { password: 'senha-da-ana' });
 
     expect(right.status).toBe(200);
-    expect(await right.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await right.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
     expect((await app.request('/me', { headers: { Cookie: cookieOf(right) } })).status).toBe(200);
   });
 
@@ -2752,7 +2760,11 @@ describe('Accepting an invitation', () => {
     const res = await accept(app, token, { ...newAccount, email: 'Maria.Nova@x.com' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+    expect(await res.json()).toEqual({
+      condos: [],
+      emailVerified: false,
+      invitedCondoId: CONDO.id,
+    });
     const confirmToken =
       /confirmar-email\/([\w-]+)/.exec(sender.lastTo('maria.nova@x.com')?.text ?? '')?.[1] ?? '';
     const confirmed = await app.request('/auth/email/confirm', {
@@ -2954,7 +2966,11 @@ describe('Accepting an invitation', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await res.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
   });
 });
 
@@ -3267,10 +3283,14 @@ describe('Síndico access', () => {
       const accepted = await publicRequest(app, `${token}/accept`, newSindica);
 
       expect(accepted.status).toBe(200);
-      const session = (await accepted.json()) as { condos: Record<string, unknown>[] };
+      const session = (await accepted.json()) as {
+        condos: Record<string, unknown>[];
+        invitedCondoId: string | null;
+      };
       expect(session.condos).toEqual([
         expect.objectContaining({ id: TEST_CONDO_ID, role: 'admin', condoRole: 'sindico' }),
       ]);
+      expect(session.invitedCondoId).toBe(TEST_CONDO_ID);
       expect(await (await admin(S)).json()).toEqual({
         current: { name: 'Nova Síndica', email: SINDICA },
         invitation: { status: 'aceito', email: SINDICA, expiresAt: body.expiresAt },
@@ -3640,6 +3660,7 @@ describe('Organization team', () => {
     });
 
     expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({ invitedCondoId: null });
     const team = (await (await owner(O)).json()) as { members: { name: string }[] };
     expect(team.members.map((m) => m.name)).toContain('Nova');
   });

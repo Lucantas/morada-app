@@ -147,18 +147,28 @@ function ensureInvitedEmail(invitation: Invitation, requested: string | undefine
   if (normalizeEmail(requested) !== invitation.email) throw new InvalidCredentialsError();
 }
 
+export interface AcceptedInvitation {
+  user: User;
+  invitedCondoId: string | null;
+}
+
+function invitedCondoIdOf(invitation: Invitation): string | null {
+  return invitation.role === 'membro' ? null : invitation.condominiumId;
+}
+
 export async function acceptInvitation(
   deps: AcceptInvitationDeps,
   token: string,
   input: unknown,
-): Promise<User> {
+): Promise<AcceptedInvitation> {
   const body = acceptBodySchema.parse(input);
   const { invitation } = await findUsableInvitation(deps, token);
   ensureInvitedEmail(invitation, body.email);
   if (invitation.email === null) newAccountSchema.parse(body);
   const email = invitation.email ?? emailSchema.parse(body.email);
   const existing = await deps.users.findByEmail(email);
-  return existing
-    ? acceptAsExisting(deps, invitation, { ...existing, email }, body.password)
-    : acceptAsNew(deps, invitation, email, body);
+  const user = existing
+    ? await acceptAsExisting(deps, invitation, { ...existing, email }, body.password)
+    : await acceptAsNew(deps, invitation, email, body);
+  return { user, invitedCondoId: invitedCondoIdOf(invitation) };
 }

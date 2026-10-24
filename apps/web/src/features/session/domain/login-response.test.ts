@@ -34,6 +34,21 @@ describe('parseLoginResponse', () => {
     });
   });
 
+  test('keeps the invited condo id of an accepted invitation', () => {
+    expect(
+      parseLoginResponse({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' }),
+    ).toEqual({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' });
+    expect(
+      parseLoginResponse({ condos: [], emailVerified: true, invitedCondoId: null }).invitedCondoId,
+    ).toBeNull();
+  });
+
+  test('rejects an empty invited condo id', () => {
+    expect(() =>
+      parseLoginResponse({ condos: [], emailVerified: true, invitedCondoId: '' }),
+    ).toThrow();
+  });
+
   test('accepts an empty condo list', () => {
     expect(parseLoginResponse({ condos: [], emailVerified: false })).toEqual({
       condos: [],

@@ -6,7 +6,11 @@ import { InvitationError } from '@/features/invitations/domain/errors';
 import { useSessionStore } from '@/features/session/ui/session-store';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 import { fakeAuthRepository } from '@/test/factories.auth';
-import { TEAM_PREVIEW, fakeInvitationRepository } from '@/test/factories.invitations';
+import {
+  SINDICO_PREVIEW,
+  TEAM_PREVIEW,
+  fakeInvitationRepository,
+} from '@/test/factories.invitations';
 import { loginCondo } from '@/test/factories.auth';
 import { renderWithClient } from '@/test/render';
 
@@ -278,6 +282,31 @@ describe('EntryRouter', () => {
 
     await waitFor(() => expect(onLanded).toHaveBeenCalledWith('admin'));
     expect(useCondoScope.getState().condo?.name).toBe('Edifício Real');
+  });
+
+  test('accepting a síndico invite lands on the invited condominium, not the first', async () => {
+    window.history.replaceState(null, '', `/#/convite/${TOKEN}`);
+    const { onLanded } = renderEntry(
+      fakeAuthRepository(),
+      fakeInvitationRepository({
+        preview: jest.fn().mockResolvedValue({ ...SINDICO_PREVIEW, accountExists: true }),
+        accept: jest.fn().mockResolvedValue({
+          condos: [
+            loginCondo({ id: 'c1', name: 'Primeiro', role: 'resident', condoRole: 'morador' }),
+            loginCondo({ id: 'c9', name: 'Convidado', condoRole: 'sindico' }),
+          ],
+          emailVerified: true,
+          invitedCondoId: 'c9',
+        }),
+      }),
+    );
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText('Senha'), 'segredo123');
+    await user.click(screen.getByRole('button', { name: 'Aceitar convite' }));
+
+    await waitFor(() => expect(onLanded).toHaveBeenCalledWith('admin'));
+    expect(useCondoScope.getState().condo).toMatchObject({ id: 'c9', name: 'Convidado' });
   });
 
   test('"Esqueci a senha" on an invite opens the forgot-password screen', async () => {

@@ -18,6 +18,7 @@ export const loginCondoSchema = z.object({
 const loginResponseSchema = z.object({
   condos: z.array(loginCondoSchema),
   emailVerified: z.boolean(),
+  invitedCondoId: z.string().min(1).nullable().optional(),
 });
 
 export type LoginCondo = z.infer<typeof loginCondoSchema>;

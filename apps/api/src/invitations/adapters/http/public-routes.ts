@@ -39,8 +39,8 @@ export function publicInvitationRoutes(deps: PublicInvitationRoutesDeps) {
     if (!withinLimit(c)) return c.json({ error: TOO_MANY_ATTEMPTS }, 429);
     const token = tokenFrom(c);
     const body: unknown = await c.req.json().catch(() => undefined);
-    const user = await acceptInvitation(deps, token, body);
-    return sessionResponse(c, user, await deps.condosFor(user.id));
+    const { user, invitedCondoId } = await acceptInvitation(deps, token, body);
+    return sessionResponse(c, user, await deps.condosFor(user.id), { invitedCondoId });
   });
 
   return app;

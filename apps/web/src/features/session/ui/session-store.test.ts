@@ -60,6 +60,40 @@ describe('condo-aware session', () => {
     });
   });
 
+  test('login lands on the invited condo when it is among the condos', () => {
+    const role = applyLogin({
+      condos: [
+        loginCondo({ role: 'resident', condoRole: 'morador', permissions: [] }),
+        loginCondo({ id: 'c2', name: 'Outro', condoRole: 'sindico' }),
+      ],
+      emailVerified: true,
+      invitedCondoId: 'c2',
+    });
+
+    expect(role).toBe('admin');
+    expect(useCondoScope.getState().condo).toMatchObject({ id: 'c2', condoRole: 'sindico' });
+  });
+
+  test('login falls back to the first condo when the invited one is not listed', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+      invitedCondoId: 'c-missing',
+    });
+
+    expect(useCondoScope.getState().condo?.id).toBe('c1');
+  });
+
+  test('login falls back to the first condo when no condo was invited', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+      invitedCondoId: null,
+    });
+
+    expect(useCondoScope.getState().condo?.id).toBe('c1');
+  });
+
   test('signOut clears the condo', () => {
     applyLogin({ condos: [loginCondo()], emailVerified: true });
     act(() => useSessionStore.getState().signOut());

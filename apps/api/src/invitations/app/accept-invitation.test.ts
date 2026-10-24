@@ -84,7 +84,10 @@ describe('acceptInvitation', () => {
   test('an e-mail invite with a new account creates a verified resident and grants now', async () => {
     const { deps, invitations, condos, email } = setup();
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' });
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
 
     expect(user).toMatchObject({
       email: 'maria@x.com',
@@ -106,7 +109,7 @@ describe('acceptInvitation', () => {
   test('a WhatsApp invite with a new account claims and sends the confirmation', async () => {
     const { deps, invitations, condos, email } = setup({ invitation: { email: null } });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: ' Nova@X.com ',
       password: 'senha-segura',
       name: 'Maria',
@@ -154,7 +157,7 @@ describe('acceptInvitation', () => {
       invitation: { email: null },
     });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
       name: 'Maria',
@@ -170,7 +173,7 @@ describe('acceptInvitation', () => {
       users: [account({ emailVerifiedAt: null })],
     });
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-antiga' });
+    const { user } = await acceptInvitation(deps, TOKEN, { password: 'senha-antiga' });
 
     expect(user).toMatchObject({ emailVerifiedAt: INVITE_NOW, sessionVersion: 4 });
     expect((await users.findById('u-maria'))?.sessionVersion).toBe(4);
@@ -184,7 +187,7 @@ describe('acceptInvitation', () => {
       invitation: { email: null },
     });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
       name: 'Maria',
@@ -279,7 +282,10 @@ describe('acceptInvitation', () => {
   test('sindico invite grants sindico and retires the previous sindico', async () => {
     const { deps, invitations, condos } = setup({ stored: sindicoInvitationFixture() });
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' });
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
 
     expect(user).toMatchObject({ email: 'maria@x.com', emailVerifiedAt: INVITE_NOW });
     expect(condos.grants()).toEqual([
@@ -335,7 +341,7 @@ describe('acceptInvitation', () => {
   test('an invited e-mail repeated in the body is accepted after normalization', async () => {
     const { deps, condos } = setup({ stored: sindicoInvitationFixture() });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: ' Maria@X.com ',
       password: 'senha-segura',
       name: 'Maria',
@@ -351,7 +357,10 @@ describe('acceptInvitation', () => {
       stored: membroInvitationFixture({ orgRole: 'owner' }),
     });
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' });
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
 
     expect(condos.orgMembers()).toEqual([
       { organizationId: 'org-a', userId: user.id, role: 'owner' },
@@ -380,6 +389,34 @@ describe('acceptInvitation', () => {
       acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' }),
     ).rejects.toMatchObject({ status: 404 });
     expect(condos.grants()).toEqual([]);
+  });
+
+  test.each([
+    ['morador', invitationFixture(), 'condo-a'],
+    ['sindico', sindicoInvitationFixture(), 'condo-a'],
+    ['membro', membroInvitationFixture(), null],
+  ])('reports the invited condo of a %s invite', async (_label, stored, expected) => {
+    const { deps } = setup({ stored });
+
+    const accepted = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(accepted.invitedCondoId).toBe(expected);
+  });
+
+  test('a WhatsApp invite still reports its condo before the grant', async () => {
+    const { deps, condos } = setup({ invitation: { email: null } });
+
+    const accepted = await acceptInvitation(deps, TOKEN, {
+      email: 'nova@x.com',
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(condos.grants()).toEqual([]);
+    expect(accepted.invitedCondoId).toBe('condo-a');
   });
 
   test('accept is single use', async () => {

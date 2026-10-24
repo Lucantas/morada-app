@@ -17,9 +17,10 @@ export async function sessionResponse(
   c: Context<ApiEnv>,
   user: User,
   condos: CondoSummary[],
+  extra: { invitedCondoId?: string | null } = {},
 ): Promise<Response> {
   const token = await signSession(user.id, user.sessionVersion);
   setCookie(c, SESSION_COOKIE, token, sessionCookieOptions(config.isProduction));
   setCookie(c, CSRF_COOKIE, newCsrfToken(), csrfCookieOptions(config.isProduction));
-  return c.json({ condos, emailVerified: isEmailVerified(user) });
+  return c.json({ condos, emailVerified: isEmailVerified(user), ...extra });
 }
