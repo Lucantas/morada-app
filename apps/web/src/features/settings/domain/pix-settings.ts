@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { sanitizePixText } from '@/shared/lib/pix-text';
+
 export const PIX_KEY_TYPES = ['cpf', 'cnpj', 'email', 'telefone', 'aleatoria'] as const;
 export type PixKeyType = (typeof PIX_KEY_TYPES)[number];
 
@@ -104,8 +106,14 @@ export const pixSettingsSchema = z
       .string({ message: RECEIVER_MESSAGE })
       .trim()
       .min(1, RECEIVER_MESSAGE)
-      .max(25, RECEIVER_MESSAGE),
-    city: z.string({ message: CITY_MESSAGE }).trim().min(1, CITY_MESSAGE).max(15, CITY_MESSAGE),
+      .max(25, RECEIVER_MESSAGE)
+      .refine((value) => sanitizePixText(value, 25) !== '', RECEIVER_MESSAGE),
+    city: z
+      .string({ message: CITY_MESSAGE })
+      .trim()
+      .min(1, CITY_MESSAGE)
+      .max(15, CITY_MESSAGE)
+      .refine((value) => sanitizePixText(value, 15) !== '', CITY_MESSAGE),
   })
   .transform((value, ctx) => {
     const key = NORMALIZERS[value.keyType](value.key);

@@ -5,7 +5,8 @@ const CRC_INITIAL = 0xffff;
 const CRC_MASK = 0xffff;
 const CRC_TOP_BIT = 0x8000;
 const BYTE_BITS = 8;
-const COMBINING_MARKS = /[̀-ͯ]/g;
+
+import { sanitizePixText } from '@/shared/lib/pix-text';
 
 export interface BrCodeInput {
   readonly key: string;
@@ -18,7 +19,6 @@ export interface BrCodeInput {
 const MAX_FIELD_LENGTH = 99;
 const MAX_NAME_LENGTH = 25;
 const MAX_CITY_LENGTH = 15;
-const NON_PRINTABLE_ASCII = /[^\x20-\x7E]/g;
 const PRINTABLE_ASCII = /^[\x20-\x7E]*$/;
 
 function field(id: string, value: string): string {
@@ -26,17 +26,10 @@ function field(id: string, value: string): string {
   return `${id}${String(value.length).padStart(2, '0')}${value}`;
 }
 
-function sanitizeText(text: string, maxLength: number): string {
-  return text
-    .normalize('NFD')
-    .replace(COMBINING_MARKS, '')
-    .replace(/º/g, 'o')
-    .replace(/ª/g, 'a')
-    .replace(NON_PRINTABLE_ASCII, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength)
-    .trim();
+function requireText(value: string, maxLength: number, name: string): string {
+  const text = sanitizePixText(value, maxLength);
+  if (text === '') throw new Error(`Pix ${name} is empty after sanitizing`);
+  return text;
 }
 
 function requireAscii(value: string, name: string): string {
@@ -68,10 +61,18 @@ export function brCode(input: BrCodeInput): string {
     field('53', '986'),
     amount,
     field('58', 'BR'),
-    field('59', sanitizeText(input.receiverName, MAX_NAME_LENGTH)),
-    field('60', sanitizeText(input.city, MAX_CITY_LENGTH)),
+    field('59', requireText(input.receiverName, MAX_NAME_LENGTH, 'receiver name')),
+    field('60', requireText(input.city, MAX_CITY_LENGTH, 'city')),
     field('62', field('05', requireAscii(input.txid ?? DEFAULT_TXID, 'txid'))),
     '6304',
   ].join('');
   return payload + crc16(payload);
+}
+
+export function tryBrCode(input: BrCodeInput): string | null {
+  try {
+    return brCode(input);
+  } catch {
+    return null;
+  }
 }

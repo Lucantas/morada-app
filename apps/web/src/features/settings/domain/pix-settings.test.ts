@@ -77,4 +77,33 @@ describe('pixSettingsSchema', () => {
 
     expect(result.error?.issues[0]?.message).toBe('Informe a cidade (até 15 caracteres)');
   });
+
+  test('rejects a receiver name or city that has no printable characters', () => {
+    const name = pixSettingsSchema.safeParse({
+      ...base,
+      receiverName: '😀ø',
+      keyType: 'email',
+      key: 'a@b.com',
+    });
+    const city = pixSettingsSchema.safeParse({
+      ...base,
+      city: '😀',
+      keyType: 'email',
+      key: 'a@b.com',
+    });
+
+    expect(name.error?.issues[0]?.message).toBe('Informe o nome do recebedor (até 25 caracteres)');
+    expect(city.error?.issues[0]?.message).toBe('Informe a cidade (até 15 caracteres)');
+  });
+
+  test('accepts Nº in the receiver name', () => {
+    const result = pixSettingsSchema.safeParse({
+      ...base,
+      receiverName: 'Bloco Nº2',
+      keyType: 'email',
+      key: 'a@b.com',
+    });
+
+    expect(result.success).toBe(true);
+  });
 });

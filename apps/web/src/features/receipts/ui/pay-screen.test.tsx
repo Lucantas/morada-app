@@ -140,4 +140,15 @@ describe('PayScreen', () => {
     expect(screen.queryByRole('button', { name: 'Copiar código Pix' })).not.toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'QR Code Pix' })).not.toBeInTheDocument();
   });
+
+  test('a Pix key that cannot be encoded shows an error instead of crashing, with no QR or copy button', async () => {
+    const repository = new InMemoryReceiptRepository([
+      buildReceipt({ id: 'rc-1', ref: '04/2026', status: 'pendente' }),
+    ]);
+    renderPay(repository, { ...CONFIGURED, key: 'chávé@b.com' });
+
+    expect(await screen.findByText(/não foi possível gerar o código pix/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copiar código Pix' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'QR Code Pix' })).not.toBeInTheDocument();
+  });
 });

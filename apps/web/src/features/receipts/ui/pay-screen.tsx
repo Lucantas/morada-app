@@ -10,7 +10,7 @@ import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { PrimaryButton } from '@/shared/ui/primitives';
 
 import { getReceipt } from '../domain/get-receipt';
-import { brCode } from '../domain/pix-code';
+import { tryBrCode } from '../domain/pix-code';
 import { fileToDataUrl, isAllowedProof } from '../domain/proof';
 import type { ReceiptMethod } from '../domain/receipt';
 import type { PixRepository } from '../domain/pix-repository';
@@ -44,7 +44,7 @@ export function PayScreen({ repository, pixRepository, receiptId, onDone }: Prop
 
   const pixCode =
     receipt.data && pix.data?.configured
-      ? brCode({
+      ? tryBrCode({
           key: pix.data.key,
           receiverName: pix.data.receiverName,
           city: pix.data.city,
@@ -203,6 +203,15 @@ export function PayScreen({ repository, pixRepository, receiptId, onDone }: Prop
             {method === 'pix' && pix.data?.configured === false && (
               <p style={{ color: 'var(--ink-500)', marginBottom: 18, fontSize: '.9rem' }}>
                 O Pix deste condomínio ainda não foi configurado.
+              </p>
+            )}
+
+            {method === 'pix' && pix.data?.configured && !pixCode && (
+              <p
+                role="alert"
+                style={{ color: 'var(--atraso-700)', marginBottom: 18, fontSize: '.88rem' }}
+              >
+                Não foi possível gerar o código Pix. Avise a administração do condomínio.
               </p>
             )}
 

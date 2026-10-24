@@ -1,4 +1,4 @@
-import { brCode } from './pix-code';
+import { brCode, tryBrCode } from './pix-code';
 
 function parseTlv(payload: string): Array<{ id: string; value: string }> {
   const fields: Array<{ id: string; value: string }> = [];
@@ -97,5 +97,19 @@ describe('brCode', () => {
 
   test('throws when a field value exceeds 99 characters', () => {
     expect(() => brCode({ key: 'a'.repeat(100), receiverName: 'X', city: 'Y' })).toThrow();
+  });
+
+  test('throws when the sanitized name or city is empty', () => {
+    expect(() => brCode({ key: 'a@b.com', receiverName: '😀ø', city: 'Y' })).toThrow();
+    expect(() => brCode({ key: 'a@b.com', receiverName: 'X', city: '😀' })).toThrow();
+  });
+});
+
+describe('tryBrCode', () => {
+  test('returns the code when valid and null when brCode would throw', () => {
+    const valid = { key: 'a@b.com', receiverName: 'X', city: 'Y' };
+
+    expect(tryBrCode(valid)).toBe(brCode(valid));
+    expect(tryBrCode({ ...valid, key: 'á' })).toBeNull();
   });
 });
