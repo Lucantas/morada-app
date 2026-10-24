@@ -60,6 +60,35 @@ describe('recordActivity', () => {
     ]);
   });
 
+  test('an upsert that answers 201 is recorded as a creation', async () => {
+    const recorded: unknown[] = [];
+    const app = new Hono<ApiEnv>();
+    app.use('*', async (c, next) => {
+      c.set('uid', 'u-1');
+      c.set('condoId', 'c-1');
+      await next();
+    });
+    app.use(
+      '*',
+      recordActivity(
+        moneyActivityResolver,
+        () => ({ record: async (entry) => void recorded.push(entry) }),
+        () => new Date('2026-05-01T10:00:00Z'),
+      ),
+    );
+    app.put('/api/condos/:condoId/accounts/:id', (c) =>
+      c.body(null, c.req.query('new') ? 201 : 200),
+    );
+
+    await app.request('/api/condos/c-1/accounts/a-1?new=1', { method: 'PUT' });
+    await app.request('/api/condos/c-1/accounts/a-1', { method: 'PUT' });
+
+    expect(recorded.map((entry) => (entry as { action: string }).action)).toEqual([
+      'account.created',
+      'account.updated',
+    ]);
+  });
+
   test('does not record failed writes', async () => {
     const { app, recorded } = appWith(400);
 

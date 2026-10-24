@@ -10,6 +10,10 @@ export type ActivityResolver = (method: string, routePath: string) => ActivityAc
 
 const NEEDS_CREATED_RESULT: ReadonlySet<ActivityAction> = new Set(['receipt.monthly']);
 
+const CREATED_WHEN_201: Readonly<Partial<Record<ActivityAction, ActivityAction>>> = {
+  'account.updated': 'account.created',
+};
+
 async function createdSomething(res: Response): Promise<boolean> {
   const body: unknown = await res.clone().json();
   return Array.isArray(body) && body.length > 0;
@@ -24,8 +28,9 @@ export function recordActivity(
     await next();
     if (c.req.method === 'GET') return;
     if (c.res.status < 200 || c.res.status >= 300) return;
-    const action = resolve(c.req.method, c.req.routePath);
-    if (action === null) return;
+    const resolved = resolve(c.req.method, c.req.routePath);
+    if (resolved === null) return;
+    const action = c.res.status === 201 ? (CREATED_WHEN_201[resolved] ?? resolved) : resolved;
     try {
       if (NEEDS_CREATED_RESULT.has(action) && !(await createdSomething(c.res))) return;
       await activityFor(c.get('condoId')).record({

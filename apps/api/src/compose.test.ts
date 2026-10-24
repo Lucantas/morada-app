@@ -1834,7 +1834,7 @@ describe('Morada API — authorization wiring', () => {
         proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
       }),
     });
-    expect(put.status).toBe(200);
+    expect(put.status).toBe(201);
 
     const adminProof = await app.request(`${P}/accounts/a-proof/proof`, {
       headers: { Cookie: adminAuth.cookie },
