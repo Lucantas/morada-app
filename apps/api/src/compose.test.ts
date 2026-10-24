@@ -546,7 +546,7 @@ describe('Morada API', () => {
     const app = await makeApp();
     await createTestCondo(pool, 'condo-other');
     const other = makePostgresRepositories(pool).forCondo('condo-other');
-    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3 });
+    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
     const admin = await authFor(app, adminCredentials);
     const headers = {
       Cookie: admin.cookie,
@@ -561,11 +561,11 @@ describe('Morada API', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
 
-    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
     expect(update.status).toBe(200);
-    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3 });
+    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
     const own = await app.request(`${P}/settings`, { headers });
-    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10 });
+    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: null });
   });
 
   test('cross-condo categories are isolated', async () => {
@@ -1427,7 +1427,7 @@ describe('Morada API — authorization wiring', () => {
     const admin = await withCreds(adminCredentials);
     const res = await admin.auth(`${P}/settings`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
   });
 
   test('categories are admin-only; saving reclassifies matching accounts', async () => {
@@ -2958,6 +2958,13 @@ describe('Accepting an invitation', () => {
   });
 });
 
+const PIX_INPUT = {
+  keyType: 'cpf',
+  key: '123.456.789-09',
+  receiverName: 'Condomínio Morada',
+  city: 'Santos',
+};
+
 describe('Síndico access', () => {
   const sindicoCredentials = { username: 'sindico', password: 'senha-sindico-1' };
   const SINDICO_RESIDENT_ID = 'r-3';
@@ -3028,6 +3035,75 @@ describe('Síndico access', () => {
     expect(residents.status).toBe(200);
     expect(account.status).toBe(201);
     expect(notice.status).toBe(201);
+  });
+
+  test('sindico cannot change pix', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(
+      `${P}/settings`,
+      json('PUT', { monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Acesso negado' });
+  });
+
+  test('resident reads pix', async () => {
+    const { app, request } = await sindicoApp();
+    await pool.query(
+      `UPDATE condo_settings SET pix_key_type = 'cpf', pix_key = '12345678909',
+         pix_receiver_name = 'Condomínio Morada', pix_city = 'Santos'
+       WHERE condominium_id = $1`,
+      [TEST_CONDO_ID],
+    );
+    const resident = await authFor(app, residentCredentials);
+
+    const asResident = await app.request(`${P}/pix`, {
+      headers: { Cookie: resident.cookie, 'X-CSRF-Token': resident.csrf },
+    });
+    const asSindicoResidentView = await request(`${P}/pix`, {
+      headers: { 'X-Morada-View': 'resident' },
+    });
+
+    const expected = {
+      configured: true,
+      key: '12345678909',
+      receiverName: 'Condomínio Morada',
+      city: 'Santos',
+    };
+    expect(asResident.status).toBe(200);
+    expect(await asResident.json()).toEqual(expected);
+    expect(asSindicoResidentView.status).toBe(200);
+    expect(await asSindicoResidentView.json()).toEqual(expected);
+  });
+
+  test('the administrador configures pix and the update without pix keeps it', async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: admin.cookie,
+      'X-CSRF-Token': admin.csrf,
+      'Content-Type': 'application/json',
+    };
+    const put = (body: unknown) =>
+      app.request(`${P}/settings`, { method: 'PUT', headers, body: JSON.stringify(body) });
+
+    const before = await app.request(`${P}/pix`, { headers });
+    await put({ monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT });
+    await put({ monthlyFeeCents: 16000, dueDay: 12 });
+    const kept = await app.request(`${P}/pix`, { headers });
+    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null });
+    const cleared = await app.request(`${P}/pix`, { headers });
+
+    expect(await before.json()).toEqual({ configured: false });
+    expect(await kept.json()).toEqual({
+      configured: true,
+      key: '12345678909',
+      receiverName: 'Condomínio Morada',
+      city: 'Santos',
+    });
+    expect(await cleared.json()).toEqual({ configured: false });
   });
 
   test('the administrador still manages fees', async () => {

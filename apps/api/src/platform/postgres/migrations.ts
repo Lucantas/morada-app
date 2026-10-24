@@ -468,4 +468,17 @@ CREATE UNIQUE INDEX idx_invitations_one_pending_sindico ON invitations (condomin
 CREATE UNIQUE INDEX idx_invitations_one_pending_member ON invitations (organization_id, email) WHERE role = 'membro' AND status = 'pendente';
 `,
   },
+  {
+    id: '026_condo_pix',
+    sql: `
+ALTER TABLE condo_settings ADD COLUMN pix_key_type TEXT CHECK (pix_key_type IN ('cpf','cnpj','email','telefone','aleatoria'));
+ALTER TABLE condo_settings ADD COLUMN pix_key TEXT;
+ALTER TABLE condo_settings ADD COLUMN pix_receiver_name TEXT;
+ALTER TABLE condo_settings ADD COLUMN pix_city TEXT;
+ALTER TABLE condo_settings ADD CONSTRAINT condo_settings_pix_all_or_none CHECK (
+  (pix_key_type IS NULL AND pix_key IS NULL AND pix_receiver_name IS NULL AND pix_city IS NULL) OR
+  (pix_key_type IS NOT NULL AND pix_key IS NOT NULL AND pix_receiver_name IS NOT NULL AND pix_city IS NOT NULL)
+);
+`,
+  },
 ];

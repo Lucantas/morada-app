@@ -34,6 +34,7 @@ import { receiptRoutes } from './receipts/adapters/http/routes';
 import { apartmentResidentRoutes } from './residents/adapters/http/apartment-routes';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
+import { pixRoutes } from './settings/adapters/http/pix-routes';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
@@ -209,6 +210,8 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     '/settings',
     guarded('admin', settingsRoutes(scoped(({ settings }) => ({ settings })))),
   );
+
+  api.route('/pix', pixRoutes(scoped(({ settings }) => ({ settings }))));
 
   // Admin: apartment-scoped views — full receipt ledger and occupant history,
   // across every resident who has occupied the apartment (the resident-facing
