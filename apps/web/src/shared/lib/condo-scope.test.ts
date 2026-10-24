@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 
 import { renderHook } from '@testing-library/react';
 
-import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
+import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
 import { testCondo } from '@/test/condo';
 
 import { scopedApiPath, useCanDo, useCondoName, useCondoScope } from './condo-scope';
@@ -114,7 +114,7 @@ describe('persisted condo from an older version', () => {
     act(() => useSessionStore.getState().authenticate('admin', null));
 
     await act(() => useCondoScope.persist.rehydrate());
-    signOutIfCondoMissing();
+    restoreSession();
 
     expect(useSessionStore.getState().role).toBeNull();
   });

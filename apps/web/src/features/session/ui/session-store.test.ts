@@ -2,9 +2,10 @@ import { act } from '@testing-library/react';
 
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
+import { testCondo } from '@/test/condo';
 import { loginCondo } from '@/test/factories.auth';
 
-import { applyLogin, signOutIfCondoMissing, useSessionStore } from './session-store';
+import { applyLogin, restoreSession, useSessionStore } from './session-store';
 
 describe('useSessionStore', () => {
   afterEach(() => act(() => useSessionStore.getState().signOut()));
@@ -167,15 +168,51 @@ describe('condo-aware session', () => {
     act(() => useSessionStore.getState().authenticate('admin', null));
     act(() => useCondoScope.getState().setCondo(null));
 
-    signOutIfCondoMissing();
+    restoreSession();
 
     expect(useSessionStore.getState().role).toBeNull();
+  });
+
+  test.each(['administrador', 'sindico'] as const)(
+    'boot as resident without a home corrects a %s to the staff view',
+    (condoRole) => {
+      act(() => useCondoScope.getState().setCondo(testCondo({ condoRole, hasHome: false })));
+      act(() => useSessionStore.getState().authenticate('resident', null));
+
+      restoreSession();
+
+      expect(useSessionStore.getState().role).toBe('admin');
+    },
+  );
+
+  test('boot as resident keeps the resident view of a staff person with a home', () => {
+    act(() =>
+      useCondoScope.getState().setCondo(testCondo({ condoRole: 'sindico', hasHome: true })),
+    );
+    act(() => useSessionStore.getState().authenticate('resident', null));
+
+    restoreSession();
+
+    expect(useSessionStore.getState().role).toBe('resident');
+  });
+
+  test('boot as resident keeps a morador in the resident view', () => {
+    act(() =>
+      useCondoScope
+        .getState()
+        .setCondo(testCondo({ condoRole: 'morador', permissions: [], hasHome: false })),
+    );
+    act(() => useSessionStore.getState().authenticate('resident', null));
+
+    restoreSession();
+
+    expect(useSessionStore.getState().role).toBe('resident');
   });
 
   test('boot with a session and a condo keeps the session', () => {
     applyLogin({ condos: [loginCondo()], emailVerified: true });
 
-    signOutIfCondoMissing();
+    restoreSession();
 
     expect(useSessionStore.getState().role).toBe('admin');
   });

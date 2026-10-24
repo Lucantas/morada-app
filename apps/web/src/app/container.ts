@@ -13,7 +13,7 @@ import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-rep
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
 import { HttpTeamRepository } from '@/features/team/data/http-team-repository';
-import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
+import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
@@ -30,7 +30,7 @@ const apiClient = createApiClient({
 
 const publicApiClient = createApiClient({ baseUrl: apiUrl });
 
-signOutIfCondoMissing();
+restoreSession();
 
 export const authRepository = new HttpAuthRepository({
   api: apiClient,

@@ -61,8 +61,14 @@ export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginRespo
   return first.role;
 }
 
-export function signOutIfCondoMissing(): void {
-  if (useSessionStore.getState().role && !useCondoScope.getState().condo) {
-    useSessionStore.getState().signOut();
+export function restoreSession(): void {
+  const { role, signOut, switchView } = useSessionStore.getState();
+  const { condo } = useCondoScope.getState();
+  if (!role) return;
+  if (!condo) {
+    signOut();
+    return;
   }
+  const isHomelessStaff = !condo.hasHome && condo.condoRole !== 'morador';
+  if (role === 'resident' && isHomelessStaff) switchView('admin');
 }
