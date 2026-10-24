@@ -34,4 +34,26 @@ describe('PostgresActivityRepository — contract', () => {
       );
     },
   );
+
+  test('latest skips rows whose action is unknown instead of failing', async () => {
+    const repo = new PostgresActivityRepository(pool, 'condo-a');
+    await pool.query(
+      `INSERT INTO users (id, username, email, name, password_hash, role)
+       VALUES ('u-1', 'ana', NULL, 'Ana', 'x', 'resident')`,
+    );
+    await repo.record({
+      actorUserId: 'u-1',
+      action: 'account.created',
+      subjectId: 'acc-1',
+      at: new Date('2026-05-01T10:00:00Z'),
+    });
+    await pool.query(
+      `INSERT INTO activity_log (id, condominium_id, actor_user_id, action, subject_id, created_at)
+       VALUES ('legacy-1', 'condo-a', 'u-1', 'acao.removida', NULL, '2026-05-02T10:00:00Z')`,
+    );
+
+    const entries = await repo.latest(10);
+
+    expect(entries.map((e) => e.action)).toEqual(['account.created']);
+  });
 });

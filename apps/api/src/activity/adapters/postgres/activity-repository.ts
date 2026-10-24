@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 
 import {
+  activityActionSchema,
   activityEntrySchema,
   type ActivityEntry,
   type ActivityRecord,
@@ -49,14 +50,16 @@ export class PostgresActivityRepository implements ActivityRepository {
        LIMIT $2`,
       [this.condominiumId, limit],
     );
-    return rows.map((row) =>
-      activityEntrySchema.parse({
-        id: row.id,
-        action: row.action,
-        actorName: row.actor_name,
-        subjectId: row.subject_id,
-        at: row.created_at,
-      }),
-    );
+    return rows
+      .filter((row) => activityActionSchema.safeParse(row.action).success)
+      .map((row) =>
+        activityEntrySchema.parse({
+          id: row.id,
+          action: row.action,
+          actorName: row.actor_name,
+          subjectId: row.subject_id,
+          at: row.created_at,
+        }),
+      );
   }
 }
