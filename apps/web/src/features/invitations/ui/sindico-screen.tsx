@@ -102,7 +102,10 @@ function SindicoPanel({ view, repository }: { view: SindicoView; repository: Rep
         ? invitationErrorMessage(remove.error, { 'not-found': NOT_FOUND_MESSAGE })
         : null;
   const pending = view.invitation?.status === 'pendente' ? view.invitation : null;
-  const expired = view.invitation !== null && view.invitation.status !== 'pendente';
+  const lapsed =
+    view.invitation?.status === 'expirado' || view.invitation?.status === 'revogado'
+      ? view.invitation
+      : null;
 
   return (
     <>
@@ -122,17 +125,15 @@ function SindicoPanel({ view, repository }: { view: SindicoView; repository: Rep
         />
       ) : (
         <>
-          {expired && view.invitation && (
+          {lapsed && (
             <StateCard
-              title={
-                view.invitation.status === 'expirado' ? 'Convite expirado' : 'Convite revogado'
-              }
+              title={lapsed.status === 'expirado' ? 'Convite expirado' : 'Convite revogado'}
             />
           )}
           <InviteForm
             {...FORM_COPY}
-            initialEmail={view.invitation?.email ?? ''}
-            submitLabel={expired ? 'Gerar novo convite' : 'Gerar convite'}
+            initialEmail={lapsed?.email ?? ''}
+            submitLabel={lapsed ? 'Gerar novo convite' : 'Gerar convite'}
             pending={invite.isPending}
             error={null}
             onSubmit={(email, phone) => invite.mutate({ email, phone })}

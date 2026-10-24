@@ -161,6 +161,79 @@ describe('SindicoScreen', () => {
     expect(screen.getByRole('button', { name: 'Gerar novo convite' })).toBeInTheDocument();
   });
 
+  test('an accepted invite shows no state card and offers a fresh invite', async () => {
+    renderSindico(
+      fakeInvitationRepository({
+        sindico: jest.fn().mockResolvedValue({
+          current: CURRENT_SINDICO.current,
+          invitation: { ...PENDING_SINDICO.invitation, status: 'aceito' },
+        }),
+      }),
+    );
+
+    expect(await screen.findByText('Carla Lima')).toBeInTheDocument();
+    expect(screen.queryByText('Convite revogado')).not.toBeInTheDocument();
+    expect(screen.queryByText('Convite expirado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gerar novo convite' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gerar convite' })).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail do síndico')).toHaveValue('');
+  });
+
+  test('an accepted invite after removing the síndico shows no state card', async () => {
+    renderSindico(
+      fakeInvitationRepository({
+        sindico: jest.fn().mockResolvedValue({
+          current: null,
+          invitation: { ...PENDING_SINDICO.invitation, status: 'aceito' },
+        }),
+      }),
+    );
+
+    expect(await screen.findByRole('button', { name: 'Gerar convite' })).toBeInTheDocument();
+    expect(screen.queryByText('Convite revogado')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail do síndico')).toHaveValue('');
+  });
+
+  test('a revoked invite is shown as revoked and offers a new invite', async () => {
+    renderSindico(
+      fakeInvitationRepository({
+        sindico: jest.fn().mockResolvedValue({
+          current: null,
+          invitation: { ...PENDING_SINDICO.invitation, status: 'revogado' },
+        }),
+      }),
+    );
+
+    expect(await screen.findByText('Convite revogado')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gerar novo convite' })).toBeInTheDocument();
+  });
+
+  test('removing the síndico keeps a still-pending invite shown as pending', async () => {
+    const sindico = jest
+      .fn()
+      .mockResolvedValueOnce({
+        current: CURRENT_SINDICO.current,
+        invitation: PENDING_SINDICO.invitation,
+      })
+      .mockResolvedValue({ current: null, invitation: PENDING_SINDICO.invitation });
+    renderSindico(fakeInvitationRepository({ sindico }));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Remover síndico' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover síndico' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Remover síndico' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Convite pendente/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reenviar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revogar' })).toBeInTheDocument();
+    expect(screen.queryByText('Convite revogado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Gerar/ })).not.toBeInTheDocument();
+  });
+
   test('shows an error state when loading fails', async () => {
     renderSindico(
       fakeInvitationRepository({ sindico: jest.fn().mockRejectedValue(new Error('x')) }),
