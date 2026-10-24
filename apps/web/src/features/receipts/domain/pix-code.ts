@@ -15,12 +15,33 @@ export interface BrCodeInput {
   readonly txid?: string;
 }
 
+const MAX_FIELD_LENGTH = 99;
+const MAX_NAME_LENGTH = 25;
+const MAX_CITY_LENGTH = 15;
+const NON_PRINTABLE_ASCII = /[^\x20-\x7E]/g;
+const PRINTABLE_ASCII = /^[\x20-\x7E]*$/;
+
 function field(id: string, value: string): string {
+  if (value.length > MAX_FIELD_LENGTH) throw new Error(`Pix field ${id} is too long`);
   return `${id}${String(value.length).padStart(2, '0')}${value}`;
 }
 
-function stripDiacritics(text: string): string {
-  return text.normalize('NFD').replace(COMBINING_MARKS, '');
+function sanitizeText(text: string, maxLength: number): string {
+  return text
+    .normalize('NFD')
+    .replace(COMBINING_MARKS, '')
+    .replace(/º/g, 'o')
+    .replace(/ª/g, 'a')
+    .replace(NON_PRINTABLE_ASCII, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength)
+    .trim();
+}
+
+function requireAscii(value: string, name: string): string {
+  if (!PRINTABLE_ASCII.test(value)) throw new Error(`Pix ${name} must be printable ASCII`);
+  return value;
 }
 
 function crc16(payload: string): string {
@@ -42,14 +63,14 @@ export function brCode(input: BrCodeInput): string {
       : '';
   const payload = [
     field('00', '01'),
-    field('26', field('00', GUI) + field('01', input.key)),
+    field('26', field('00', GUI) + field('01', requireAscii(input.key, 'key'))),
     field('52', '0000'),
     field('53', '986'),
     amount,
     field('58', 'BR'),
-    field('59', stripDiacritics(input.receiverName)),
-    field('60', stripDiacritics(input.city)),
-    field('62', field('05', input.txid ?? DEFAULT_TXID)),
+    field('59', sanitizeText(input.receiverName, MAX_NAME_LENGTH)),
+    field('60', sanitizeText(input.city, MAX_CITY_LENGTH)),
+    field('62', field('05', requireAscii(input.txid ?? DEFAULT_TXID, 'txid'))),
     '6304',
   ].join('');
   return payload + crc16(payload);
