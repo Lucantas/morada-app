@@ -21,6 +21,10 @@ export class InMemorySettingsRepository implements SettingsRepository {
     this.current = condoSettingsSchema.parse({
       ...settings,
       pix: settings.pix === undefined ? this.current.pix : settings.pix,
+      openingBalance:
+        settings.openingBalance === undefined
+          ? this.current.openingBalance
+          : settings.openingBalance,
     });
     return this.current;
   }

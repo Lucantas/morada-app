@@ -37,3 +37,5 @@ export function countApartments(building: Building): number {
   );
   return placed + building.unplaced.length;
 }
+
+export const buildingQueryKey = (condoId: string) => ['building', condoId] as const;

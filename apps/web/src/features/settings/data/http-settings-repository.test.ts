@@ -14,7 +14,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
 
 describe('HttpSettingsRepository', () => {
   test('get parses the GET /api/settings response', async () => {
-    const settings = { monthlyFeeCents: 15000, dueDay: 15, pix: null };
+    const settings = { monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null };
     const api = fakeApi({ get: jest.fn().mockResolvedValue(settings) });
 
     const result = await new HttpSettingsRepository(api).get();
@@ -24,7 +24,7 @@ describe('HttpSettingsRepository', () => {
   });
 
   test('save PUTs to /api/settings and parses the response', async () => {
-    const settings = { monthlyFeeCents: 20000, dueDay: 10, pix: null };
+    const settings = { monthlyFeeCents: 20000, dueDay: 10, pix: null, openingBalance: null };
     const api = fakeApi({ put: jest.fn().mockResolvedValue(settings) });
 
     const result = await new HttpSettingsRepository(api).save(settings);
@@ -66,5 +66,37 @@ describe('HttpSettingsRepository pix', () => {
     expect(put.mock.calls[0]?.[1]).not.toHaveProperty('pix');
     expect(put.mock.calls[1]?.[1]).toEqual({ monthlyFeeCents: 1, dueDay: 2, pix: null });
     expect(put.mock.calls[2]?.[1]).toEqual({ monthlyFeeCents: 1, dueDay: 2, pix });
+  });
+});
+
+describe('HttpSettingsRepository opening balance', () => {
+  test('get defaults the opening balance to null and parses a stored one', async () => {
+    const opening = { valueCents: 1_578_000, date: '2026-10-27' };
+    const withOpening = fakeApi({
+      get: jest.fn().mockResolvedValue({ monthlyFeeCents: 1, dueDay: 2, openingBalance: opening }),
+    });
+    const without = fakeApi({
+      get: jest.fn().mockResolvedValue({ monthlyFeeCents: 1, dueDay: 2 }),
+    });
+
+    expect((await new HttpSettingsRepository(withOpening).get()).openingBalance).toEqual(opening);
+    expect((await new HttpSettingsRepository(without).get()).openingBalance).toBeNull();
+  });
+
+  test('save sends the opening balance', async () => {
+    const opening = { valueCents: 0, date: '2026-10-27' };
+    const put = jest.fn().mockResolvedValue({ monthlyFeeCents: 1, dueDay: 2 });
+
+    await new HttpSettingsRepository(fakeApi({ put })).save({
+      monthlyFeeCents: 1,
+      dueDay: 2,
+      openingBalance: opening,
+    });
+
+    expect(put).toHaveBeenCalledWith('/api/settings', {
+      monthlyFeeCents: 1,
+      dueDay: 2,
+      openingBalance: opening,
+    });
   });
 });

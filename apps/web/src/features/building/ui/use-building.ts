@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
+import { buildingQueryKey } from '../domain/building';
 import type { BuildingRepository } from '../domain/building-repository';
 
-export const buildingQueryKey = (condoId: string) => ['building', condoId] as const;
+export { buildingQueryKey };
 
 export function useBuilding(repository: BuildingRepository) {
   const condoId = useCondoScope((state) => state.condo?.id ?? null);

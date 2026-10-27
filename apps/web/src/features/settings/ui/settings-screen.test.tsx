@@ -247,7 +247,12 @@ describe('SettingsScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
 
     await waitFor(() =>
-      expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15, pix: null }),
+      expect(repo.snapshot()).toEqual({
+        monthlyFeeCents: 20000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      }),
     );
   });
 

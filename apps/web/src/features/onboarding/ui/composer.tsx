@@ -20,18 +20,27 @@ type Send = (input: AnswerInput) => void;
 const LATER = 'Depois eu vejo';
 const DEFAULT_DUE_DAY = '10';
 
-export function Chip({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+export function Chip({
+  children,
+  onClick,
+  pressed,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  pressed?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={pressed}
       style={{
         minHeight: 44,
         padding: '0 16px',
-        border: '1.5px solid var(--petrol-100)',
+        border: `1.5px solid ${pressed ? 'var(--petrol-700)' : 'var(--petrol-100)'}`,
         borderRadius: 999,
-        background: 'var(--petrol-50)',
-        color: 'var(--petrol-700)',
+        background: pressed ? 'var(--petrol-700)' : 'var(--petrol-50)',
+        color: pressed ? 'var(--surface)' : 'var(--petrol-700)',
         fontFamily: "'Inter', sans-serif",
         fontWeight: 600,
         fontSize: '.95rem',
@@ -43,7 +52,7 @@ export function Chip({ children, onClick }: { children: ReactNode; onClick: () =
   );
 }
 
-function ChipRow({ children }: { children: ReactNode }) {
+export function ChipRow({ children }: { children: ReactNode }) {
   return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{children}</div>;
 }
 

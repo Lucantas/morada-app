@@ -3,7 +3,7 @@ import type { AccountRepository } from './account-repository';
 import { AccountValidationError } from './errors';
 
 export async function saveAccount(
-  repository: AccountRepository,
+  repository: Pick<AccountRepository, 'save'>,
   draft: AccountDraft,
 ): Promise<Account> {
   const parsedDraft = accountDraftSchema.safeParse(draft);

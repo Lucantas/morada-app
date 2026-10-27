@@ -25,6 +25,9 @@ import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { InviteForm } from '@/features/invitations/ui/invite-form';
 import { clearDraft } from '@/features/onboarding/data/local-draft-store';
+import { OnboardingFlow } from '@/features/onboarding/ui/onboarding-flow';
+import { BuildingView } from '@/features/building/ui/building-view';
+import { ResidentAccessCard } from '@/features/invitations/ui/resident-access-card';
 import { InviteShare } from '@/features/invitations/ui/invite-share';
 import { SindicoScreen } from '@/features/invitations/ui/sindico-screen';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
@@ -46,6 +49,7 @@ import { StatusView } from '@/shared/ui/status-view';
 import {
   accountRepository,
   activityRepository,
+  buildingRepository,
   categoryRepository,
   condoInfoRepository,
   confirmPayment,
@@ -57,6 +61,7 @@ import {
   issueCharge,
   logout,
   noticeRepository,
+  onboardingRepository,
   overrideResidentStatus,
   pixRepository,
   receiptRepository,
@@ -136,6 +141,8 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   const go = useNavStore((s) => s.go);
   const queryClient = useQueryClient();
   const switchView = useSessionStore((s) => s.switchView);
+  const onboardingPending = useCondoScope((s) => s.condo?.onboardingPending ?? false);
+  const canManageCondo = useCanDo('manage_condo');
 
   const handleSwitch = useCallback(
     (next: Role) => {
@@ -147,6 +154,9 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   );
   const headerAction = <ViewSwitch onSwitch={handleSwitch} />;
 
+  if (role === 'admin' && onboardingPending && canManageCondo) {
+    return <AdminOnboarding onDone={() => go('a-home')} />;
+  }
   if (role === 'admin') {
     return (
       <AdminRouter
@@ -167,6 +177,23 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
       go={go}
       signOut={signOut}
       headerAction={headerAction}
+    />
+  );
+}
+
+function AdminOnboarding({ onDone }: { onDone: () => void }) {
+  return (
+    <OnboardingFlow
+      building={buildingRepository}
+      categories={categoryRepository}
+      accounts={accountRepository}
+      settings={settingsRepository}
+      residents={residentRepository}
+      invitations={invitationRepository}
+      onboarding={onboardingRepository}
+      onDone={onDone}
+      buildingView={BuildingView}
+      accessCard={ResidentAccessCard}
     />
   );
 }
