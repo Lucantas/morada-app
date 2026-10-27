@@ -41,6 +41,15 @@ function totalCategory(categories: readonly string[]): string {
   return categories.includes(TOTAL_CATEGORY) ? TOTAL_CATEGORY : (categories[0] ?? TOTAL_CATEGORY);
 }
 
+function savedCategories(selected: readonly string[], accounts: GroundAccount[]): string[] {
+  const missing = accounts
+    .map((account) => account.category)
+    .filter(
+      (category, index, all) => !selected.includes(category) && all.indexOf(category) === index,
+    );
+  return [...selected, ...missing];
+}
+
 function spendAccounts(input: GroundInput, month: string): GroundAccount[] {
   const { spend } = input;
   if (spend.kind === 'none') return [];
@@ -69,8 +78,9 @@ function spendAccounts(input: GroundInput, month: string): GroundAccount[] {
 export function planGround(input: GroundInput, current: string[], today: string): GroundPlan {
   const accounts = spendAccounts(input, formatMonthName(today));
   const spendTotal = accounts.reduce((sum, account) => sum + account.valueCents, 0);
+  const names = savedCategories(input.categories, accounts);
   return {
-    categories: sameNames(input.categories, current) ? null : [...input.categories],
+    categories: sameNames(names, current) ? null : names,
     accounts,
     openingBalance:
       input.cashCents === null

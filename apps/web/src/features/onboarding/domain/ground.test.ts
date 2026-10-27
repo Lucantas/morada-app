@@ -50,6 +50,19 @@ describe('planGround', () => {
     ]);
   });
 
+  test('a total with every category deselected keeps Serviços in the saved list', () => {
+    const plan = planGround(
+      input({ categories: [], spend: { kind: 'total', cents: 1000 } }),
+      CURRENT,
+      TODAY,
+    );
+
+    expect(plan.accounts).toEqual([
+      { slot: 'total', description: 'Gastos de outubro', category: 'Serviços', valueCents: 1000 },
+    ]);
+    expect(plan.categories).toEqual(['Serviços']);
+  });
+
   test('a zero total creates no account', () => {
     const plan = planGround(input({ spend: { kind: 'total', cents: 0 } }), CURRENT, TODAY);
 
