@@ -3878,3 +3878,156 @@ describe('Organization team', () => {
     ]);
   });
 });
+
+describe('Building view and apartment management', () => {
+  const jsonBody = (method: string, body: unknown): RequestInit => ({
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  async function adminRequest(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: {
+          ...(init.headers ?? {}),
+          Cookie: auth.cookie,
+          'X-CSRF-Token': auth.csrf,
+        },
+      });
+  }
+
+  test('GET building draws the seeded apartments with their occupants', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+
+    const res = await request(`${P}/building`);
+    const body = (await res.json()) as {
+      blocks: { name: string | null; floors: { floor: number }[] }[];
+      unplaced: unknown[];
+    };
+
+    expect(res.status).toBe(200);
+    const floors = body.blocks.flatMap((b) => b.floors.map((f) => f.floor));
+    expect(floors).toEqual([...floors].sort((a, b) => b - a));
+    expect(JSON.stringify(body)).toContain('Maria Ribeiro');
+  });
+
+  test('administrador adds, renames and deactivates an apartment', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+
+    const created = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: 'Apto 801', block: null, floor: 8 }),
+    );
+    const apartment = (await created.json()) as { id: string; label: string };
+    const renamed = await request(
+      `${P}/building/apartments/${apartment.id}`,
+      jsonBody('PUT', { label: 'Cobertura' }),
+    );
+    const duplicate = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: 'Cobertura', block: null, floor: 8 }),
+    );
+    const invalid = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: '', block: null, floor: 8 }),
+    );
+    const deactivated = await request(`${P}/building/apartments/${apartment.id}/deactivate`, {
+      method: 'POST',
+    });
+
+    expect(created.status).toBe(201);
+    expect(renamed.status).toBe(200);
+    expect(((await renamed.json()) as { label: string }).label).toBe('Cobertura');
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toEqual({ error: 'Já existe um apartamento com esse nome' });
+    expect(invalid.status).toBe(400);
+    expect(deactivated.status).toBe(204);
+  });
+
+  test('deactivating an apartment with an active resident answers 409', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+    const resident = await makePostgresRepositories(pool)
+      .forCondo(TEST_CONDO_ID)
+      .residents.getById('r-1');
+
+    const res = await request(`${P}/building/apartments/${resident?.apartmentId}/deactivate`, {
+      method: 'POST',
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Apartamento com morador ativo' });
+  });
+
+  test('GET building isolates condos', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const foreign = await makePostgresRepositories(pool)
+      .forCondo('condo-other')
+      .building.add({ label: 'Apto 900', block: null, floor: 9 });
+    const request = await adminRequest(app);
+
+    const rename = await request(
+      `${P}/building/apartments/${foreign.id}`,
+      jsonBody('PUT', { label: 'Invadido' }),
+    );
+    const deactivate = await request(`${P}/building/apartments/${foreign.id}/deactivate`, {
+      method: 'POST',
+    });
+    const list = await request(`${P}/building`);
+
+    expect(rename.status).toBe(404);
+    expect(await rename.json()).toEqual({ error: 'Apartamento não encontrado' });
+    expect(deactivate.status).toBe(404);
+    expect(JSON.stringify(await list.json())).not.toContain('Apto 900');
+  });
+
+  test('sindico sees the building but cannot change it', async () => {
+    const app = await makeApp();
+    const hasher = new BcryptPasswordHasher(config.bcryptCost);
+    await new PostgresUserRepository(pool).save({
+      id: 'u-sindico-b',
+      username: 'sindico-b',
+      email: null,
+      name: 'Síndica',
+      passwordHash: await hasher.hash('senha-sindico-1'),
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
+    });
+    await pool.query(
+      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+       VALUES ('role-sindico-b', $1, 'u-sindico-b', 'sindico', NULL)`,
+      [TEST_CONDO_ID],
+    );
+    const auth = await authFor(app, { username: 'sindico-b', password: 'senha-sindico-1' });
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/building`, { headers });
+    const create = await app.request(`${P}/building/apartments`, {
+      ...jsonBody('POST', { label: 'Apto 901', block: null, floor: 9 }),
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+
+    expect(read.status).toBe(200);
+    expect(create.status).toBe(403);
+    expect(await create.json()).toEqual({ error: 'Acesso negado' });
+  });
+
+  test('a resident cannot read the building', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, residentCredentials);
+
+    const res = await app.request(`${P}/building`, {
+      headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+    });
+
+    expect(res.status).toBe(403);
+  });
+});
