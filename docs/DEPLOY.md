@@ -368,6 +368,17 @@ so do not roll back to it; restore the pre-deploy database dump instead.
 Manual `wrangler pages deploy` runs leave `.wrangler/` bundles at the repo root; the
 directory is git-ignored.
 
+## Building and onboarding release
+
+Migration `027_building` is additive: it adds `apartments.block/floor/position/active`
+(existing apartments are placed by the `Apto <n>` rule and stay `active`), the opening
+balance columns on `condo_settings` (null) and `condominiums.onboarded_at`. Existing
+condominiums are backfilled with `now()`, so no one already in production sees the
+onboarding. The Fly `release_command` applies it on the next deploy; no new secrets.
+
+Take the usual Neon `pg_dump` before merging (see Database backup & restore); rollback is
+restoring that dump.
+
 ## Verify
 
 ```bash
