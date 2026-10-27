@@ -7,6 +7,7 @@ import { recordActivity } from './activity/adapters/http/record-activity';
 import { activityRoutes } from './activity/adapters/http/routes';
 import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
+import { onboardingRoutes } from './condos/adapters/http/onboarding-routes';
 import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
 import { listMyCondos, resolveCondoAccess } from './condos/app/condo-access-views';
 import { dashboardRoutes } from './dashboard/adapters/http/routes';
@@ -163,6 +164,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   }
 
   api.route('/info', condoInfoRoutes(condos));
+  api.route('/onboarding', onboardingRoutes(condos));
   api.route('/activity', activityRoutes(scoped(({ activity }) => ({ activity }))));
 
   // Residents router self-guards per-route: '/me' is resident-accessible,

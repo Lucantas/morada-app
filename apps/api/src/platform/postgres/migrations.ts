@@ -489,9 +489,13 @@ ALTER TABLE apartments ADD COLUMN floor INTEGER;
 ALTER TABLE apartments ADD COLUMN position INTEGER;
 ALTER TABLE apartments ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
 UPDATE apartments
-SET floor = substring(label from 6)::integer / 100,
-    position = substring(label from 6)::integer % 100
-WHERE label ~ '^Apto [0-9]{3,9}$' AND substring(label from 6)::integer >= 100;
+SET floor = placed.number / 100,
+    position = placed.number % 100
+FROM (
+  SELECT id, CASE WHEN label ~ '^Apto [0-9]{3,9}$' THEN substring(label from 6)::integer END AS number
+  FROM apartments
+) placed
+WHERE apartments.id = placed.id AND placed.number >= 100;
 ALTER TABLE condo_settings ADD COLUMN opening_balance_cents INTEGER;
 ALTER TABLE condo_settings ADD COLUMN opening_balance_date DATE;
 ALTER TABLE condo_settings ADD CONSTRAINT condo_settings_opening_all_or_none CHECK (

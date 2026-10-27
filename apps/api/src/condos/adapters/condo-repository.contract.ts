@@ -163,6 +163,7 @@ export function runCondoRepositoryContract(
           residentId: null,
           organizationId: 'org-condo-a',
           orgRole: null,
+          onboardingPending: false,
         },
       ]);
     });
@@ -199,6 +200,7 @@ export function runCondoRepositoryContract(
           residentId: null,
           organizationId: org.id,
           orgRole: 'owner',
+          onboardingPending: true,
         },
         {
           condominiumId: ipe.id,
@@ -207,6 +209,7 @@ export function runCondoRepositoryContract(
           residentId: null,
           organizationId: org.id,
           orgRole: 'owner',
+          onboardingPending: true,
         },
       ]);
       expect(await repo.accessFor('u-owner', 'condo-other')).toBeNull();
@@ -290,6 +293,7 @@ export function runCondoRepositoryContract(
         residentId: 'r-lucia',
         organizationId: 'org-condo-a',
         orgRole: null,
+        onboardingPending: false,
       });
 
       await pool.query("UPDATE apartment_residents SET active = FALSE WHERE id = 'occ-r-lucia'");
@@ -334,6 +338,7 @@ export function runCondoRepositoryContract(
         residentId: 'r-1',
         organizationId: 'org-condo-a',
         orgRole: null,
+        onboardingPending: false,
       };
       expect(await repo.accessFor('u-1', 'condo-a')).toEqual(expected);
       expect(await repo.listForUser('u-1')).toEqual([expected]);
@@ -432,6 +437,7 @@ export function runCondoRepositoryContract(
         residentId: null,
         organizationId: 'org-condo-a',
         orgRole: 'member',
+        onboardingPending: false,
       });
     });
 
@@ -454,6 +460,7 @@ export function runCondoRepositoryContract(
       expect(await repo.accessFor('u-1', 'condo-a')).toMatchObject({
         role: 'morador',
         orgRole: null,
+        onboardingPending: false,
       });
     });
 
@@ -810,6 +817,40 @@ export function runCondoRepositoryContract(
       await pool.query('UPDATE organizations SET active = FALSE WHERE id = $1', [org.id]);
       expect(await repo.getOrganization(org.id)).toBeNull();
       expect(await repo.getOrganization('org-missing')).toBeNull();
+    });
+
+    test('completeOnboarding stamps a new condominium once and is a no-op afterwards', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+      const condo = await repo.create({
+        organizationId: org.id,
+        name: 'Ipê',
+        monthlyFeeCents: 0,
+        dueDay: 10,
+        pix: null,
+        apartments: [],
+      });
+      await repo.grant({
+        condominiumId: condo.id,
+        userId: 'u-owner',
+        role: 'administrador',
+        residentId: null,
+      });
+      const stamp = async () =>
+        (await pool.query('SELECT onboarded_at FROM condominiums WHERE id = $1', [condo.id]))
+          .rows[0]?.onboarded_at as Date | null;
+      const pendingBefore = (await repo.accessFor('u-owner', condo.id))?.onboardingPending;
+
+      await repo.completeOnboarding(condo.id);
+      const first = await stamp();
+      await repo.completeOnboarding(condo.id);
+      const second = await stamp();
+
+      expect(pendingBefore).toBe(true);
+      expect(first).toBeInstanceOf(Date);
+      expect(second).toEqual(first);
+      expect((await repo.accessFor('u-owner', condo.id))?.onboardingPending).toBe(false);
     });
   });
 }

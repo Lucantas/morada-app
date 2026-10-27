@@ -77,6 +77,7 @@ export async function createMyCondominium(
       residentId: null,
       organizationId: organization.id,
       orgRole,
+      onboardingPending: true,
     },
     'admin',
   );

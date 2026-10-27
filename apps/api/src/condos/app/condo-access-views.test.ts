@@ -20,6 +20,7 @@ const access = (overrides: Partial<CondoAccess>): CondoAccess => ({
   residentId: null,
   organizationId: 'org-1',
   orgRole: null,
+  onboardingPending: false,
   ...overrides,
 });
 
@@ -46,6 +47,7 @@ describe('listMyCondos', () => {
         hasHome: false,
         organizationId: 'org-1',
         orgRole: 'owner',
+        onboardingPending: false,
       },
       {
         id: 'c-2',
@@ -56,6 +58,7 @@ describe('listMyCondos', () => {
         hasHome: false,
         organizationId: 'org-2',
         orgRole: null,
+        onboardingPending: false,
       },
       {
         id: 'c-3',
@@ -66,6 +69,7 @@ describe('listMyCondos', () => {
         hasHome: false,
         organizationId: 'org-1',
         orgRole: null,
+        onboardingPending: false,
       },
     ]);
   });
@@ -79,6 +83,18 @@ describe('listMyCondos', () => {
 
     expect(summary).toMatchObject({ role: 'admin', condoRole: 'sindico', hasHome: true });
     expect(summary?.permissions).toHaveLength(4);
+  });
+});
+
+describe('onboarding flag', () => {
+  test('a summary carries a pending onboarding', async () => {
+    const condos = {
+      listForUser: async () => [access({ onboardingPending: true })],
+    };
+
+    const [summary] = await listMyCondos(condos, 'u-1');
+
+    expect(summary?.onboardingPending).toBe(true);
   });
 });
 

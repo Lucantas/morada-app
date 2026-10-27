@@ -7,6 +7,7 @@ const grant = (overrides: Partial<CondoAccess>): CondoAccess => ({
   residentId: null,
   organizationId: 'org-a',
   orgRole: null,
+  onboardingPending: false,
   ...overrides,
 });
 

@@ -28,13 +28,15 @@ const DEFAULT_CATEGORIES = [
 
 const GRANTS_SQL = `
   SELECT c.id AS condominium_id, c.name, 'administrador' AS role, NULL AS resident_id,
-    c.organization_id, 'owner' AS org_role
+    c.organization_id, 'owner' AS org_role,
+    c.onboarded_at IS NULL AS onboarding_pending
   FROM condominiums c
   JOIN organizations o ON o.id = c.organization_id AND o.active
   JOIN organization_members m ON m.organization_id = c.organization_id
   WHERE m.user_id = $1 AND m.active AND m.role = 'owner' AND c.active
   UNION ALL
-  SELECT c.id, c.name, r.role, r.resident_id, c.organization_id, om.role
+  SELECT c.id, c.name, r.role, r.resident_id, c.organization_id, om.role,
+    c.onboarded_at IS NULL
   FROM condo_roles r
   JOIN condominiums c ON c.id = r.condominium_id
   JOIN organizations o ON o.id = c.organization_id AND o.active
@@ -71,6 +73,7 @@ const grantRowSchema = z.object({
   resident_id: z.string().nullable(),
   organization_id: z.string(),
   org_role: z.enum(['owner', 'member']).nullable(),
+  onboarding_pending: z.boolean(),
 });
 
 const condoRowSchema = z.object({
@@ -127,6 +130,7 @@ function toAccess(row: unknown): CondoAccess {
     residentId: parsed.resident_id,
     organizationId: parsed.organization_id,
     orgRole: parsed.org_role,
+    onboardingPending: parsed.onboarding_pending,
   };
 }
 
@@ -171,6 +175,13 @@ export class PostgresCondoRepository implements CondoRepository {
     );
     if (!rows[0]) throw new CondoNotFoundError();
     return toCondominium(rows[0]);
+  }
+
+  async completeOnboarding(condominiumId: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE condominiums SET onboarded_at = now() WHERE id = $1 AND onboarded_at IS NULL',
+      [condominiumId],
+    );
   }
 
   async create(input: CreateCondominiumInput): Promise<Condominium> {

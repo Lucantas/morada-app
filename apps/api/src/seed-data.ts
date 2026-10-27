@@ -63,6 +63,7 @@ async function ensureAdminCondominium(condos: CondoRepository): Promise<void> {
     role: 'administrador',
     residentId: null,
   });
+  await condos.completeOnboarding(condominium.id);
 }
 
 export async function seedAdmin(

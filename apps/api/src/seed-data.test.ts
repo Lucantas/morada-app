@@ -41,12 +41,14 @@ interface FakeCondos extends CondoRepository {
   organizations: { id: string; name: string; ownerUserId: string }[];
   condominiums: (Condominium & { monthlyFeeCents: number; dueDay: number })[];
   grants: CondoGrant[];
+  completed: string[];
 }
 
 function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
   const organizations: FakeCondos['organizations'] = [];
   const condominiums: FakeCondos['condominiums'] = [];
   const grants: CondoGrant[] = [];
+  const completed: string[] = [];
   const accessOf = (grant: CondoGrant): CondoAccess => ({
     condominiumId: grant.condominiumId,
     name: condominiums.find((c) => c.id === grant.condominiumId)?.name ?? '',
@@ -54,11 +56,16 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     residentId: grant.residentId,
     organizationId: condominiums.find((c) => c.id === grant.condominiumId)?.organizationId ?? '',
     orgRole: null,
+    onboardingPending: !completed.includes(grant.condominiumId),
   });
   return {
     organizations,
     condominiums,
     grants,
+    completed,
+    completeOnboarding: async (id) => {
+      completed.push(id);
+    },
     listForUser: async (userId) => [
       ...initial,
       ...grants.filter((g) => g.userId === userId).map(accessOf),
@@ -227,6 +234,14 @@ describe('seedAdmin', () => {
     ]);
   });
 
+  test('the demo condominium is born onboarded', async () => {
+    const condos = fakeCondos();
+
+    await seedAdmin(fakeRepo([]), condos, noopHasher);
+
+    expect(condos.completed).toEqual(['condo-1']);
+  });
+
   test('does not seed a demo condominium when the admin already administers one', async () => {
     const existingAdmin: User = {
       id: 'u-admin',
@@ -247,6 +262,7 @@ describe('seedAdmin', () => {
         residentId: null,
         organizationId: 'org-legacy',
         orgRole: 'owner',
+        onboardingPending: false,
       },
     ]);
 

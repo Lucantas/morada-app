@@ -63,6 +63,7 @@ describe('createMyCondominium', () => {
       hasHome: false,
       organizationId: 'org-new',
       orgRole: 'owner',
+      onboardingPending: true,
     });
     expect(calls).toEqual([
       'org:Residencial Ipê:u-1',

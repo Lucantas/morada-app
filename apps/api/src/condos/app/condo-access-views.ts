@@ -14,6 +14,7 @@ export type CondoSummary = {
   hasHome: boolean;
   organizationId: string;
   orgRole: OrgRoleName | null;
+  onboardingPending: boolean;
 };
 
 function viewFor(
@@ -50,6 +51,7 @@ export function summaryOf(access: CondoAccess, role: Role): CondoSummary {
     hasHome: isStaff(access.role) && access.residentId !== null,
     organizationId: access.organizationId,
     orgRole: access.orgRole,
+    onboardingPending: access.onboardingPending,
   };
 }
 

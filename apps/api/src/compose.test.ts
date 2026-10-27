@@ -39,6 +39,7 @@ const ADMIN_SUMMARY = {
   hasHome: false,
   organizationId: `org-${TEST_CONDO_ID}`,
   orgRole: 'owner',
+  onboardingPending: false,
 };
 
 const RESIDENT_SUMMARY = {
@@ -50,6 +51,7 @@ const RESIDENT_SUMMARY = {
   hasHome: false,
   organizationId: `org-${TEST_CONDO_ID}`,
   orgRole: null,
+  onboardingPending: false,
 };
 
 const pool = createPool(config.databaseUrl);
@@ -993,6 +995,35 @@ describe('Morada API — real credentials', () => {
         city: 'Sao Paulo',
       },
     });
+  });
+
+  test('new condo is pending until completed', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const complete = (id: string) =>
+      app.request(`/api/condos/${id}/onboarding/complete`, {
+        method: 'POST',
+        headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+      });
+    const listed = async () =>
+      (await (await app.request('/me/condos', { headers: { Cookie: auth.cookie } })).json()) as {
+        onboardingPending: boolean;
+      }[];
+
+    const created = (await (await createCondo(app, auth, { name: 'Ipê' })).json()) as {
+      id: string;
+      onboardingPending: boolean;
+    };
+    const pendingBefore = await listed();
+    const first = await complete(created.id);
+    const pendingAfter = await listed();
+    const second = await complete(created.id);
+
+    expect(created.onboardingPending).toBe(true);
+    expect(pendingBefore[0]?.onboardingPending).toBe(true);
+    expect(first.status).toBe(204);
+    expect(pendingAfter[0]?.onboardingPending).toBe(false);
+    expect(second.status).toBe(204);
   });
 
   test('a second condominium reuses the same organization', async () => {
@@ -3063,6 +3094,14 @@ describe('Síndico access', () => {
     body: JSON.stringify(body),
   });
 
+  test('sindico cannot complete onboarding', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(`${P}/onboarding/complete`, { method: 'POST' });
+
+    expect(res.status).toBe(403);
+  });
+
   test('sindico cannot manage fees or condo', async () => {
     const { request } = await sindicoApp();
 
@@ -3193,6 +3232,7 @@ describe('Síndico access', () => {
         hasHome: true,
         organizationId: `org-${TEST_CONDO_ID}`,
         orgRole: null,
+        onboardingPending: false,
       },
     ]);
   });
