@@ -3941,6 +3941,39 @@ describe('Building view and apartment management', () => {
     expect(JSON.stringify(body)).toContain('Maria Ribeiro');
   });
 
+  test('GET building colours windows by the derived status and the admin override', async () => {
+    const app = await makeApp();
+    const repos = makePostgresRepositories(pool).forCondo(TEST_CONDO_ID);
+    await repos.receipts.save({
+      id: 'rc-future',
+      ref: '12/2099',
+      title: 'Taxa condominial',
+      dueDate: '2099-12-10',
+      valueCents: 45000,
+      status: 'pendente',
+      residentId: 'r-2',
+      apartmentId: 'apt-r-2',
+    });
+    await repos.residents.setStatusOverride('r-4', 'atrasado');
+    const request = await adminRequest(app);
+
+    const res = await request(`${P}/building`);
+    type Window = { residentId: string | null; state: string };
+    const body = (await res.json()) as {
+      blocks: { floors: { apartments: Window[] }[] }[];
+      unplaced: Window[];
+    };
+    const stateOf = (residentId: string) =>
+      [...body.blocks.flatMap((b) => b.floors.flatMap((f) => f.apartments)), ...body.unplaced].find(
+        (a) => a.residentId === residentId,
+      )?.state;
+
+    expect(stateOf('r-1')).toBe('atrasado');
+    expect(stateOf('r-2')).toBe('pendente');
+    expect(stateOf('r-5')).toBe('ocupado');
+    expect(stateOf('r-4')).toBe('atrasado');
+  });
+
   test('administrador adds, renames and deactivates an apartment', async () => {
     const app = await makeApp();
     const request = await adminRequest(app);

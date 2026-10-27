@@ -168,7 +168,9 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   api.route('/onboarding', onboardingRoutes(condos));
   api.route(
     '/building',
-    buildingRoutes(scoped(({ building, residents }) => ({ building, residents }))),
+    buildingRoutes(
+      scoped(({ building, residents, receipts }) => ({ building, residents, receipts })),
+    ),
   );
   api.route('/activity', activityRoutes(scoped(({ activity }) => ({ activity }))));
 
