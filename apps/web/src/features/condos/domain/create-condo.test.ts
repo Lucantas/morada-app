@@ -26,6 +26,17 @@ describe('createCondoInputSchema', () => {
     );
   });
 
+  test('drops a leading "Bloco " from block names', () => {
+    const blocks = [
+      { ...BLOCK, name: 'Bloco A' },
+      { ...BLOCK, name: 'bloco B' },
+    ];
+
+    const parsed = createCondoInputSchema.parse({ name: 'Ipê', structure: { blocks } });
+
+    expect(parsed.structure?.blocks.map((block) => block.name)).toEqual(['A', 'B']);
+  });
+
   test('rejects block names that differ only by case', () => {
     const blocks = [
       { ...BLOCK, name: 'a' },

@@ -11,6 +11,7 @@ import {
   MAX_PER_FLOOR,
   apartmentCount,
   createCondoInputSchema,
+  normalizeBlockName,
   type Block,
   type CreateCondoInput,
 } from '@/features/condos/domain/create-condo';
@@ -154,7 +155,7 @@ function answerBlockCount(count: number): Answer | string {
 function answerBlockNames(raw: string, expected: number): Answer | string {
   const names = raw
     .split(',')
-    .map((name) => name.trim())
+    .map(normalizeBlockName)
     .filter((name) => name !== '');
   if (names.length !== expected) return `Informe ${expected} nomes, separados por vírgula.`;
   if (names.some((name) => name.length > MAX_BLOCK_NAME)) return 'Use até 30 caracteres por nome.';

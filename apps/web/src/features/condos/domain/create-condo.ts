@@ -13,8 +13,18 @@ export const MAX_MONTHLY_FEE_CENTS = 1_000_000_000;
 export const MAX_DUE_DAY = 28;
 export const DEFAULT_DUE_DAY = 10;
 
+const BLOCK_PREFIX = /^bloco\s+/i;
+
+export function normalizeBlockName(name: string): string {
+  return name.trim().replace(BLOCK_PREFIX, '');
+}
+
 export const blockSchema = z.object({
-  name: z.string().trim().min(1).max(MAX_BLOCK_NAME).nullable(),
+  name: z
+    .string()
+    .transform(normalizeBlockName)
+    .pipe(z.string().min(1).max(MAX_BLOCK_NAME))
+    .nullable(),
   floors: z.number().int().min(1).max(MAX_FLOORS),
   perFloor: z.number().int().min(1).max(MAX_PER_FLOOR),
 });

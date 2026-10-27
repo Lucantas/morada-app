@@ -233,6 +233,32 @@ describe('conversation', () => {
     );
   });
 
+  test('drops a leading "Bloco " from block names', () => {
+    const state = play([
+      ...TWO_BLOCKS.slice(0, 3),
+      { question: 'blockNames', names: 'Bloco A, bloco B' },
+      { question: 'sameShape', same: true },
+      { question: 'shape', floors: 2, perFloor: 2 },
+      { question: 'fee', fee: null },
+      { question: 'pix', draft: null },
+    ]);
+
+    expect(toCreateCondoInput(state).structure?.blocks.map((block) => block.name)).toEqual([
+      'A',
+      'B',
+    ]);
+    expect(
+      errorOf(play(TWO_BLOCKS.slice(0, 3)), { question: 'blockNames', names: 'Bloco A, A' }),
+    ).toBe('Os blocos precisam de nomes diferentes.');
+    expect(
+      'error' in
+        answer(play(TWO_BLOCKS.slice(0, 3)), {
+          question: 'blockNames',
+          names: `A, Bloco ${'x'.repeat(30)}`,
+        }),
+    ).toBe(false);
+  });
+
   test('suggests letters as block names', () => {
     expect(defaultBlockNames(3)).toBe('A, B, C');
   });
