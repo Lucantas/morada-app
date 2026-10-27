@@ -44,6 +44,10 @@ test.describe('onboarding do condomínio', () => {
     await expect(page.getByRole('button', { name: 'Apto 101 · ocupado por Ana' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Agora as contas' }).click();
+    await page
+      .getByRole('group', { name: 'Gasto no mês' })
+      .getByLabel('Água', { exact: true })
+      .fill('34800');
     await page.getByLabel('Valor em caixa').fill('1230000');
     await page.getByRole('button', { name: `Abrir o ${CONDO_NAME}` }).click();
 
