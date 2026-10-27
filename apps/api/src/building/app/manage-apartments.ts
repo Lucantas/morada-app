@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
+import { MAX_APARTMENT_LABEL } from '../../residents/domain/resident';
 import type { PlacedApartment } from '../domain/building';
 import type { BuildingRepository } from '../domain/building-repository';
 import { ApartmentOccupiedError, ApartmentValidationError } from '../domain/errors';
 
-const labelSchema = z.string().trim().min(1).max(40);
+const labelSchema = z.string().trim().min(1).max(MAX_APARTMENT_LABEL);
 
 const addSchema = z.object({
   label: labelSchema,

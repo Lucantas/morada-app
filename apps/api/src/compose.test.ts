@@ -1018,6 +1018,49 @@ describe('Morada API — real credentials', () => {
     });
   });
 
+  test('long block names make apartments that take a resident, and "Bloco " is dropped', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const longName = 'Residencial Jardim Primavera I';
+    const res = await createCondo(app, auth, {
+      name: 'Residencial Ipê',
+      structure: {
+        blocks: [
+          { name: 'Bloco A', floors: 1, perFloor: 1 },
+          { name: longName, floors: 60, perFloor: 20 },
+        ],
+      },
+    });
+    const created = (await res.json()) as { id: string };
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
+    const longest = `Apto 6020 · Bloco ${longName}`;
+
+    const saved = await app.request(`/api/condos/${created.id}/residents`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: 'Ana', apt: longest, phone: '', email: '', status: 'em_dia' }),
+    });
+    const blocks = await pool.query<{ block: string }>(
+      'SELECT DISTINCT block FROM apartments WHERE condominium_id = $1 ORDER BY block',
+      [created.id],
+    );
+    const building = (await (
+      await app.request(`/api/condos/${created.id}/building`, { headers })
+    ).json()) as { blocks: { floors: { apartments: { label: string; state: string }[] }[] }[] };
+    const window = building.blocks
+      .flatMap((b) => b.floors.flatMap((f) => f.apartments))
+      .find((a) => a.label === longest);
+
+    expect(res.status).toBe(201);
+    expect(saved.status).toBe(201);
+    expect(blocks.rows.map((row) => row.block)).toEqual(['A', longName]);
+    expect(window?.state).toBe('ocupado');
+  });
+
   test('new condo is pending until completed', async () => {
     const app = await makeApp();
     const auth = await verifiedEmailAuth(app, 'ana@x.com');

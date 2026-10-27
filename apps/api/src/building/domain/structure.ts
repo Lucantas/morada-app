@@ -6,8 +6,20 @@ const MAX_PER_FLOOR = 20;
 const MAX_APARTMENTS = 2000;
 const POSITION_DIGITS = 2;
 
+const MAX_BLOCK_NAME = 30;
+const BLOCK_PREFIX = /^bloco\s+/i;
+
+export function normalizeBlockName(name: string): string {
+  return name.trim().replace(BLOCK_PREFIX, '');
+}
+
+const blockNameSchema = z
+  .string()
+  .transform(normalizeBlockName)
+  .pipe(z.string().min(1).max(MAX_BLOCK_NAME));
+
 const blockSchema = z.object({
-  name: z.string().trim().min(1).max(30).nullable(),
+  name: blockNameSchema.nullable(),
   floors: z.number().int().min(1).max(MAX_FLOORS),
   perFloor: z.number().int().min(1).max(MAX_PER_FLOOR),
 });

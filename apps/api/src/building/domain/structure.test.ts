@@ -48,6 +48,30 @@ describe('generateApartments', () => {
 });
 
 describe('structureSchema', () => {
+  test('drops a leading "Bloco " from block names', () => {
+    const structure = structureSchema.parse({
+      blocks: [
+        { name: 'Bloco A', floors: 1, perFloor: 1 },
+        { name: 'bloco  B', floors: 1, perFloor: 1 },
+        { name: 'Bloco', floors: 1, perFloor: 1 },
+      ],
+    });
+
+    expect(structure.blocks.map((block) => block.name)).toEqual(['A', 'B', 'Bloco']);
+    expect(generateApartments(structure)[0]?.label).toBe('Apto 101 · Bloco A');
+  });
+
+  test('names that only differ by the "Bloco " prefix are duplicates', () => {
+    const result = structureSchema.safeParse({
+      blocks: [
+        { name: 'Bloco A', floors: 1, perFloor: 1 },
+        { name: 'A', floors: 1, perFloor: 1 },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   const block = { name: 'A', floors: 1, perFloor: 1 };
 
   test.each([

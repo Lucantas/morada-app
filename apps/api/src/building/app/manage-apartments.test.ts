@@ -31,6 +31,17 @@ describe('manage apartments', () => {
     expect(deactivate).toHaveBeenCalledWith('a-1');
   });
 
+  test('a label as long as the longest generated one is accepted, up to 80 characters', async () => {
+    const repo = fakeRepo();
+
+    await expect(renameApartment(repo, 'a-1', { label: 'x'.repeat(80) })).resolves.toEqual(
+      expect.objectContaining({ label: 'x'.repeat(80) }),
+    );
+    await expect(renameApartment(repo, 'a-1', { label: 'x'.repeat(81) })).rejects.toThrow(
+      ApartmentValidationError,
+    );
+  });
+
   test('a blank label throws ApartmentValidationError', async () => {
     const repo = fakeRepo();
 
