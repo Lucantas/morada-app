@@ -34,6 +34,19 @@ import {
   useSaveResident,
 } from './use-residents';
 
+const APT_INPUT_STYLE = {
+  width: '100%',
+  minHeight: 54,
+  border: '1.5px solid var(--petrol-100)',
+  borderRadius: 'var(--r-md)',
+  fontFamily: "'Fraunces', serif",
+  fontWeight: 600,
+  fontSize: '1.35rem',
+  color: 'var(--petrol-900)',
+} as const;
+
+const NUMERIC_LABEL = /^Apto\s+\d+$/;
+
 const EMPTY = { name: '', apt: '', phone: '', email: '', status: 'em_dia' as ResidentStatus };
 
 type RegisterPayment = (input: {
@@ -63,6 +76,7 @@ type Props = {
   repository: ResidentRepository;
   receiptRepository: ReceiptRepository;
   residentId?: string;
+  presetApt?: string;
   onBack: () => void;
   onOpenAccess?: () => void;
   dueDay?: number;
@@ -88,6 +102,7 @@ export function ResidentEditScreen({
   repository,
   receiptRepository,
   residentId,
+  presetApt,
   onBack,
   onOpenAccess,
   dueDay = 15,
@@ -176,6 +191,21 @@ export function ResidentEditScreen({
     }
   }, [existing.data]);
 
+  useEffect(() => {
+    if (!residentId && presetApt && NUMERIC_LABEL.test(presetApt)) {
+      setForm((prev) => ({ ...prev, apt: apartmentNumber(presetApt) }));
+    }
+  }, [residentId, presetApt]);
+
+  const existingApt = existing.data?.apt;
+  const lockedLabel = residentId
+    ? existingApt !== undefined && !NUMERIC_LABEL.test(existingApt)
+      ? existingApt
+      : null
+    : presetApt && !NUMERIC_LABEL.test(presetApt)
+      ? presetApt
+      : null;
+
   const set = (key: keyof typeof EMPTY) => (value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -200,7 +230,10 @@ export function ResidentEditScreen({
       : undefined;
 
   const submit = () =>
-    save.mutate({ ...form, apt: apartmentLabel(form.apt), id: residentId }, { onSuccess: onBack });
+    save.mutate(
+      { ...form, apt: lockedLabel ?? apartmentLabel(form.apt), id: residentId },
+      { onSuccess: onBack },
+    );
   const moveOut = () => {
     if (residentId) deactivate.mutate(residentId, { onSuccess: onBack });
   };
@@ -279,42 +312,51 @@ export function ResidentEditScreen({
               >
                 Número do apartamento
               </span>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: 'absolute',
-                    left: 16,
-                    fontFamily: "'Fraunces', serif",
-                    fontWeight: 600,
-                    fontSize: '1.35rem',
-                    color: 'var(--ink-300)',
-                  }}
-                >
-                  Apto
-                </span>
+              {lockedLabel !== null ? (
                 <input
-                  value={form.apt}
-                  inputMode="numeric"
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    set('apt')(e.target.value.replace(/\D/g, ''))
-                  }
-                  placeholder="302"
+                  value={lockedLabel}
+                  readOnly
                   aria-label="Número do apartamento"
-                  style={{
-                    width: '100%',
-                    minHeight: 54,
-                    border: '1.5px solid var(--petrol-100)',
-                    borderRadius: 'var(--r-md)',
-                    padding: '0 16px 0 74px',
-                    fontFamily: "'Fraunces', serif",
-                    fontWeight: 600,
-                    fontSize: '1.35rem',
-                    color: 'var(--petrol-900)',
-                    background: 'var(--surface)',
-                  }}
+                  style={{ ...APT_INPUT_STYLE, padding: '0 16px', background: 'var(--line)' }}
                 />
-              </div>
+              ) : (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      left: 16,
+                      fontFamily: "'Fraunces', serif",
+                      fontWeight: 600,
+                      fontSize: '1.35rem',
+                      color: 'var(--ink-300)',
+                    }}
+                  >
+                    Apto
+                  </span>
+                  <input
+                    value={form.apt}
+                    inputMode="numeric"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      set('apt')(e.target.value.replace(/\D/g, ''))
+                    }
+                    placeholder="302"
+                    aria-label="Número do apartamento"
+                    style={{
+                      width: '100%',
+                      minHeight: 54,
+                      border: '1.5px solid var(--petrol-100)',
+                      borderRadius: 'var(--r-md)',
+                      padding: '0 16px 0 74px',
+                      fontFamily: "'Fraunces', serif",
+                      fontWeight: 600,
+                      fontSize: '1.35rem',
+                      color: 'var(--petrol-900)',
+                      background: 'var(--surface)',
+                    }}
+                  />
+                </div>
+              )}
             </label>
 
             <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 4px' }} />

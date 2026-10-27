@@ -5,6 +5,8 @@ import { clearTestCondo, setTestCondo, TEST_CONDO_NAME } from '@/test/condo';
 import { renderWithClient } from '@/test/render';
 import { buildDashboardSummary } from '@/test/factories.dashboard';
 
+import { InMemoryCategoryRepository } from '@/features/categories/data/in-memory-category-repository';
+
 import { InMemoryDashboardRepository } from '../data/in-memory-dashboard-repository';
 
 import { DashboardScreen } from './dashboard-screen';
@@ -13,6 +15,11 @@ beforeEach(() => setTestCondo());
 afterEach(() => clearTestCondo());
 
 function setup() {
+  const onSelectWindow = jest.fn();
+  const categories = new InMemoryCategoryRepository([
+    { id: 'c-1', name: 'Água', keywords: '', position: 0 },
+    { id: 'c-2', name: 'Energia', keywords: '', position: 1 },
+  ]);
   const repository = new InMemoryDashboardRepository(buildDashboardSummary());
   const onSendNotice = jest.fn();
   const onSeeAccounts = jest.fn();
@@ -24,9 +31,18 @@ function setup() {
       onSeeAccounts={onSeeAccounts}
       onOpenSettings={onOpenSettings}
       bottomNav={null}
+      categories={categories}
+      renderBuilding={(ground) => (
+        <section>
+          <button type="button" onClick={() => onSelectWindow('Apto 101')}>
+            Apto 101
+          </button>
+          {ground}
+        </section>
+      )}
     />,
   );
-  return { onSendNotice, onSeeAccounts, onOpenSettings };
+  return { onSendNotice, onSeeAccounts, onOpenSettings, onSelectWindow };
 }
 
 describe('DashboardScreen', () => {
@@ -40,6 +56,24 @@ describe('DashboardScreen', () => {
     setup();
 
     expect(await screen.findByText('12.480,00')).toBeInTheDocument();
+  });
+
+  test('home shows the building and the térreo', async () => {
+    setup();
+
+    expect(await screen.findByRole('button', { name: 'Apto 101' })).toBeInTheDocument();
+    expect(await screen.findByText('Em caixa')).toBeInTheDocument();
+    expect(await screen.findByText('R$ 12.480,00')).toBeInTheDocument();
+    expect(await screen.findByText('R$ 4.120,00')).toBeInTheDocument();
+    expect(await screen.findByText('Água · Energia')).toBeInTheDocument();
+  });
+
+  test('tapping a window goes through the building slot', async () => {
+    const { onSelectWindow } = setup();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Apto 101' }));
+
+    expect(onSelectWindow).toHaveBeenCalledWith('Apto 101');
   });
 
   test('firing "Enviar aviso" calls onSendNotice', async () => {

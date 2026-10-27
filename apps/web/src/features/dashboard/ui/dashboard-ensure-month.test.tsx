@@ -27,6 +27,8 @@ function renderScreen() {
         onSendNotice={() => {}}
         onSeeAccounts={() => {}}
         bottomNav={null}
+        categories={{} as never}
+        renderBuilding={() => null}
         ensureMonthlyReceipts={() => ensureMock()}
       />
     </QueryClientProvider>,

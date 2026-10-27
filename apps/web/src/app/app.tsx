@@ -26,6 +26,7 @@ import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { InviteForm } from '@/features/invitations/ui/invite-form';
 import { clearDraft } from '@/features/onboarding/data/local-draft-store';
 import { OnboardingFlow } from '@/features/onboarding/ui/onboarding-flow';
+import { BuildingPanel } from '@/features/building/ui/building-panel';
 import { BuildingView } from '@/features/building/ui/building-view';
 import { ResidentAccessCard } from '@/features/invitations/ui/resident-access-card';
 import { InviteShare } from '@/features/invitations/ui/invite-share';
@@ -138,6 +139,7 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
+  const apt = useNavStore((s) => s.apt);
   const go = useNavStore((s) => s.go);
   const queryClient = useQueryClient();
   const switchView = useSessionStore((s) => s.switchView);
@@ -163,6 +165,7 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
         view={view}
         residentId={residentId}
         incomeId={incomeId}
+        apt={apt}
         go={go}
         signOut={signOut}
         headerAction={headerAction}
@@ -202,13 +205,14 @@ type RouteProps = {
   view: View;
   residentId?: string;
   incomeId?: string;
+  apt?: string;
   condoId?: string | null;
-  go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
+  go: (view: View, opts?: { residentId?: string; incomeId?: string; apt?: string }) => void;
   signOut: () => void;
   headerAction?: ReactNode;
 };
 
-function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: RouteProps) {
+function AdminRouter({ view, residentId, incomeId, apt, go, signOut, headerAction }: RouteProps) {
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
   const defaultReceiptValueCents = settings.data?.monthlyFeeCents ?? 0;
@@ -239,6 +243,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           repository={residentRepository}
           receiptRepository={receiptRepository}
           residentId={residentId}
+          presetApt={apt}
           onBack={() => go('a-residents')}
           onOpenAccess={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           dueDay={dueDay}
@@ -338,6 +343,18 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           bottomNav={nav}
           headerAction={headerAction}
           ensureMonthlyReceipts={ensureMonthly}
+          categories={categoryRepository}
+          renderBuilding={(ground) => (
+            <BuildingPanel
+              repository={buildingRepository}
+              ground={ground}
+              onSelectApartment={(apartment) =>
+                apartment.residentId !== null
+                  ? go('a-resident-edit', { residentId: apartment.residentId })
+                  : go('a-resident-edit', { apt: apartment.label })
+              }
+            />
+          )}
         />
       );
   }

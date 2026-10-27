@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { useCondoName } from '@/shared/lib/condo-scope';
+import type { CategoryRepository } from '@/features/categories/domain/category-repository';
+
+import { useCondoName, useCondoScope } from '@/shared/lib/condo-scope';
 import { formatBRL, formatBRLShort } from '@/shared/lib/money';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
@@ -11,6 +14,7 @@ import { TopBar } from '@/shared/ui/top-bar';
 import type { CondoBalance, DashboardSummary, Maintenance, PaidItem } from '../domain/dashboard';
 import type { DashboardRepository } from '../domain/dashboard-repository';
 
+import { GroundCards } from './ground-cards';
 import { useDashboard } from './use-dashboard';
 import { DashboardSkeleton } from './dashboard-skeleton';
 
@@ -22,6 +26,8 @@ type Props = {
   bottomNav: ReactNode;
   headerAction?: ReactNode;
   ensureMonthlyReceipts?: () => Promise<void>;
+  categories: CategoryRepository;
+  renderBuilding: (ground: ReactNode) => ReactNode;
 };
 
 export function DashboardScreen({
@@ -32,8 +38,16 @@ export function DashboardScreen({
   bottomNav,
   headerAction,
   ensureMonthlyReceipts,
+  categories,
+  renderBuilding,
 }: Props) {
   const condoName = useCondoName();
+  const condoId = useCondoScope((state) => state.condo?.id ?? null);
+  const categoryList = useQuery({
+    queryKey: ['categories', condoId],
+    queryFn: () => categories.list(),
+    enabled: condoId !== null,
+  });
   const dashboard = useDashboard(repository);
   const [ensureError, setEnsureError] = useState(false);
 
@@ -101,6 +115,8 @@ export function DashboardScreen({
         {dashboard.isSuccess && (
           <DashboardContent
             summary={dashboard.data}
+            renderBuilding={renderBuilding}
+            categoryNames={(categoryList.data ?? []).map((category) => category.name)}
             onSendNotice={onSendNotice}
             onSeeAccounts={onSeeAccounts}
           />
@@ -113,15 +129,26 @@ export function DashboardScreen({
 
 function DashboardContent({
   summary,
+  renderBuilding,
+  categoryNames,
   onSendNotice,
   onSeeAccounts,
 }: {
   summary: DashboardSummary;
+  renderBuilding: (ground: ReactNode) => ReactNode;
+  categoryNames: string[];
   onSendNotice: () => void;
   onSeeAccounts: () => void;
 }) {
   return (
     <>
+      {renderBuilding(
+        <GroundCards
+          categories={categoryNames}
+          monthSpentCents={summary.balance.paidCents}
+          cashCents={summary.balance.balanceCents}
+        />,
+      )}
       <BalanceHero balance={summary.balance} />
       <div style={{ marginTop: 12 }}>
         <QuickAction

@@ -26,10 +26,11 @@ export type NavSnapshot = {
   view: View;
   residentId?: string;
   incomeId?: string;
+  apt?: string;
 };
 
 type NavState = NavSnapshot & {
-  go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
+  go: (view: View, opts?: { residentId?: string; incomeId?: string; apt?: string }) => void;
   restore: (snapshot: NavSnapshot) => void;
 };
 
@@ -37,11 +38,14 @@ export const useNavStore = create<NavState>((set) => ({
   view: 'a-home',
   residentId: undefined,
   incomeId: undefined,
-  go: (view, opts) => set({ view, residentId: opts?.residentId, incomeId: opts?.incomeId }),
+  apt: undefined,
+  go: (view, opts) =>
+    set({ view, residentId: opts?.residentId, incomeId: opts?.incomeId, apt: opts?.apt }),
   restore: (snapshot) =>
     set({
       view: snapshot.view,
       residentId: snapshot.residentId,
       incomeId: snapshot.incomeId,
+      apt: snapshot.apt,
     }),
 }));

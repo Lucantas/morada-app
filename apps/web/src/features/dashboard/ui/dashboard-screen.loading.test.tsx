@@ -17,6 +17,8 @@ describe('DashboardScreen loading', () => {
         onSendNotice={() => {}}
         onSeeAccounts={() => {}}
         bottomNav={null}
+        categories={{} as never}
+        renderBuilding={() => null}
       />,
     );
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
