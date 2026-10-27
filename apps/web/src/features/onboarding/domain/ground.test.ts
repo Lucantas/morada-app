@@ -26,7 +26,7 @@ describe('planGround', () => {
     );
 
     expect(plan.accounts).toEqual([
-      { description: 'Água de outubro', category: 'Água', valueCents: 34800 },
+      { slot: 'Água', description: 'Água de outubro', category: 'Água', valueCents: 34800 },
     ]);
   });
 
@@ -34,7 +34,7 @@ describe('planGround', () => {
     const plan = planGround(input({ spend: { kind: 'total', cents: 348000 } }), CURRENT, TODAY);
 
     expect(plan.accounts).toEqual([
-      { description: 'Gastos de outubro', category: 'Serviços', valueCents: 348000 },
+      { slot: 'total', description: 'Gastos de outubro', category: 'Serviços', valueCents: 348000 },
     ]);
   });
 
@@ -46,7 +46,7 @@ describe('planGround', () => {
     );
 
     expect(plan.accounts).toEqual([
-      { description: 'Gastos de outubro', category: 'Energia', valueCents: 1000 },
+      { slot: 'total', description: 'Gastos de outubro', category: 'Energia', valueCents: 1000 },
     ]);
   });
 

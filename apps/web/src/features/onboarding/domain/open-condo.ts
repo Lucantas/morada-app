@@ -4,7 +4,7 @@ import type { Category } from '@/features/categories/domain/category';
 import type { CategoryRepository } from '@/features/categories/domain/category-repository';
 import type { SettingsRepository } from '@/features/settings/domain/settings-repository';
 
-import { categoryDrafts, type GroundPlan } from './ground';
+import { categoryDrafts, TOTAL_SLOT, type GroundPlan } from './ground';
 import type { OnboardingRepository } from './onboarding-repository';
 
 export type OpenCondoDeps = {
@@ -17,7 +17,24 @@ export type OpenCondoDeps = {
 export type OpenCondoContext = OpenCondoDeps & {
   existingCategories: readonly Category[];
   today: string;
+  condoId: string;
 };
+
+const MAX_ACCOUNT_ID = 64;
+
+function shortHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of text) {
+    hash = Math.imul(hash ^ (char.codePointAt(0) ?? 0), 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+export function onboardingAccountId(condoId: string, slot: string): string {
+  const suffix = slot === TOTAL_SLOT ? TOTAL_SLOT : `c${shortHash(slot)}`;
+  const readable = `onb-${condoId}-${suffix}`;
+  return readable.length <= MAX_ACCOUNT_ID ? readable : `onb-${shortHash(condoId)}-${suffix}`;
+}
 
 type Step = { key: string; run: () => Promise<unknown> };
 
@@ -33,9 +50,15 @@ function planSteps(plan: GroundPlan, context: OpenCondoContext): Step[] {
               context.categories.save(categoryDrafts(categories, context.existingCategories)),
           },
         ];
-  const accountSteps: Step[] = plan.accounts.map((account) => ({
+  const accountSteps: Step[] = plan.accounts.map(({ slot, ...account }) => ({
     key: `account:${account.description}`,
-    run: () => saveAccount(context.accounts, { ...account, status: 'pago', date: context.today }),
+    run: () =>
+      saveAccount(context.accounts, {
+        ...account,
+        id: onboardingAccountId(context.condoId, slot),
+        status: 'pago',
+        date: context.today,
+      }),
   }));
   const settingsStep: Step[] =
     openingBalance === null
@@ -60,12 +83,10 @@ function planSteps(plan: GroundPlan, context: OpenCondoContext): Step[] {
 export async function openCondo(
   plan: GroundPlan,
   context: OpenCondoContext,
-  done: readonly string[],
-  markDone: (step: string) => void,
+  onStepDone: (step: string) => void,
 ): Promise<void> {
-  const pending = planSteps(plan, context).filter((step) => !done.includes(step.key));
-  for (const step of pending) {
+  for (const step of planSteps(plan, context)) {
     await step.run();
-    markDone(step.key);
+    onStepDone(step.key);
   }
 }

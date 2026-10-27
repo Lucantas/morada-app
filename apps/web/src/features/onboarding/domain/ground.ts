@@ -12,7 +12,14 @@ export type GroundInput = {
   cashCents: number | null;
 };
 
-export type GroundAccount = { description: string; category: string; valueCents: number };
+export type GroundAccount = {
+  slot: string;
+  description: string;
+  category: string;
+  valueCents: number;
+};
+
+export const TOTAL_SLOT = 'total';
 
 export type GroundPlan = {
   categories: string[] | null;
@@ -41,6 +48,7 @@ function spendAccounts(input: GroundInput, month: string): GroundAccount[] {
     return spend.cents > 0
       ? [
           {
+            slot: TOTAL_SLOT,
             description: `Gastos de ${month}`,
             category: totalCategory(input.categories),
             valueCents: spend.cents,
@@ -51,6 +59,7 @@ function spendAccounts(input: GroundInput, month: string): GroundAccount[] {
   return spend.items
     .filter((item) => item.cents > 0)
     .map((item) => ({
+      slot: item.category,
       description: `${item.category} de ${month}`,
       category: item.category,
       valueCents: item.cents,

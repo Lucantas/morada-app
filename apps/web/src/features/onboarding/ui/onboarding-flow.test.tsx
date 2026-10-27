@@ -28,7 +28,10 @@ const SETTINGS: CondoSettings = {
   openingBalance: null,
 };
 
-function setup({ buildingFails = false } = {}) {
+function setup({
+  buildingFails = false,
+  savedAccounts = new Map<string, Account>(),
+}: { buildingFails?: boolean; savedAccounts?: Map<string, Account> } = {}) {
   let residents: readonly Resident[] = [];
   const residentRepository = {
     save: jest.fn(async (resident: Resident) => {
@@ -71,7 +74,12 @@ function setup({ buildingFails = false } = {}) {
       list: jest.fn(async () => CATEGORIES),
       save: jest.fn(async () => ({ categories: CATEGORIES, reclassified: 0 })),
     },
-    accounts: { save: jest.fn(async (account: Account) => account) },
+    accounts: {
+      save: jest.fn(async (account: Account) => {
+        savedAccounts.set(account.id, account);
+        return account;
+      }),
+    },
     settings: {
       get: jest.fn(async () => SETTINGS),
       save: jest.fn(async () => SETTINGS),
@@ -83,8 +91,8 @@ function setup({ buildingFails = false } = {}) {
     buildingView: BuildingView,
     accessCard: ResidentAccessCard,
   };
-  renderWithClient(<OnboardingFlow {...props} />);
-  return props;
+  const view = renderWithClient(<OnboardingFlow {...props} />);
+  return { ...props, unmount: view.unmount };
 }
 
 async function goToGround(user: ReturnType<typeof userEvent.setup>) {
@@ -153,16 +161,27 @@ describe('OnboardingFlow', () => {
     expect(useCondoScope.getState().condo?.onboardingPending).toBe(false);
   });
 
-  test('save failure keeps the step and retries only the rest', async () => {
-    const user = userEvent.setup();
-    const props = setup();
-    props.settings.save.mockRejectedValueOnce(new Error('falhou'));
-    await goToGround(user);
-
+  async function fillGround(user: ReturnType<typeof userEvent.setup>) {
     const gasto = within(screen.getByRole('group', { name: 'Gasto no mês' }));
     const caixa = within(screen.getByRole('group', { name: 'Em caixa hoje' }));
     await user.type(gasto.getByLabelText('Água'), '34800');
     await user.type(caixa.getByLabelText('Valor em caixa'), '1230000');
+  }
+
+  function cashShown(props: ReturnType<typeof setup>, accounts: Map<string, Account>): number {
+    const call = props.settings.save.mock.lastCall as unknown as [CondoSettings] | undefined;
+    const opening = call?.[0].openingBalance?.valueCents ?? 0;
+    const spent = [...accounts.values()].reduce((sum, account) => sum + account.valueCents, 0);
+    return opening - spent;
+  }
+
+  test('after a partial save the térreo locks and the retry re-runs the same plan', async () => {
+    const user = userEvent.setup();
+    const savedAccounts = new Map<string, Account>();
+    const props = setup({ savedAccounts });
+    props.settings.save.mockRejectedValueOnce(new Error('falhou'));
+    await goToGround(user);
+    await fillGround(user);
     await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -171,15 +190,21 @@ describe('OnboardingFlow', () => {
     expect(
       screen.getByText('Quais contas o prédio paga, e quanto tem em caixa hoje?'),
     ).toBeInTheDocument();
-    expect(props.accounts.save).toHaveBeenCalledTimes(1);
     expect(props.onboarding.complete).not.toHaveBeenCalled();
     expect(props.onDone).not.toHaveBeenCalled();
+    const caixa = within(screen.getByRole('group', { name: 'Em caixa hoje' }));
+    expect(caixa.getByLabelText('Valor em caixa')).toBeDisabled();
+    expect(
+      within(screen.getByRole('group', { name: 'Gasto no mês' })).getByLabelText('Água'),
+    ).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
 
     await waitFor(() => expect(props.onDone).toHaveBeenCalledTimes(1));
-    expect(props.accounts.save).toHaveBeenCalledTimes(1);
-    expect(props.accounts.save).toHaveBeenCalledWith(
+    expect(props.accounts.save).toHaveBeenCalledTimes(2);
+    expect(savedAccounts.size).toBe(1);
+    expect([...savedAccounts.keys()][0]).toMatch(/^onb-c1-c[0-9a-f]{8}$/);
+    expect([...savedAccounts.values()][0]).toEqual(
       expect.objectContaining({
         description: expect.stringMatching(/^Água de /),
         category: 'Água',
@@ -187,13 +212,48 @@ describe('OnboardingFlow', () => {
         status: 'pago',
       }),
     );
-    expect(props.settings.save).toHaveBeenCalledTimes(2);
     expect(props.settings.save).toHaveBeenLastCalledWith({
       monthlyFeeCents: 35000,
       dueDay: 10,
       openingBalance: { valueCents: 1_264_800, date: expect.any(String) },
     });
+    expect(cashShown(props, savedAccounts)).toBe(1_230_000);
     expect(props.onboarding.complete).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failure before anything is written keeps the térreo editable', async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    props.accounts.save.mockRejectedValueOnce(new Error('falhou'));
+    await goToGround(user);
+    await fillGround(user);
+    await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Em caixa hoje' })).getByLabelText('Valor em caixa'),
+    ).toBeEnabled();
+  });
+
+  test('saving again after a reload creates no duplicate accounts', async () => {
+    const user = userEvent.setup();
+    const savedAccounts = new Map<string, Account>();
+    const first = setup({ savedAccounts });
+    first.settings.save.mockRejectedValueOnce(new Error('falhou'));
+    await goToGround(user);
+    await fillGround(user);
+    await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    first.unmount();
+
+    const second = setup({ savedAccounts });
+    await goToGround(user);
+    await fillGround(user);
+    await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
+
+    await waitFor(() => expect(second.onDone).toHaveBeenCalledTimes(1));
+    expect(savedAccounts.size).toBe(1);
+    expect(cashShown(second, savedAccounts)).toBe(1_230_000);
   });
 
   test('a building that cannot load shows an error', async () => {

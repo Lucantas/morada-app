@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AccountRepository } from '@/features/accounts/domain/account-repository';
 import { buildingQueryKey, type BuildingApartment } from '@/features/building/domain/building';
 import type { BuildingRepository } from '@/features/building/domain/building-repository';
+import type { Category } from '@/features/categories/domain/category';
 import type { CategoryRepository } from '@/features/categories/domain/category-repository';
 import type { ResidentRepository } from '@/features/residents/domain/resident-repository';
 import type { SettingsRepository } from '@/features/settings/domain/settings-repository';
@@ -14,7 +15,7 @@ import { FormError } from '@/shared/ui/entry-layout';
 import { PrimaryButton } from '@/shared/ui/primitives';
 import { StatusView } from '@/shared/ui/status-view';
 
-import { planGround } from '../domain/ground';
+import { planGround, type GroundPlan } from '../domain/ground';
 import { groundInputFromForm, initialGroundForm, type GroundForm } from '../domain/ground-form';
 import type { OnboardingRepository } from '../domain/onboarding-repository';
 import { openCondo } from '../domain/open-condo';
@@ -56,9 +57,12 @@ function Question({ children }: { children: string }) {
   );
 }
 
-function useOpenCondo(props: Props, condoName: string) {
+type Attempt = { plan: GroundPlan; existing: readonly Category[]; today: string };
+
+function useOpenCondo(props: Props, condoId: string | null, condoName: string) {
   const queryClient = useQueryClient();
-  const done = useRef<readonly string[]>([]);
+  const frozen = useRef<Attempt | null>(null);
+  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const categories = useQuery({
@@ -66,7 +70,7 @@ function useOpenCondo(props: Props, condoName: string) {
     queryFn: () => props.categories.list(),
   });
 
-  const open = async (form: GroundForm) => {
+  const freshAttempt = (form: GroundForm): Attempt => {
     const existing = categories.data ?? [];
     const today = todayIso();
     const plan = planGround(
@@ -74,15 +78,21 @@ function useOpenCondo(props: Props, condoName: string) {
       existing.map((category) => category.name),
       today,
     );
+    return { plan, existing, today };
+  };
+
+  const open = async (form: GroundForm) => {
+    if (condoId === null) return;
+    const attempt = frozen.current ?? freshAttempt(form);
     setSaving(true);
     setFailed(false);
     try {
       await openCondo(
-        plan,
-        { ...props, existingCategories: existing, today },
-        done.current,
-        (step) => {
-          done.current = [...done.current, step];
+        attempt.plan,
+        { ...props, existingCategories: attempt.existing, today: attempt.today, condoId },
+        () => {
+          frozen.current = attempt;
+          setLocked(true);
         },
       );
     } catch {
@@ -95,7 +105,7 @@ function useOpenCondo(props: Props, condoName: string) {
     props.onDone();
   };
 
-  return { categories, open, saving, failed, label: `Abrir o ${condoName}` };
+  return { categories, open, saving, failed, locked, label: `Abrir o ${condoName}` };
 }
 
 export function OnboardingFlow(props: Props) {
@@ -106,7 +116,7 @@ export function OnboardingFlow(props: Props) {
   const [step, setStep] = useState<Step>('residents');
   const [selected, setSelected] = useState<BuildingApartment | null>(null);
   const [form, setForm] = useState<GroundForm | null>(null);
-  const opening = useOpenCondo(props, condoName);
+  const opening = useOpenCondo(props, condoId, condoName);
   const drawing = useQuery({
     queryKey: buildingQueryKey(condoId ?? ''),
     queryFn: () => building.get(),
@@ -118,7 +128,9 @@ export function OnboardingFlow(props: Props) {
 
   const ground =
     step !== 'ground' ? undefined : groundForm ? (
-      <GroundStep form={groundForm} onChange={setForm} />
+      <fieldset disabled={opening.locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <GroundStep form={groundForm} onChange={setForm} />
+      </fieldset>
     ) : opening.categories.isError ? (
       <FormError message="Não foi possível carregar as contas." />
     ) : (
