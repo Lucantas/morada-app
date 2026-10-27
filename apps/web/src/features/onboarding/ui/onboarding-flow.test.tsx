@@ -31,7 +31,8 @@ const SETTINGS: CondoSettings = {
 function setup({
   buildingFails = false,
   savedAccounts = new Map<string, Account>(),
-}: { buildingFails?: boolean; savedAccounts?: Map<string, Account> } = {}) {
+  pending = true,
+}: { buildingFails?: boolean; savedAccounts?: Map<string, Account>; pending?: boolean } = {}) {
   let residents: readonly Resident[] = [];
   const residentRepository = {
     save: jest.fn(async (resident: Resident) => {
@@ -86,7 +87,10 @@ function setup({
     },
     residents: residentRepository,
     invitations: fakeInvitationRepository(),
-    onboarding: { complete: jest.fn(async () => undefined) },
+    onboarding: {
+      complete: jest.fn(async () => undefined),
+      isPending: jest.fn(async () => pending),
+    },
     onDone: jest.fn(),
     buildingView: BuildingView,
     accessCard: ResidentAccessCard,
@@ -254,6 +258,42 @@ describe('OnboardingFlow', () => {
     await waitFor(() => expect(second.onDone).toHaveBeenCalledTimes(1));
     expect(savedAccounts.size).toBe(1);
     expect(cashShown(second, savedAccounts)).toBe(1_230_000);
+  });
+
+  test('a condo already opened on another device leaves to the home', async () => {
+    const props = setup({ pending: false });
+
+    await waitFor(() => expect(props.onDone).toHaveBeenCalledTimes(1));
+    expect(props.onboarding.isPending).toHaveBeenCalledWith('c1');
+    expect(useCondoScope.getState().condo?.onboardingPending).toBe(false);
+    expect(props.accounts.save).not.toHaveBeenCalled();
+    expect(props.onboarding.complete).not.toHaveBeenCalled();
+  });
+
+  test('a condo still pending on the server stays in the onboarding', async () => {
+    const props = setup();
+
+    await waitFor(() => expect(props.onboarding.isPending).toHaveBeenCalledWith('c1'));
+    expect(props.onDone).not.toHaveBeenCalled();
+    expect(useCondoScope.getState().condo?.onboardingPending).toBe(true);
+  });
+
+  test('finishing here leaves only once even when the server stops reporting pending', async () => {
+    const user = userEvent.setup();
+    const props = setup();
+    props.onboarding.complete.mockImplementation(async () => {
+      props.onboarding.isPending.mockResolvedValue(false);
+    });
+    await goToGround(user);
+    const gasto = within(screen.getByRole('group', { name: 'Gasto no mês' }));
+    const caixa = within(screen.getByRole('group', { name: 'Em caixa hoje' }));
+    await user.click(gasto.getByRole('button', { name: 'Depois eu vejo' }));
+    await user.click(caixa.getByRole('button', { name: 'Depois eu vejo' }));
+    await user.click(screen.getByRole('button', { name: 'Abrir o Residencial Ipê' }));
+
+    await waitFor(() => expect(props.onDone).toHaveBeenCalled());
+    await waitFor(() => expect(props.onboarding.isPending).toHaveBeenCalledTimes(2));
+    expect(props.onDone).toHaveBeenCalledTimes(1);
   });
 
   test('a building that cannot load shows an error', async () => {

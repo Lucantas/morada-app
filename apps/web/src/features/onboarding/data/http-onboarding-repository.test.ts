@@ -22,4 +22,18 @@ describe('HttpOnboardingRepository', () => {
 
     await expect(new HttpOnboardingRepository(api).complete()).rejects.toThrow('falhou');
   });
+
+  test('isPending reads the condo from the caller’s condos', async () => {
+    const get = jest.fn().mockResolvedValue([
+      { id: 'c1', name: 'A', onboardingPending: false },
+      { id: 'c2', name: 'B', onboardingPending: true },
+    ]);
+    const api: ApiClient = { get, post: jest.fn(), put: jest.fn(), del: jest.fn() };
+    const repository = new HttpOnboardingRepository(api);
+
+    expect(await repository.isPending('c1')).toBe(false);
+    expect(await repository.isPending('c2')).toBe(true);
+    expect(await repository.isPending('c3')).toBe(false);
+    expect(get).toHaveBeenCalledWith('/me/condos');
+  });
 });

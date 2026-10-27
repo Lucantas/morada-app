@@ -11,7 +11,7 @@ export type OpenCondoDeps = {
   categories: Pick<CategoryRepository, 'save'>;
   accounts: Pick<AccountRepository, 'save'>;
   settings: SettingsRepository;
-  onboarding: OnboardingRepository;
+  onboarding: Pick<OnboardingRepository, 'complete'>;
 };
 
 export type OpenCondoContext = OpenCondoDeps & {

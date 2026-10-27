@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { AccountRepository } from '@/features/accounts/domain/account-repository';
@@ -59,7 +59,17 @@ function Question({ children }: { children: string }) {
 
 type Attempt = { plan: GroundPlan; existing: readonly Category[]; today: string };
 
-function useOpenCondo(props: Props, condoId: string | null, condoName: string) {
+function useLeaveOnce(onDone: () => void): () => void {
+  const left = useRef(false);
+  return useCallback(() => {
+    if (left.current) return;
+    left.current = true;
+    useCondoScope.getState().completeOnboarding();
+    onDone();
+  }, [onDone]);
+}
+
+function useOpenCondo(props: Props, condoId: string | null, condoName: string, leave: () => void) {
   const queryClient = useQueryClient();
   const frozen = useRef<Attempt | null>(null);
   const [locked, setLocked] = useState(false);
@@ -101,11 +111,26 @@ function useOpenCondo(props: Props, condoId: string | null, condoName: string) {
       return;
     }
     await queryClient.invalidateQueries();
-    useCondoScope.getState().completeOnboarding();
-    props.onDone();
+    leave();
   };
 
   return { categories, open, saving, failed, locked, label: `Abrir o ${condoName}` };
+}
+
+function useLeaveWhenOpenedElsewhere(
+  onboarding: Pick<OnboardingRepository, 'isPending'>,
+  condoId: string | null,
+  leave: () => void,
+) {
+  const pending = useQuery({
+    queryKey: ['onboarding', 'pending', condoId],
+    queryFn: () => onboarding.isPending(condoId ?? ''),
+    enabled: condoId !== null,
+  });
+  const openedElsewhere = pending.data === false;
+  useEffect(() => {
+    if (openedElsewhere) leave();
+  }, [openedElsewhere, leave]);
 }
 
 export function OnboardingFlow(props: Props) {
@@ -116,7 +141,9 @@ export function OnboardingFlow(props: Props) {
   const [step, setStep] = useState<Step>('residents');
   const [selected, setSelected] = useState<BuildingApartment | null>(null);
   const [form, setForm] = useState<GroundForm | null>(null);
-  const opening = useOpenCondo(props, condoId, condoName);
+  const leave = useLeaveOnce(props.onDone);
+  const opening = useOpenCondo(props, condoId, condoName, leave);
+  useLeaveWhenOpenedElsewhere(props.onboarding, condoId, leave);
   const drawing = useQuery({
     queryKey: buildingQueryKey(condoId ?? ''),
     queryFn: () => building.get(),
