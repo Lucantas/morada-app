@@ -34,25 +34,41 @@ function mount(repo: SettingsRepository, permissions: readonly Permission[] = ['
 
 describe('settings routes', () => {
   it('GET returns the current settings', async () => {
-    const app = mount(makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null }));
+    const app = mount(
+      makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null }),
+    );
     const res = await app.request('/settings');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await res.json()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   it('PUT updates and returns the new settings', async () => {
-    const app = mount(makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null }));
+    const app = mount(
+      makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null }),
+    );
     const res = await app.request('/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: null });
+    expect(await res.json()).toEqual({
+      monthlyFeeCents: 20000,
+      dueDay: 10,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   it('PUT rejects an invalid dueDay', async () => {
-    const app = mount(makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null }));
+    const app = mount(
+      makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null }),
+    );
     const res = await app.request('/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -62,7 +78,7 @@ describe('settings routes', () => {
   });
 
   it('PUT without manage_fees answers 403 and keeps the settings', async () => {
-    const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null });
     const app = mount(repo, ['manage_money']);
     const res = await app.request('/settings', {
       method: 'PUT',
@@ -70,7 +86,12 @@ describe('settings routes', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
     expect(res.status).toBe(403);
-    expect(await repo.get()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await repo.get()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   describe('pix', () => {
@@ -91,33 +112,68 @@ describe('settings routes', () => {
     }
 
     it('PUT stores a normalized pix key', async () => {
-      const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+      const repo = makeRepo({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      });
       const app = mount(repo);
 
       const res = await put(app, { monthlyFeeCents: 15000, dueDay: 15, pix });
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: stored });
+      expect(await res.json()).toEqual({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: stored,
+        openingBalance: null,
+      });
       expect((await repo.get()).pix).toEqual(stored);
     });
 
     it('PUT without a pix field keeps the configured key', async () => {
-      const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: stored });
+      const repo = makeRepo({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: stored,
+        openingBalance: null,
+      });
       const app = mount(repo);
 
       const res = await put(app, { monthlyFeeCents: 20000, dueDay: 10 });
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: stored });
+      expect(await res.json()).toEqual({
+        monthlyFeeCents: 20000,
+        dueDay: 10,
+        pix: stored,
+        openingBalance: null,
+      });
     });
 
     it('PUT with pix null clears the configured key', async () => {
-      const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: stored });
+      const repo = makeRepo({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: stored,
+        openingBalance: null,
+      });
       const app = mount(repo);
 
-      const res = await put(app, { monthlyFeeCents: 15000, dueDay: 15, pix: null });
+      const res = await put(app, {
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      });
 
-      expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+      expect(await res.json()).toEqual({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      });
       expect((await repo.get()).pix).toBeNull();
     });
 
@@ -126,7 +182,12 @@ describe('settings routes', () => {
       ['receiver', { ...pix, receiverName: '' }, 'Informe o nome do recebedor (até 25 caracteres)'],
       ['city', { ...pix, city: 'x'.repeat(16) }, 'Informe a cidade (até 15 caracteres)'],
     ])('PUT answers 400 for an invalid %s', async (_label, invalid, message) => {
-      const repo = makeRepo({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+      const repo = makeRepo({
+        monthlyFeeCents: 15000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      });
       const app = mount(repo);
 
       const res = await put(app, { monthlyFeeCents: 15000, dueDay: 15, pix: invalid });

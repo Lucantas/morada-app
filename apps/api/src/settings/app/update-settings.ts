@@ -2,10 +2,10 @@ import { condoSettingsSchema, type CondoSettings } from '../domain/condo-setting
 import { SettingsValidationError } from '../domain/errors';
 import type { SettingsRepository } from '../domain/settings-repository';
 
-const PIX_FIELD_PATH = 'pix';
+const PRESERVED_FIELDS = ['pix', 'openingBalance'] as const;
 
-function hasPixField(input: unknown): boolean {
-  return typeof input === 'object' && input !== null && PIX_FIELD_PATH in input;
+function hasField(input: unknown, field: string): boolean {
+  return typeof input === 'object' && input !== null && field in input;
 }
 
 export async function updateSettings(
@@ -14,10 +14,14 @@ export async function updateSettings(
 ): Promise<CondoSettings> {
   const parsed = condoSettingsSchema.safeParse(input);
   if (!parsed.success) {
-    const pixIssue = parsed.error.issues.find((issue) => issue.path[0] === PIX_FIELD_PATH);
-    throw new SettingsValidationError(pixIssue?.message ?? 'Configurações inválidas');
+    const preservedIssue = parsed.error.issues.find((issue) =>
+      PRESERVED_FIELDS.some((field) => issue.path[0] === field),
+    );
+    throw new SettingsValidationError(preservedIssue?.message ?? 'Configurações inválidas');
   }
-  if (hasPixField(input)) return repo.save(parsed.data);
+  const omitted = PRESERVED_FIELDS.filter((field) => !hasField(input, field));
+  if (omitted.length === 0) return repo.save(parsed.data);
   const current = await repo.get();
-  return repo.save({ ...parsed.data, pix: current.pix });
+  const kept = Object.fromEntries(omitted.map((field) => [field, current[field]]));
+  return repo.save({ ...parsed.data, ...kept });
 }

@@ -548,7 +548,12 @@ describe('Morada API', () => {
     const app = await makeApp();
     await createTestCondo(pool, 'condo-other');
     const other = makePostgresRepositories(pool).forCondo('condo-other');
-    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
+    await other.settings.save({
+      monthlyFeeCents: 99000,
+      dueDay: 3,
+      pix: null,
+      openingBalance: null,
+    });
     const admin = await authFor(app, adminCredentials);
     const headers = {
       Cookie: admin.cookie,
@@ -563,11 +568,26 @@ describe('Morada API', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
 
-    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await read.json()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
     expect(update.status).toBe(200);
-    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
+    expect(await other.settings.get()).toEqual({
+      monthlyFeeCents: 99000,
+      dueDay: 3,
+      pix: null,
+      openingBalance: null,
+    });
     const own = await app.request(`${P}/settings`, { headers });
-    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: null });
+    expect(await own.json()).toEqual({
+      monthlyFeeCents: 20000,
+      dueDay: 10,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   test('cross-condo categories are isolated', async () => {
@@ -994,6 +1014,7 @@ describe('Morada API — real credentials', () => {
         receiverName: 'Condominio Ipe',
         city: 'Sao Paulo',
       },
+      openingBalance: null,
     });
   });
 
@@ -1497,7 +1518,12 @@ describe('Morada API — authorization wiring', () => {
     const admin = await withCreds(adminCredentials);
     const res = await admin.auth(`${P}/settings`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await res.json()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   test('categories are admin-only; saving reclassifies matching accounts', async () => {
@@ -3187,7 +3213,7 @@ describe('Síndico access', () => {
     await put({ monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT });
     await put({ monthlyFeeCents: 16000, dueDay: 12 });
     const kept = await app.request(`${P}/pix`, { headers });
-    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null });
+    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null, openingBalance: null });
     const cleared = await app.request(`${P}/pix`, { headers });
 
     expect(await before.json()).toEqual({ configured: false });

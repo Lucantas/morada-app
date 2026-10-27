@@ -245,3 +245,62 @@ describe('buildDashboardSummary — recentPaid carries hasProof', () => {
     expect(byId.get('a-2')?.hasProof).toBe(false);
   });
 });
+
+describe('buildDashboardSummary — opening balance', () => {
+  const account = (id: string, date: string | null, valueCents: number) => ({
+    id,
+    description: id,
+    category: 'Utilidades',
+    date,
+    valueCents,
+    status: 'pago',
+  });
+
+  test('opening balance starts the balance', () => {
+    const summary = buildDashboardSummary(
+      [
+        account('a-1', '2026-10-27', 348_000),
+        account('a-2', '2026-10-01', 50_000),
+        account('a-3', null, 10_000),
+      ],
+      [],
+      [],
+      '2026-10-27',
+      { valueCents: 1_230_000, date: '2026-10-27' },
+    );
+
+    expect(summary.balance.balanceCents).toBe(882_000);
+    expect(summary.balance.paidCents).toBe(398_000);
+  });
+
+  test('receipts and incomes on or after the opening date add to the balance', () => {
+    const summary = buildDashboardSummary(
+      [],
+      [
+        { valueCents: 15_000, status: 'pago', paidAt: '2026-10-28' },
+        { valueCents: 9_000, status: 'pago', paidAt: '2026-10-26' },
+        { valueCents: 7_000, status: 'pago', paidAt: null },
+      ],
+      [
+        { valueCents: 4_000, date: '2026-10-27' },
+        { valueCents: 3_000, date: '2026-10-01' },
+      ],
+      '2026-10-27',
+      { valueCents: 100_000, date: '2026-10-27' },
+    );
+
+    expect(summary.balance.balanceCents).toBe(119_000);
+  });
+
+  test('no opening balance keeps today behaviour', () => {
+    const summary = buildDashboardSummary(
+      [account('a-1', '2026-10-01', 50_000), account('a-2', null, 10_000)],
+      [],
+      [],
+      '2026-10-27',
+      null,
+    );
+
+    expect(summary.balance.balanceCents).toBe(-60_000);
+  });
+});

@@ -27,6 +27,11 @@ export interface LedgerIncome {
   date: string | null;
 }
 
+export interface OpeningBalance {
+  valueCents: number;
+  date: string;
+}
+
 const PAID = 'pago';
 const RECENT_PAID_LIMIT = 4;
 
@@ -58,12 +63,18 @@ export function buildDashboardSummary(
   receipts: LedgerReceipt[],
   incomes: LedgerIncome[],
   today: string,
+  opening: OpeningBalance | null = null,
 ): DashboardSummary {
   const paidAccounts = accounts.filter((a) => a.status === PAID);
   const paidReceipts = receipts.filter((r) => r.status === PAID);
 
-  const allTimeIncome = sum(paidReceipts) + sum(incomes);
-  const allTimePaid = sum(paidAccounts);
+  const anchoredFrom = (date: string | null): boolean =>
+    opening === null || (date !== null && date >= opening.date);
+  const openingCents = opening?.valueCents ?? 0;
+  const allTimeIncome =
+    sum(paidReceipts.filter((r) => anchoredFrom(r.paidAt))) +
+    sum(incomes.filter((i) => anchoredFrom(i.date)));
+  const allTimePaid = sum(paidAccounts.filter((a) => anchoredFrom(a.date)));
   const monthIncome =
     sum(paidReceipts.filter((r) => sameMonth(r.paidAt, today))) +
     sum(incomes.filter((i) => sameMonth(i.date, today)));
@@ -93,7 +104,7 @@ export function buildDashboardSummary(
 
   return dashboardSummarySchema.parse({
     balance: {
-      balanceCents: allTimeIncome - allTimePaid,
+      balanceCents: openingCents + allTimeIncome - allTimePaid,
       incomeCents: monthIncome,
       paidCents: monthPaid,
     },

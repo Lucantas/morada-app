@@ -3,6 +3,7 @@ import { PostgresIncomeRepository } from '../../../income/adapters/postgres/inco
 import { migrate } from '../../../platform/postgres/migrate';
 import { createPool } from '../../../platform/postgres/pool';
 import { PostgresReceiptRepository } from '../../../receipts/adapters/postgres/receipt-repository';
+import { PostgresSettingsRepository } from '../../../settings/adapters/postgres/settings-repository';
 import { createTestCondo } from '../../../test-support/condos';
 import { resetPg } from '../../../test-support/pg';
 import { runDashboardRepositoryContract } from '../dashboard-repository.contract';
@@ -31,5 +32,6 @@ describe('PostgresDashboardRepository — contract', () => {
     accounts: new PostgresAccountRepository(pool, condominiumId, null),
     receipts: new PostgresReceiptRepository(pool, condominiumId, null),
     incomes: new PostgresIncomeRepository(pool, condominiumId, null),
+    settings: new PostgresSettingsRepository(pool, condominiumId),
   }));
 });
