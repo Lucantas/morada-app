@@ -26,18 +26,31 @@ describe('parseLoginResponse', () => {
   });
 
   test('returns the condos and the e-mail verification flag', () => {
-    const condos = [SINDICO];
-
-    expect(parseLoginResponse({ condos, emailVerified: true })).toEqual({
-      condos,
+    expect(parseLoginResponse({ condos: [SINDICO], emailVerified: true })).toEqual({
+      condos: [{ ...SINDICO, onboardingPending: false }],
       emailVerified: true,
+    });
+  });
+
+  test('keeps a pending onboarding and defaults it to false when absent', () => {
+    const pending = { ...SINDICO, onboardingPending: true };
+
+    expect(parseLoginResponse({ condos: [pending], emailVerified: true }).condos[0]).toMatchObject({
+      onboardingPending: true,
+    });
+    expect(parseLoginResponse({ condos: [SINDICO], emailVerified: true }).condos[0]).toMatchObject({
+      onboardingPending: false,
     });
   });
 
   test('keeps the invited condo id of an accepted invitation', () => {
     expect(
       parseLoginResponse({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' }),
-    ).toEqual({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' });
+    ).toEqual({
+      condos: [{ ...SINDICO, onboardingPending: false }],
+      emailVerified: true,
+      invitedCondoId: 'c1',
+    });
     expect(
       parseLoginResponse({ condos: [], emailVerified: true, invitedCondoId: null }).invitedCondoId,
     ).toBeNull();

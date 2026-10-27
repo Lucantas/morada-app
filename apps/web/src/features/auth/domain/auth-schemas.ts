@@ -33,12 +33,6 @@ export const newPasswordSchema = z
     path: ['confirmation'],
   });
 
-export const condoNameSchema = z
-  .string()
-  .trim()
-  .min(1, 'Informe o nome do condomínio.')
-  .max(80, 'Use até 80 caracteres.');
-
 export type Validation<T> = { ok: true; data: T } | { ok: false; message: string };
 
 export function validate<T>(

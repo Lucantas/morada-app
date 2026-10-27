@@ -10,6 +10,8 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return { get: jest.fn(), post: jest.fn(), put: jest.fn(), del: jest.fn(), ...overrides };
 }
 
+const CREATE_INPUT = { name: 'X', monthlyFeeCents: 0, dueDay: 10, pix: null };
+
 const LOGIN_BODY = { condos: [loginCondo()], emailVerified: true };
 
 function repositoryWith(publicApi: ApiClient, api: ApiClient = fakeApi()) {
@@ -131,20 +133,27 @@ describe('HttpAuthRepository', () => {
     expect(result).toEqual(LOGIN_BODY);
   });
 
-  test('createCondo posts the name on the session client and parses the condo', async () => {
-    const created = loginCondo({ id: 'c9', name: 'Edifício Sol' });
+  test('createCondo posts the whole input on the session client and parses the condo', async () => {
+    const created = loginCondo({ id: 'c9', name: 'Edifício Sol', onboardingPending: true });
     const api = fakeApi({ post: jest.fn().mockResolvedValue(created) });
+    const input = {
+      name: 'Edifício Sol',
+      structure: { blocks: [{ name: null, floors: 4, perFloor: 4 }] },
+      monthlyFeeCents: 35000,
+      dueDay: 10,
+      pix: null,
+    };
 
-    const result = await repositoryWith(fakeApi(), api).createCondo('Edifício Sol');
+    const result = await repositoryWith(fakeApi(), api).createCondo(input);
 
-    expect(api.post).toHaveBeenCalledWith('/me/condos', { name: 'Edifício Sol' });
+    expect(api.post).toHaveBeenCalledWith('/me/condos', input);
     expect(result).toEqual(created);
   });
 
   test('createCondo maps a 403 to the e-mail-not-confirmed error', async () => {
     const api = fakeApi({ post: jest.fn().mockRejectedValue(new ApiError(403, 'x')) });
 
-    expect(await kindOf(repositoryWith(fakeApi(), api).createCondo('X'))).toBe(
+    expect(await kindOf(repositoryWith(fakeApi(), api).createCondo(CREATE_INPUT))).toBe(
       'email-not-confirmed',
     );
   });

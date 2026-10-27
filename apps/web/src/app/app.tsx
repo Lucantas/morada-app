@@ -24,6 +24,7 @@ import { useSessionStore } from '@/features/session/ui/session-store';
 import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { InviteForm } from '@/features/invitations/ui/invite-form';
+import { clearDraft } from '@/features/onboarding/data/local-draft-store';
 import { InviteShare } from '@/features/invitations/ui/invite-share';
 import { SindicoScreen } from '@/features/invitations/ui/sindico-screen';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
@@ -109,6 +110,7 @@ function Router() {
   const queryClient = useQueryClient();
 
   const handleSignOut = useCallback(() => {
+    clearDraft();
     queryClient.clear();
     void logout();
   }, [queryClient]);

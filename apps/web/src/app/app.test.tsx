@@ -74,6 +74,21 @@ describe('App router', () => {
     expect(await screen.findByText('Painel do administrador')).toBeInTheDocument();
   });
 
+  test('signing out from the onboarding conversation clears its draft', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      'morada-onboarding-draft',
+      JSON.stringify({ answers: [{ question: 'name', name: 'Ipê', text: 'Ipê' }] }),
+    );
+    act(() => useSessionStore.setState({ pendingUser: { emailVerified: true } }));
+    render(<App />);
+
+    expect(screen.getByText('Ele tem blocos ou é um prédio só?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(window.localStorage.getItem('morada-onboarding-draft')).toBeNull();
+  });
+
   test('shows the login screen when signed out', () => {
     render(<App />);
 

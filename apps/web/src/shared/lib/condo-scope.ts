@@ -20,6 +20,7 @@ export type CurrentCondo = {
   hasHome: boolean;
   organizationId: string;
   orgRole: OrgRole | null;
+  onboardingPending: boolean;
 };
 
 const currentCondoSchema = z.object({
@@ -30,12 +31,14 @@ const currentCondoSchema = z.object({
   hasHome: z.boolean(),
   organizationId: z.string().min(1),
   orgRole: orgRoleSchema.nullable(),
+  onboardingPending: z.boolean().default(false),
 });
 
 type CondoScopeState = {
   condo: CurrentCondo | null;
   setCondo: (condo: CurrentCondo | null) => void;
   rename: (name: string) => void;
+  completeOnboarding: () => void;
 };
 
 function parseStoredCondo(persisted: unknown): CurrentCondo | null {
@@ -51,6 +54,10 @@ export const useCondoScope = create<CondoScopeState>()(
       condo: null,
       setCondo: (condo) => set({ condo }),
       rename: (name) => set((state) => (state.condo ? { condo: { ...state.condo, name } } : state)),
+      completeOnboarding: () =>
+        set((state) =>
+          state.condo ? { condo: { ...state.condo, onboardingPending: false } } : state,
+        ),
     }),
     {
       name: 'morada-condo',

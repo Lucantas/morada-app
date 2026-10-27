@@ -1,10 +1,4 @@
-import {
-  condoNameSchema,
-  emailSchema,
-  newPasswordSchema,
-  signUpInputSchema,
-  validate,
-} from './auth-schemas';
+import { emailSchema, newPasswordSchema, signUpInputSchema, validate } from './auth-schemas';
 
 describe('auth schemas', () => {
   test('normalizes the e-mail', () => {
@@ -45,19 +39,5 @@ describe('auth schemas', () => {
     expect(validate(newPasswordSchema, { password: '12345678', confirmation: '12345679' })).toEqual(
       { ok: false, message: 'As senhas não conferem.' },
     );
-  });
-
-  test('rejects a blank condominium name', () => {
-    expect(validate(condoNameSchema, '   ')).toEqual({
-      ok: false,
-      message: 'Informe o nome do condomínio.',
-    });
-  });
-
-  test('rejects a condominium name longer than 80 characters', () => {
-    expect(validate(condoNameSchema, 'a'.repeat(81))).toEqual({
-      ok: false,
-      message: 'Use até 80 caracteres.',
-    });
   });
 });

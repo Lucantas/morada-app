@@ -14,6 +14,7 @@ export function testCondo(overrides: Partial<CurrentCondo> = {}): CurrentCondo {
     hasHome: false,
     organizationId: 'o1',
     orgRole: 'owner',
+    onboardingPending: false,
     ...overrides,
   };
 }

@@ -40,6 +40,17 @@ describe('useCondoScope', () => {
     expect(useCondoScope.getState().condo).toEqual(testCondo({ name: 'Novo' }));
   });
 
+  test('completeOnboarding clears only the pending onboarding flag', () => {
+    act(() => useCondoScope.getState().setCondo(testCondo({ onboardingPending: true })));
+    act(() => useCondoScope.getState().completeOnboarding());
+    expect(useCondoScope.getState().condo).toEqual(testCondo({ onboardingPending: false }));
+  });
+
+  test('completeOnboarding is a no-op without a condominium', () => {
+    act(() => useCondoScope.getState().completeOnboarding());
+    expect(useCondoScope.getState().condo).toBeNull();
+  });
+
   test('rename is a no-op without a condominium', () => {
     act(() => useCondoScope.getState().rename('Novo'));
     expect(useCondoScope.getState().condo).toBeNull();
@@ -95,6 +106,17 @@ describe('persisted condo from an older version', () => {
 
     expect(useCondoScope.getState().condo).toBeNull();
     expect(renderHook(() => useCanDo('manage_fees')).result.current).toBe(false);
+  });
+
+  test('a stored condo from before onboarding loads as already onboarded', async () => {
+    const legacy = Object.fromEntries(
+      Object.entries(testCondo()).filter(([key]) => key !== 'onboardingPending'),
+    );
+    localStorage.setItem('morada-condo', JSON.stringify({ state: { condo: legacy }, version: 1 }));
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState().condo).toEqual(testCondo({ onboardingPending: false }));
   });
 
   test('keeps a complete stored condo', async () => {

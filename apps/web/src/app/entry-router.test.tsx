@@ -42,6 +42,7 @@ describe('EntryRouter', () => {
   afterEach(() => {
     act(() => useSessionStore.getState().signOut());
     window.history.replaceState(null, '', '/');
+    window.localStorage.removeItem('morada-onboarding-draft');
   });
 
   test('renders the signed-in app when a role is set', () => {
@@ -130,13 +131,28 @@ describe('EntryRouter', () => {
     expect(onSignOut).toHaveBeenCalled();
   });
 
+  test('a confirmed user without condos sees the onboarding conversation', () => {
+    act(() => useSessionStore.setState({ pendingUser: { emailVerified: true } }));
+
+    renderEntry();
+
+    expect(screen.getByText('Que condomínio vamos gerenciar hoje?')).toBeInTheDocument();
+  });
+
   test('a confirmed user without condos creates one and lands as admin', async () => {
     act(() => useSessionStore.setState({ pendingUser: { emailVerified: true } }));
     const { onLanded } = renderEntry();
     const user = userEvent.setup();
 
     await user.type(screen.getByLabelText('Nome do condomínio'), 'Edifício Sol');
-    await user.click(screen.getByRole('button', { name: 'Criar condomínio' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await user.click(screen.getByRole('button', { name: 'Só um prédio' }));
+    await user.type(screen.getByLabelText('Andares'), '2');
+    await user.type(screen.getByLabelText('Apartamentos por andar'), '2');
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await user.click(screen.getByRole('button', { name: 'Depois eu vejo' }));
+    await user.click(screen.getByRole('button', { name: 'Depois eu vejo' }));
+    await user.click(screen.getByRole('button', { name: 'Criar o Edifício Sol' }));
 
     await waitFor(() => expect(onLanded).toHaveBeenCalledWith('admin'));
     expect(useSessionStore.getState()).toMatchObject({ role: 'admin', pendingUser: null });
