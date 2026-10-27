@@ -5,6 +5,8 @@ const grant = (overrides: Partial<CondoAccess>): CondoAccess => ({
   name: 'A',
   role: 'morador',
   residentId: null,
+  organizationId: 'org-a',
+  orgRole: null,
   ...overrides,
 });
 
@@ -17,6 +19,16 @@ describe('resolveAccess', () => {
 
     expect(resolveAccess([morador, sindico, administrador])).toEqual([expected]);
     expect(resolveAccess([administrador, sindico, morador])).toEqual([expected]);
+  });
+
+  test('keeps the non-null org role whichever grant carries it', () => {
+    const morador = grant({ role: 'morador', residentId: 'r-1', orgRole: 'member' });
+    const sindico = grant({ role: 'sindico' });
+
+    expect(resolveAccess([morador, sindico])).toEqual([
+      grant({ role: 'sindico', residentId: 'r-1', orgRole: 'member' }),
+    ]);
+    expect(resolveAccess([sindico, morador])[0]?.orgRole).toBe('member');
   });
 
   test('returns one entry per condo ordered by name, then id', () => {

@@ -52,6 +52,8 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     name: condominiums.find((c) => c.id === grant.condominiumId)?.name ?? '',
     role: grant.role,
     residentId: grant.residentId,
+    organizationId: condominiums.find((c) => c.id === grant.condominiumId)?.organizationId ?? '',
+    orgRole: null,
   });
   return {
     organizations,
@@ -79,6 +81,7 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
       return condo;
     },
     ownedOrganization: async () => null,
+    memberOrganization: async () => null,
     createOrganization: async (input) => {
       const org = { id: `org-${organizations.length + 1}`, ...input };
       organizations.push(org);
@@ -89,6 +92,11 @@ function fakeCondos(initial: CondoAccess[] = []): FakeCondos {
     },
     deactivateResidentGrants: async () => undefined,
     isOperational: async () => true,
+    grantSindico: async () => undefined,
+    currentSindico: async () => null,
+    removeSindico: async () => undefined,
+    addOrgMember: async () => undefined,
+    getOrganization: async () => null,
   };
 }
 
@@ -232,7 +240,14 @@ describe('seedAdmin', () => {
       sessionVersion: 0,
     };
     const condos = fakeCondos([
-      { condominiumId: 'condo-legacy', name: 'Legado', role: 'administrador', residentId: null },
+      {
+        condominiumId: 'condo-legacy',
+        name: 'Legado',
+        role: 'administrador',
+        residentId: null,
+        organizationId: 'org-legacy',
+        orgRole: 'owner',
+      },
     ]);
 
     await seedAdmin(fakeRepo([existingAdmin]), condos, noopHasher);

@@ -2,7 +2,10 @@ import { act } from '@testing-library/react';
 
 import { renderHook } from '@testing-library/react';
 
-import { scopedApiPath, useCondoName, useCondoScope } from './condo-scope';
+import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
+import { testCondo } from '@/test/condo';
+
+import { scopedApiPath, useCanDo, useCondoName, useCondoScope } from './condo-scope';
 
 describe('scopedApiPath', () => {
   test('prefixes /api paths with the condominium', () => {
@@ -12,6 +15,11 @@ describe('scopedApiPath', () => {
   test('leaves non-/api paths unchanged', () => {
     expect(scopedApiPath('/auth/logout', 'c1')).toBe('/auth/logout');
     expect(scopedApiPath('/me/condos', null)).toBe('/me/condos');
+  });
+
+  test('leaves organization paths unchanged with or without a condominium', () => {
+    expect(scopedApiPath('/api/orgs/o1', 'c1')).toBe('/api/orgs/o1');
+    expect(scopedApiPath('/api/orgs/o1/invitations', null)).toBe('/api/orgs/o1/invitations');
   });
 
   test('throws when an /api path has no condominium', () => {
@@ -27,9 +35,9 @@ describe('useCondoScope', () => {
   });
 
   test('setCondo stores it and rename changes only the name', () => {
-    act(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+    act(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
     act(() => useCondoScope.getState().rename('Novo'));
-    expect(useCondoScope.getState().condo).toEqual({ id: 'c1', name: 'Novo' });
+    expect(useCondoScope.getState().condo).toEqual(testCondo({ name: 'Novo' }));
   });
 
   test('rename is a no-op without a condominium', () => {
@@ -42,7 +50,7 @@ describe('useCondoName', () => {
   afterEach(() => act(() => useCondoScope.getState().setCondo(null)));
 
   test('returns the current condominium name', () => {
-    act(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Residencial Ipê' }));
+    act(() => useCondoScope.getState().setCondo(testCondo()));
 
     const { result } = renderHook(() => useCondoName());
 
@@ -53,5 +61,61 @@ describe('useCondoName', () => {
     const { result } = renderHook(() => useCondoName());
 
     expect(result.current).toBe('');
+  });
+});
+
+describe('useCanDo', () => {
+  afterEach(() => act(() => useCondoScope.getState().setCondo(null)));
+
+  test('is true only for permissions the condominium grants', () => {
+    act(() => useCondoScope.getState().setCondo(testCondo({ permissions: ['manage_money'] })));
+
+    expect(renderHook(() => useCanDo('manage_money')).result.current).toBe(true);
+    expect(renderHook(() => useCanDo('manage_fees')).result.current).toBe(false);
+  });
+
+  test('is false without a condominium', () => {
+    expect(renderHook(() => useCanDo('manage_money')).result.current).toBe(false);
+  });
+});
+
+describe('persisted condo from an older version', () => {
+  afterEach(() => {
+    localStorage.clear();
+    act(() => useCondoScope.getState().setCondo(null));
+  });
+
+  test('drops a stored condo without permissions instead of crashing', async () => {
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({ state: { condo: { id: 'c1', name: 'Morada' } }, version: 0 }),
+    );
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState().condo).toBeNull();
+    expect(renderHook(() => useCanDo('manage_fees')).result.current).toBe(false);
+  });
+
+  test('keeps a complete stored condo', async () => {
+    const condo = testCondo();
+    localStorage.setItem('morada-condo', JSON.stringify({ state: { condo }, version: 1 }));
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState().condo).toEqual(condo);
+  });
+
+  test('a logged-in session with an old stored condo is signed out', async () => {
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({ state: { condo: { id: 'c1', name: 'Morada' } }, version: 0 }),
+    );
+    act(() => useSessionStore.getState().authenticate('admin', null));
+
+    await act(() => useCondoScope.persist.rehydrate());
+    restoreSession();
+
+    expect(useSessionStore.getState().role).toBeNull();
   });
 });

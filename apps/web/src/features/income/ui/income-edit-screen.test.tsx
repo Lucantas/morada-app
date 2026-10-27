@@ -6,8 +6,9 @@ import { InMemoryIncomeRepository } from '@/features/income/data/in-memory-incom
 
 import { IncomeEditScreen } from './income-edit-screen';
 import { useCondoScope } from '@/shared/lib/condo-scope';
+import { testCondo } from '@/test/condo';
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+beforeEach(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
 
 describe('IncomeEditScreen', () => {
   test('creates a new income with the entered fields and navigates back', async () => {

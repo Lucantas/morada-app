@@ -5,6 +5,7 @@ import type { ReceiptMethod } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
 
 export const receiptsQueryKey = ['receipts'] as const;
+export const pixQueryKey = ['pix'] as const;
 
 export function useReceipts(repository: ReceiptRepository) {
   return useQuery({ queryKey: receiptsQueryKey, queryFn: () => listReceipts(repository) });

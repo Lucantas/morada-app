@@ -42,6 +42,26 @@ describe('createApiClient', () => {
     expect((init.headers as Record<string, string>)['X-CSRF-Token']).toBeUndefined();
   });
 
+  test('sends the view header when a view is set', async () => {
+    const fetchMock = mockFetch({ ok: true, status: 200, json: {} });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await createApiClient({ baseUrl: 'http://api.test', view: () => 'resident' }).get('/me');
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init.headers as Record<string, string>)['X-Morada-View']).toBe('resident');
+  });
+
+  test('omits the view header when the view is null', async () => {
+    const fetchMock = mockFetch({ ok: true, status: 200, json: {} });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await createApiClient({ baseUrl: 'http://api.test', view: () => null }).get('/me');
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect('X-Morada-View' in (init.headers as Record<string, string>)).toBe(false);
+  });
+
   test('serializes the body on POST', async () => {
     const fetchMock = mockFetch({ ok: true, status: 201, json: { id: 'x' } });
     global.fetch = fetchMock as unknown as typeof fetch;

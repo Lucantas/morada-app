@@ -1,3 +1,4 @@
+import { HttpActivityRepository } from '@/features/activity/data/http-activity-repository';
 import { HttpAuthRepository } from '@/features/auth/data/http-auth-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
@@ -7,10 +8,12 @@ import { HttpInvitationRepository } from '@/features/invitations/data/http-invit
 import { HttpIncomeRepository } from '@/features/income/data/http-income-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
+import { HttpPixRepository } from '@/features/receipts/data/http-pix-repository';
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
-import { signOutIfCondoMissing, useSessionStore } from '@/features/session/ui/session-store';
+import { HttpTeamRepository } from '@/features/team/data/http-team-repository';
+import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
 import { useCondoScope } from '@/shared/lib/condo-scope';
 
@@ -22,11 +25,12 @@ const apiClient = createApiClient({
   baseUrl: apiUrl,
   onUnauthorized: () => useSessionStore.getState().signOut(),
   condoId: () => useCondoScope.getState().condo?.id ?? null,
+  view: () => useSessionStore.getState().role,
 });
 
 const publicApiClient = createApiClient({ baseUrl: apiUrl });
 
-signOutIfCondoMissing();
+restoreSession();
 
 export const authRepository = new HttpAuthRepository({
   api: apiClient,
@@ -41,6 +45,8 @@ export const invitationRepository = new HttpInvitationRepository({
 export const residentRepository = new HttpResidentRepository(apiClient);
 export const accountRepository = new HttpAccountRepository(apiClient);
 export const receiptRepository = new HttpReceiptRepository(apiClient);
+export const pixRepository = new HttpPixRepository(apiClient);
+export const activityRepository = new HttpActivityRepository(apiClient);
 export const noticeRepository = new HttpNoticeRepository(apiClient);
 export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
@@ -48,6 +54,10 @@ export const settingsRepository = new HttpSettingsRepository(apiClient);
 export const condoInfoRepository = new HttpCondoInfoRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
+export const teamRepository = new HttpTeamRepository(
+  apiClient,
+  () => useCondoScope.getState().condo?.organizationId ?? null,
+);
 
 /** Sign out: tell the server to clear the session cookie, then clear local state
  *  regardless of whether the server call succeeds. */

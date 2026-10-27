@@ -3,9 +3,12 @@ import {
   INVITE_NOW,
   fakeCondos,
   fakeResidentsFor,
+  ORG_A,
   inMemoryInvitationTokens,
   invitationFixture,
+  membroInvitationFixture,
   residentFixture,
+  sindicoInvitationFixture,
 } from '../../test-support/in-memory-invitations';
 import { inMemoryUsers } from '../../test-support/in-memory-users';
 import type { User } from '../../users/domain/user';
@@ -101,5 +104,50 @@ describe('activateClaimedInvitations', () => {
 
     expect(unverified.condos.grants()).toEqual([]);
     expect(unverified.invitations.byId('inv-1')?.status).toBe('pendente');
+  });
+
+  test('activates claimed staff invitations by role and skips one for another e-mail', async () => {
+    const invitations = inMemoryInvitationTokens([
+      { invitation: sindicoInvitationFixture({ claimedBy: 'u-maria' }), tokenHash: 'hs' },
+      { invitation: membroInvitationFixture({ claimedBy: 'u-maria' }), tokenHash: 'hm' },
+      {
+        invitation: membroInvitationFixture({
+          id: 'inv-ghost-org',
+          organizationId: 'org-ghost',
+          claimedBy: 'u-maria',
+        }),
+        tokenHash: 'hg',
+      },
+      {
+        invitation: sindicoInvitationFixture({
+          id: 'inv-other-email',
+          email: 'outra@x.com',
+          claimedBy: 'u-maria',
+        }),
+        tokenHash: 'ho',
+      },
+    ]);
+    const condos = fakeCondos([CONDO_A], [ORG_A]);
+    const deps = {
+      invitations,
+      condos,
+      users: inMemoryUsers([maria]),
+      residentsFor: fakeResidentsFor({}),
+      now: () => INVITE_NOW,
+    };
+
+    await activateClaimedInvitations(deps, 'u-maria');
+
+    expect(condos.grants()).toEqual([
+      { condominiumId: 'condo-a', userId: 'u-maria', role: 'sindico', residentId: null },
+    ]);
+    expect(condos.sindicoRetirements()).toEqual([
+      { condominiumId: 'condo-a', keepUserId: 'u-maria' },
+    ]);
+    expect(condos.orgMembers()).toEqual([
+      { organizationId: 'org-a', userId: 'u-maria', role: 'member' },
+    ]);
+    expect(invitations.byId('inv-ghost-org')?.status).toBe('pendente');
+    expect(invitations.byId('inv-other-email')?.status).toBe('pendente');
   });
 });

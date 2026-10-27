@@ -23,6 +23,7 @@ type Props = {
   onGoFinance: () => void;
   onGoNotices: () => void;
   bottomNav: ReactNode;
+  headerAction?: ReactNode;
 };
 
 export function ResidentHomeScreen({
@@ -32,6 +33,7 @@ export function ResidentHomeScreen({
   onGoFinance,
   onGoNotices,
   bottomNav,
+  headerAction,
 }: Props) {
   const condoName = useCondoName();
   const home = useResidentHome(receiptRepository);
@@ -41,7 +43,12 @@ export function ResidentHomeScreen({
       <TopBar
         eyebrow={`${resident.apt} · ${condoName}`}
         title={`Olá, ${firstName(resident.name)}`}
-        right={<NoticesButton onClick={onGoNotices} />}
+        right={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {headerAction}
+            <NoticesButton onClick={onGoNotices} />
+          </div>
+        }
       />
       <ScreenBody>
         {home.isLoading && <ResidentHomeSkeleton />}

@@ -14,6 +14,7 @@ import { renderWithClient } from '@/test/render';
 import { InvitationError } from '../domain/errors';
 
 import { ResidentAccessScreen } from './resident-access-screen';
+import { testCondo } from '@/test/condo';
 
 const RESIDENT = buildResident({ id: 'r-1', name: 'Ana Souza', email: 'ana@exemplo.com' });
 
@@ -28,7 +29,7 @@ function renderAccess(repository = fakeInvitationRepository(), resident = RESIDE
   return props;
 }
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+beforeEach(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
 
 describe('ResidentAccessScreen', () => {
   test('shows a skeleton while the invitation loads', () => {

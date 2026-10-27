@@ -1,5 +1,6 @@
 import { sign } from 'hono/jwt';
 
+import { moneyActivityResolver } from './activity/adapters/http/money-activity';
 import { buildApp } from './compose';
 import { config } from './platform/config';
 import {
@@ -20,6 +21,36 @@ import { PostgresUserRepository } from './users/adapters/postgres/user-repositor
 import { residentCredentials, seedFixtures, TEST_CONDO_ID } from './test-fixtures';
 
 const P = `/api/condos/${TEST_CONDO_ID}`;
+
+const ADMIN_SUMMARY = {
+  id: TEST_CONDO_ID,
+  name: `Condomínio ${TEST_CONDO_ID}`,
+  role: 'admin',
+  condoRole: 'administrador',
+  permissions: [
+    'view_building',
+    'publish_notices',
+    'manage_residents',
+    'manage_money',
+    'manage_fees',
+    'manage_condo',
+    'view_activity',
+  ],
+  hasHome: false,
+  organizationId: `org-${TEST_CONDO_ID}`,
+  orgRole: 'owner',
+};
+
+const RESIDENT_SUMMARY = {
+  id: TEST_CONDO_ID,
+  name: `Condomínio ${TEST_CONDO_ID}`,
+  role: 'resident',
+  condoRole: 'morador',
+  permissions: [],
+  hasHome: false,
+  organizationId: `org-${TEST_CONDO_ID}`,
+  orgRole: null,
+};
 
 const pool = createPool(config.databaseUrl);
 
@@ -515,7 +546,7 @@ describe('Morada API', () => {
     const app = await makeApp();
     await createTestCondo(pool, 'condo-other');
     const other = makePostgresRepositories(pool).forCondo('condo-other');
-    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3 });
+    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
     const admin = await authFor(app, adminCredentials);
     const headers = {
       Cookie: admin.cookie,
@@ -530,11 +561,11 @@ describe('Morada API', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
 
-    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
     expect(update.status).toBe(200);
-    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3 });
+    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
     const own = await app.request(`${P}/settings`, { headers });
-    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10 });
+    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: null });
   });
 
   test('cross-condo categories are isolated', async () => {
@@ -741,12 +772,8 @@ describe('Morada API', () => {
     });
 
     expect(adminCondos.status).toBe(200);
-    expect(await adminCondos.json()).toEqual([
-      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' },
-    ]);
-    expect(await residentCondos.json()).toEqual([
-      { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' },
-    ]);
+    expect(await adminCondos.json()).toEqual([ADMIN_SUMMARY]);
+    expect(await residentCondos.json()).toEqual([RESIDENT_SUMMARY]);
   });
 
   test('GET /me/condos requires authentication', async () => {
@@ -803,7 +830,7 @@ describe('Morada API — real credentials', () => {
     const body: unknown = await res.json();
     expect(body).not.toHaveProperty('token');
     expect(body).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'admin' }],
+      condos: [ADMIN_SUMMARY],
       emailVerified: true,
     });
   });
@@ -917,7 +944,15 @@ describe('Morada API — real credentials', () => {
 
     expect(res.status).toBe(201);
     const created = (await res.json()) as { id: string; name: string; role: string };
-    expect(created).toMatchObject({ name: 'Residencial Ipê', role: 'admin' });
+    expect(created).toMatchObject({
+      name: 'Residencial Ipê',
+      role: 'admin',
+      condoRole: 'administrador',
+      permissions: ADMIN_SUMMARY.permissions,
+      hasHome: false,
+      organizationId: expect.any(String),
+      orgRole: 'owner',
+    });
     expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
   });
 
@@ -1287,7 +1322,7 @@ describe('Morada API — admin reads and resets resident logins', () => {
     const loginRes = await login(app, residentCredentials.username, body.tempPassword);
     expect(loginRes.status).toBe(200);
     expect(await loginRes.json()).toEqual({
-      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' }],
+      condos: [RESIDENT_SUMMARY],
       emailVerified: true,
     });
   });
@@ -1392,7 +1427,7 @@ describe('Morada API — authorization wiring', () => {
     const admin = await withCreds(adminCredentials);
     const res = await admin.auth(`${P}/settings`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15 });
+    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
   });
 
   test('categories are admin-only; saving reclassifies matching accounts', async () => {
@@ -1799,7 +1834,7 @@ describe('Morada API — authorization wiring', () => {
         proofDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
       }),
     });
-    expect(put.status).toBe(200);
+    expect(put.status).toBe(201);
 
     const adminProof = await app.request(`${P}/accounts/a-proof/proof`, {
       headers: { Cookie: adminAuth.cookie },
@@ -1829,7 +1864,7 @@ describe('Morada API — authorization wiring', () => {
         status: 'pago',
       }),
     });
-    expect(noProof.status).toBe(200);
+    expect(noProof.status).toBe(201);
     expect(
       (await app.request(`${P}/accounts/a-plain/proof`, { headers: { Cookie: adminAuth.cookie } }))
         .status,
@@ -2585,7 +2620,7 @@ describe('Resident invitations', () => {
 
 describe('Accepting an invitation', () => {
   const APP_URL = config.appUrl;
-  const CONDO = { id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}`, role: 'resident' };
+  const CONDO = RESIDENT_SUMMARY;
 
   async function adminHeaders(app: App) {
     const auth = await authFor(app, adminCredentials);
@@ -2635,6 +2670,8 @@ describe('Accepting an invitation', () => {
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(JSON.parse(text)).toEqual({
+      role: 'morador',
+      targetName: CONDO.name,
       condoName: CONDO.name,
       residentName: 'Maria Ribeiro',
       apt: 'Apto 302',
@@ -2655,7 +2692,11 @@ describe('Accepting an invitation', () => {
     const res = await accept(app, token, newAccount);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await res.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
     const me = await app.request('/me', { headers: { Cookie: cookieOf(res) } });
     expect(me.status).toBe(200);
     expect(await count("invitations WHERE status = 'aceito'")).toBe(1);
@@ -2703,7 +2744,11 @@ describe('Accepting an invitation', () => {
     const right = await accept(app, token, { password: 'senha-da-ana' });
 
     expect(right.status).toBe(200);
-    expect(await right.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await right.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
     expect((await app.request('/me', { headers: { Cookie: cookieOf(right) } })).status).toBe(200);
   });
 
@@ -2715,7 +2760,11 @@ describe('Accepting an invitation', () => {
     const res = await accept(app, token, { ...newAccount, email: 'Maria.Nova@x.com' });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [], emailVerified: false });
+    expect(await res.json()).toEqual({
+      condos: [],
+      emailVerified: false,
+      invitedCondoId: CONDO.id,
+    });
     const confirmToken =
       /confirmar-email\/([\w-]+)/.exec(sender.lastTo('maria.nova@x.com')?.text ?? '')?.[1] ?? '';
     const confirmed = await app.request('/auth/email/confirm', {
@@ -2917,6 +2966,836 @@ describe('Accepting an invitation', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ condos: [CONDO], emailVerified: true });
+    expect(await res.json()).toEqual({
+      condos: [CONDO],
+      emailVerified: true,
+      invitedCondoId: CONDO.id,
+    });
+  });
+});
+
+const PIX_INPUT = {
+  keyType: 'cpf',
+  key: '123.456.789-09',
+  receiverName: 'Condomínio Morada',
+  city: 'Santos',
+};
+
+describe('Síndico access', () => {
+  const sindicoCredentials = { username: 'sindico', password: 'senha-sindico-1' };
+  const SINDICO_RESIDENT_ID = 'r-3';
+
+  async function sindicoApp() {
+    const app = await makeApp();
+    const hasher = new BcryptPasswordHasher(config.bcryptCost);
+    await new PostgresUserRepository(pool).save({
+      id: 'u-sindico',
+      username: sindicoCredentials.username,
+      email: null,
+      name: 'Síndica Teste',
+      passwordHash: await hasher.hash(sindicoCredentials.password),
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
+    });
+    await pool.query(
+      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id) VALUES
+         ('role-sindico', $1, 'u-sindico', 'sindico', NULL),
+         ('role-sindico-home', $1, 'u-sindico', 'morador', $2)`,
+      [TEST_CONDO_ID, SINDICO_RESIDENT_ID],
+    );
+    const sindico = await authFor(app, sindicoCredentials);
+    const request = (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: {
+          ...(init.headers ?? {}),
+          Cookie: sindico.cookie,
+          'X-CSRF-Token': sindico.csrf,
+        },
+      });
+    return { app, request };
+  }
+
+  const json = (method: string, body: unknown): RequestInit => ({
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  test('sindico cannot manage fees or condo', async () => {
+    const { request } = await sindicoApp();
+
+    const settings = await request(`${P}/settings`, json('PUT', { monthlyFeeCents: 1, dueDay: 5 }));
+    const info = await request(`${P}/info`, json('PUT', { name: 'Outro nome' }));
+    const residents = await request(`${P}/residents`);
+    const account = await request(
+      `${P}/accounts`,
+      json('POST', {
+        description: 'Água',
+        category: 'Utilidades',
+        valueCents: 1000,
+        date: '2026-04-05',
+        status: 'pendente',
+      }),
+    );
+    const notice = await request(
+      `${P}/notices`,
+      json('POST', { title: 'Aviso', body: 'Corpo', kind: 'aviso', audience: 'Todos' }),
+    );
+
+    expect(settings.status).toBe(403);
+    expect(await settings.json()).toEqual({ error: 'Acesso negado' });
+    expect(info.status).toBe(403);
+    expect(residents.status).toBe(200);
+    expect(account.status).toBe(201);
+    expect(notice.status).toBe(201);
+  });
+
+  test('sindico cannot change pix', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(
+      `${P}/settings`,
+      json('PUT', { monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Acesso negado' });
+  });
+
+  test('resident reads pix', async () => {
+    const { app, request } = await sindicoApp();
+    await pool.query(
+      `UPDATE condo_settings SET pix_key_type = 'cpf', pix_key = '12345678909',
+         pix_receiver_name = 'Condomínio Morada', pix_city = 'Santos'
+       WHERE condominium_id = $1`,
+      [TEST_CONDO_ID],
+    );
+    const resident = await authFor(app, residentCredentials);
+
+    const asResident = await app.request(`${P}/pix`, {
+      headers: { Cookie: resident.cookie, 'X-CSRF-Token': resident.csrf },
+    });
+    const asSindicoResidentView = await request(`${P}/pix`, {
+      headers: { 'X-Morada-View': 'resident' },
+    });
+
+    const expected = {
+      configured: true,
+      key: '12345678909',
+      receiverName: 'Condomínio Morada',
+      city: 'Santos',
+    };
+    expect(asResident.status).toBe(200);
+    expect(await asResident.json()).toEqual(expected);
+    expect(asSindicoResidentView.status).toBe(200);
+    expect(await asSindicoResidentView.json()).toEqual(expected);
+  });
+
+  test('the administrador configures pix and the update without pix keeps it', async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+    const headers = {
+      Cookie: admin.cookie,
+      'X-CSRF-Token': admin.csrf,
+      'Content-Type': 'application/json',
+    };
+    const put = (body: unknown) =>
+      app.request(`${P}/settings`, { method: 'PUT', headers, body: JSON.stringify(body) });
+
+    const before = await app.request(`${P}/pix`, { headers });
+    await put({ monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT });
+    await put({ monthlyFeeCents: 16000, dueDay: 12 });
+    const kept = await app.request(`${P}/pix`, { headers });
+    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null });
+    const cleared = await app.request(`${P}/pix`, { headers });
+
+    expect(await before.json()).toEqual({ configured: false });
+    expect(await kept.json()).toEqual({
+      configured: true,
+      key: '12345678909',
+      receiverName: 'Condomínio Morada',
+      city: 'Santos',
+    });
+    expect(await cleared.json()).toEqual({ configured: false });
+  });
+
+  test('the administrador still manages fees', async () => {
+    const app = await makeApp();
+    const admin = await authFor(app, adminCredentials);
+
+    const settings = await app.request(`${P}/settings`, {
+      method: 'PUT',
+      headers: {
+        Cookie: admin.cookie,
+        'X-CSRF-Token': admin.csrf,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ monthlyFeeCents: 1, dueDay: 5 }),
+    });
+
+    expect(settings.status).toBe(200);
+  });
+
+  test('/me/condos lists the sindico with a home and four permissions', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request('/me/condos');
+
+    expect(await res.json()).toEqual([
+      {
+        id: TEST_CONDO_ID,
+        name: `Condomínio ${TEST_CONDO_ID}`,
+        role: 'admin',
+        condoRole: 'sindico',
+        permissions: ['view_building', 'publish_notices', 'manage_residents', 'manage_money'],
+        hasHome: true,
+        organizationId: `org-${TEST_CONDO_ID}`,
+        orgRole: null,
+      },
+    ]);
+  });
+
+  test('view header', async () => {
+    const { request } = await sindicoApp();
+
+    const home = await request(`${P}/receipts`, { headers: { 'X-Morada-View': 'resident' } });
+    const building = await request(`${P}/receipts`);
+
+    expect(home.status).toBe(200);
+    const homeReceipts = (await home.json()) as { residentId: string }[];
+    expect(homeReceipts.length).toBeGreaterThan(0);
+    expect(homeReceipts.every((r) => r.residentId === SINDICO_RESIDENT_ID)).toBe(true);
+    const buildingReceipts = (await building.json()) as { residentId: string }[];
+    expect(buildingReceipts.some((r) => r.residentId !== SINDICO_RESIDENT_ID)).toBe(true);
+  });
+
+  test('the resident view drops staff routes even for the sindico', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(`${P}/accounts`, { headers: { 'X-Morada-View': 'resident' } });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('CORS allows the view header', async () => {
+    const origin = config.webOrigins[0] ?? '';
+    const res = await (
+      await makeApp()
+    ).request(`${P}/receipts`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'X-Morada-View',
+      },
+    });
+
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('X-Morada-View');
+  });
+
+  describe('síndico management', () => {
+    const S = `${P}/sindico`;
+    const SINDICA = 'nova.sindica@x.com';
+
+    async function adminRequest(app: App) {
+      const admin = await authFor(app, adminCredentials);
+      return (path: string, init: RequestInit = {}) =>
+        app.request(path, {
+          ...init,
+          headers: {
+            ...(init.headers ?? {}),
+            Cookie: admin.cookie,
+            'X-CSRF-Token': admin.csrf,
+          },
+        });
+    }
+
+    function tokenOf(link: string): string {
+      return link.slice(`${config.appUrl}/#/convite/`.length);
+    }
+
+    function publicRequest(app: App, path: string, body?: unknown) {
+      return app.request(`/auth/invitations/${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '7.7.7.7' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    }
+
+    async function inviteSindico(app: App): Promise<string> {
+      const admin = await adminRequest(app);
+      const res = await admin(`${S}/invitation`, json('POST', { email: SINDICA }));
+      expect(res.status).toBe(201);
+      return tokenOf(((await res.json()) as { link: string }).link);
+    }
+
+    const newSindica = { password: 'senha-sindica-1', name: 'Nova Síndica' };
+
+    test('sindico routes are administrador-only', async () => {
+      const { request } = await sindicoApp();
+
+      const invite = await request(`${S}/invitation`, json('POST', { email: SINDICA }));
+      const view = await request(S);
+      const revoke = await request(`${S}/invitation/revoke`, { method: 'POST' });
+      const remove = await request(`${S}/remove`, { method: 'POST' });
+
+      expect(invite.status).toBe(403);
+      expect(await invite.json()).toEqual({ error: 'Acesso negado' });
+      expect([view.status, revoke.status, remove.status]).toEqual([403, 403, 403]);
+      expect(await count('invitations')).toBe(0);
+      expect(await count("condo_roles WHERE role = 'sindico' AND active")).toBe(1);
+    });
+
+    test('an administrador invites a sindico who accepts and becomes the current sindico', async () => {
+      const sender = new InMemoryEmailSender();
+      const app = await makeApp({ email: sender });
+      const admin = await adminRequest(app);
+
+      const created = await admin(
+        `${S}/invitation`,
+        json('POST', { email: ` ${SINDICA.toUpperCase()} `, phone: '(11) 98888-7777' }),
+      );
+
+      expect(created.status).toBe(201);
+      const body = (await created.json()) as Record<string, unknown> & { link: string };
+      expect(body).toMatchObject({ status: 'pendente', email: SINDICA, emailSent: true });
+      expect(body.whatsappUrl).toMatch(/^https:\/\/wa\.me\/5511988887777\?text=/);
+      expect(sender.lastTo(SINDICA)?.subject).toBe(
+        `Você foi convidado para ser síndico do Condomínio ${TEST_CONDO_ID}`,
+      );
+      const pending = (await (await admin(S)).json()) as Record<string, unknown>;
+      expect(pending).toEqual({
+        current: null,
+        invitation: { status: 'pendente', email: SINDICA, expiresAt: body.expiresAt },
+      });
+      const token = tokenOf(body.link);
+      expect(await (await publicRequest(app, token)).json()).toEqual({
+        role: 'sindico',
+        targetName: `Condomínio ${TEST_CONDO_ID}`,
+        condoName: `Condomínio ${TEST_CONDO_ID}`,
+        email: SINDICA,
+        accountExists: false,
+      });
+
+      const accepted = await publicRequest(app, `${token}/accept`, newSindica);
+
+      expect(accepted.status).toBe(200);
+      const session = (await accepted.json()) as {
+        condos: Record<string, unknown>[];
+        invitedCondoId: string | null;
+      };
+      expect(session.condos).toEqual([
+        expect.objectContaining({ id: TEST_CONDO_ID, role: 'admin', condoRole: 'sindico' }),
+      ]);
+      expect(session.invitedCondoId).toBe(TEST_CONDO_ID);
+      expect(await (await admin(S)).json()).toEqual({
+        current: { name: 'Nova Síndica', email: SINDICA },
+        invitation: { status: 'aceito', email: SINDICA, expiresAt: body.expiresAt },
+      });
+    });
+
+    test('accepting a sindico invite retires the previous sindico', async () => {
+      const { app, request } = await sindicoApp();
+      const token = await inviteSindico(app);
+
+      await publicRequest(app, `${token}/accept`, newSindica);
+
+      expect(await count("condo_roles WHERE role = 'sindico' AND active")).toBe(1);
+      expect(await count("condo_roles WHERE user_id = 'u-sindico' AND role = 'sindico'")).toBe(1);
+      const me = (await (await request('/me/condos')).json()) as { condoRole: string }[];
+      expect(me.map((c) => c.condoRole)).toEqual(['morador']);
+    });
+
+    test('a sindico invite accepted with another e-mail is 401 and grants nothing', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      const token = await inviteSindico(app);
+
+      const res = await publicRequest(app, `${token}/accept`, {
+        ...newSindica,
+        email: 'intrusa@x.com',
+      });
+
+      expect(res.status).toBe(401);
+      expect(await count(`users WHERE email IN ('intrusa@x.com', '${SINDICA}')`)).toBe(0);
+      expect(await count("invitations WHERE status = 'pendente' AND claimed_by IS NULL")).toBe(1);
+      expect(await count("condo_roles WHERE role = 'sindico'")).toBe(0);
+    });
+
+    test('a sindico invite created in one condominium grants nothing in another', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      await createTestCondo(pool, 'condo-b', { orgId: `org-${TEST_CONDO_ID}` });
+      const admin = await adminRequest(app);
+      const token = await inviteSindico(app);
+
+      const accepted = await publicRequest(app, `${token}/accept`, newSindica);
+
+      const { condos } = (await accepted.json()) as { condos: { id: string }[] };
+      expect(condos.map((c) => c.id)).toEqual([TEST_CONDO_ID]);
+      expect(await (await admin('/api/condos/condo-b/sindico')).json()).toEqual({
+        current: null,
+        invitation: null,
+      });
+    });
+
+    test('reenviar and revoke leave the old links invalid', async () => {
+      const app = await makeApp({ email: new InMemoryEmailSender() });
+      const admin = await adminRequest(app);
+      const first = await inviteSindico(app);
+      const second = await inviteSindico(app);
+
+      const revoked = await admin(`${S}/invitation/revoke`, { method: 'POST' });
+
+      expect(revoked.status).toBe(204);
+      for (const token of [first, second]) {
+        const res = await publicRequest(app, token);
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ error: 'Convite inválido ou expirado' });
+      }
+      expect(((await (await admin(S)).json()) as { invitation: unknown }).invitation).toMatchObject(
+        { status: 'revogado' },
+      );
+    });
+
+    test('creating a sindico invite without an e-mail is 400', async () => {
+      const app = await makeApp();
+      const admin = await adminRequest(app);
+
+      const res = await admin(`${S}/invitation`, json('POST', { phone: '(11) 98888-7777' }));
+
+      expect(res.status).toBe(400);
+      expect(await count('invitations')).toBe(0);
+    });
+
+    test('remove deactivates the sindico grant', async () => {
+      const { app, request } = await sindicoApp();
+      const admin = await adminRequest(app);
+
+      const removed = await admin(`${S}/remove`, { method: 'POST' });
+
+      expect(removed.status).toBe(204);
+      expect(await (await admin(S)).json()).toEqual({ current: null, invitation: null });
+      expect((await request(`${P}/dashboard`)).status).toBe(200);
+      expect((await request(`${P}/accounts`)).status).toBe(403);
+      await pool.query("UPDATE condo_roles SET active = FALSE WHERE id = 'role-sindico-home'");
+      expect((await request(`${P}/dashboard`)).status).toBe(404);
+      expect(await count("condo_roles WHERE id = 'role-sindico'")).toBe(1);
+    });
+  });
+
+  describe('activity log', () => {
+    const accountBody = {
+      description: 'Água',
+      category: 'Utilidades',
+      valueCents: 1000,
+      date: '2026-04-05',
+      status: 'pendente',
+    };
+
+    async function adminActivity(app: App) {
+      const admin = await authFor(app, adminCredentials);
+      return app.request(`${P}/activity`, {
+        headers: { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf },
+      });
+    }
+
+    test("a síndico's account creation is logged with the síndico as actor", async () => {
+      const { app, request } = await sindicoApp();
+
+      await request(`${P}/accounts`, json('POST', accountBody));
+      const res = await adminActivity(app);
+
+      const body = (await res.json()) as Record<string, unknown>[];
+      expect(res.status).toBe(200);
+      expect(body).toHaveLength(1);
+      expect(body[0]).toMatchObject({
+        action: 'account.created',
+        label: 'Conta lançada',
+        actorName: 'Síndica Teste',
+      });
+    });
+
+    test('failed writes are not logged', async () => {
+      const { app, request } = await sindicoApp();
+
+      const bad = await request(`${P}/accounts`, json('POST', { description: '' }));
+      const res = await adminActivity(app);
+
+      expect(bad.status).toBe(400);
+      expect(await res.json()).toEqual([]);
+    });
+
+    test('sindico cannot read the activity', async () => {
+      const { request } = await sindicoApp();
+
+      const res = await request(`${P}/activity`);
+
+      expect(res.status).toBe(403);
+    });
+
+    test('a no-op ensure-month adds no row and one that creates receipts adds exactly one', async () => {
+      const app = await makeApp();
+      const admin = await authFor(app, adminCredentials);
+      const headers = { Cookie: admin.cookie, 'X-CSRF-Token': admin.csrf };
+      const ensure = () => app.request(`${P}/receipts/ensure-month`, { method: 'POST', headers });
+
+      const first = (await (await ensure()).json()) as unknown[];
+      await ensure();
+      const res = await app.request(`${P}/activity`, { headers });
+
+      const body = (await res.json()) as { action: string }[];
+      expect(first.length).toBeGreaterThan(0);
+      expect(body.map((e) => e.action)).toEqual(['receipt.monthly']);
+    });
+
+    test('a :id route records the resource id as subjectId', async () => {
+      const { app, request } = await sindicoApp();
+      const created = (await (
+        await request(`${P}/accounts`, json('POST', accountBody))
+      ).json()) as { id: string };
+
+      await request(`${P}/accounts/${created.id}`, json('PUT', accountBody));
+      const res = await adminActivity(app);
+
+      const body = (await res.json()) as { action: string; subjectId: string | null }[];
+      expect(body.find((e) => e.action === 'account.updated')?.subjectId).toBe(created.id);
+    });
+
+    test('every money write has an activity label', async () => {
+      const app = await makeApp();
+      const prefixes = ['accounts', 'incomes', 'categories', 'receipts'].map(
+        (name) => `${P.replace(TEST_CONDO_ID, ':condoId')}/${name}`,
+      );
+      const statusPath = `${P.replace(TEST_CONDO_ID, ':condoId')}/residents/:id/status`;
+
+      const writes = app.routes.filter(
+        (r) =>
+          r.method !== 'GET' &&
+          r.method !== 'ALL' &&
+          (r.path === statusPath ||
+            prefixes.some((p) => r.path === p || r.path.startsWith(`${p}/`))),
+      );
+
+      expect(writes.length).toBeGreaterThan(10);
+      for (const route of writes) {
+        expect([
+          route.method,
+          route.path,
+          moneyActivityResolver(route.method, route.path),
+        ]).not.toContain(null);
+      }
+    });
+  });
+});
+
+describe('Organization team', () => {
+  const ORG_ID = `org-${TEST_CONDO_ID}`;
+  const O = `/api/orgs/${ORG_ID}`;
+  const memberCredentials = { username: 'equipe', password: 'senha-equipe-1' };
+
+  const json = (method: string, body: unknown): RequestInit => ({
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  async function saveUser(id: string, username: string, password: string, name: string) {
+    const hasher = new BcryptPasswordHasher(config.bcryptCost);
+    await new PostgresUserRepository(pool).save({
+      id,
+      username,
+      email: `${username}@equipe.test`,
+      name,
+      passwordHash: await hasher.hash(password),
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+      sessionVersion: 0,
+    });
+  }
+
+  function requester(app: App, auth: Auth) {
+    return (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: { ...(init.headers ?? {}), Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+      });
+  }
+
+  async function teamApp(opts?: { email?: EmailSender }) {
+    const app = await makeApp(opts);
+    await saveUser('u-equipe', memberCredentials.username, memberCredentials.password, 'Equipe');
+    await pool.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ('om-equipe', $1, 'u-equipe', 'member')`,
+      [ORG_ID],
+    );
+    await createTestCondo(pool, 'condo-b', { orgId: ORG_ID, name: 'Bloco B' });
+    await createTestCondo(pool, 'condo-x', { orgId: 'org-x', name: 'Alheio' });
+    const owner = requester(app, await authFor(app, adminCredentials));
+    const member = requester(app, await authFor(app, memberCredentials));
+    const outsider = requester(app, await authFor(app, residentCredentials));
+    return { app, owner, member, outsider };
+  }
+
+  async function adminCondosOf(userId: string): Promise<string[]> {
+    const { rows } = await pool.query<{ condominium_id: string }>(
+      `SELECT condominium_id FROM condo_roles
+       WHERE user_id = $1 AND role = 'administrador' AND active ORDER BY condominium_id`,
+      [userId],
+    );
+    return rows.map((row) => row.condominium_id);
+  }
+
+  test('non-owner gets 404 on org routes', async () => {
+    const { member, outsider } = await teamApp();
+
+    for (const request of [member, outsider]) {
+      const read = await request(O);
+      const rename = await request(O, json('PUT', { name: 'Tomada' }));
+      const assign = await request(
+        `${O}/members/u-equipe/condos`,
+        json('PUT', { condoIds: [TEST_CONDO_ID] }),
+      );
+      const invite = await request(
+        `${O}/invitations`,
+        json('POST', { email: 'x@x.com', orgRole: 'owner' }),
+      );
+
+      expect(read.status).toBe(404);
+      expect(await read.json()).toEqual({ error: 'Organização não encontrada' });
+      expect([rename.status, assign.status, invite.status]).toEqual([404, 404, 404]);
+    }
+    expect(await count(`organizations WHERE name = 'Tomada'`)).toBe(0);
+    expect(await count('invitations')).toBe(0);
+    expect(await adminCondosOf('u-equipe')).toEqual([]);
+  });
+
+  test('an owner of another organization gets 404', async () => {
+    const { app } = await teamApp();
+    await saveUser('u-alheio', 'alheio', 'senha-alheio-1', 'Alheio');
+    await pool.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ('om-alheio', 'org-x', 'u-alheio', 'owner')`,
+    );
+    const foreign = requester(
+      app,
+      await authFor(app, { username: 'alheio', password: 'senha-alheio-1' }),
+    );
+
+    expect((await foreign(O)).status).toBe(404);
+    expect((await foreign('/api/orgs/org-x')).status).toBe(200);
+  });
+
+  test('the owner reads the team, the condos and the pending invitations', async () => {
+    const { owner } = await teamApp({ email: new InMemoryEmailSender() });
+    await pool.query("UPDATE condominiums SET active = FALSE WHERE id = 'condo-b'");
+    const invited = await owner(
+      `${O}/invitations`,
+      json('POST', { email: 'nova@x.com', orgRole: 'member' }),
+    );
+    const { expiresAt } = (await invited.json()) as { expiresAt: string };
+
+    const res = await owner(O);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { invitations: { id: string }[] };
+    expect(body).toEqual({
+      id: ORG_ID,
+      name: `Organização ${ORG_ID}`,
+      members: [
+        expect.objectContaining({ userId: 'u-admin', role: 'owner', active: true }),
+        {
+          userId: 'u-equipe',
+          name: 'Equipe',
+          email: 'equipe@equipe.test',
+          role: 'member',
+          active: true,
+          condoIds: [],
+        },
+      ],
+      condos: [{ id: TEST_CONDO_ID, name: `Condomínio ${TEST_CONDO_ID}` }],
+      invitations: [{ id: expect.any(String), email: 'nova@x.com', orgRole: 'member', expiresAt }],
+    });
+  });
+
+  test('the owner renames the organization', async () => {
+    const { owner } = await teamApp();
+
+    const renamed = await owner(O, json('PUT', { name: '  Gestora Ipê ' }));
+    const blank = await owner(O, json('PUT', { name: '   ' }));
+
+    expect(renamed.status).toBe(200);
+    expect(await renamed.json()).toEqual({ id: ORG_ID, name: 'Gestora Ipê' });
+    expect(blank.status).toBe(400);
+  });
+
+  test('an owner invites a member who accepts and joins the team', async () => {
+    const sender = new InMemoryEmailSender();
+    const { app, owner } = await teamApp({ email: sender });
+
+    const first = await owner(
+      `${O}/invitations`,
+      json('POST', { email: 'Nova@x.com', orgRole: 'member', phone: '(11) 98888-7777' }),
+    );
+    const second = await owner(
+      `${O}/invitations`,
+      json('POST', { email: 'nova@x.com', orgRole: 'member' }),
+    );
+
+    expect(first.status).toBe(201);
+    const created = (await second.json()) as Record<string, unknown> & { link: string };
+    expect(created).toMatchObject({ status: 'pendente', email: 'nova@x.com', emailSent: true });
+    expect(sender.lastTo('nova@x.com')?.subject).toBe(
+      `Você foi convidado para a equipe Organização ${ORG_ID}`,
+    );
+    expect(await count("invitations WHERE status = 'pendente'")).toBe(1);
+    const token = created.link.slice(`${config.appUrl}/#/convite/`.length);
+    const accepted = await app.request(`/auth/invitations/${token}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '7.7.7.8' },
+      body: JSON.stringify({ password: 'senha-nova-1', name: 'Nova' }),
+    });
+
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({ invitedCondoId: null });
+    const team = (await (await owner(O)).json()) as { members: { name: string }[] };
+    expect(team.members.map((m) => m.name)).toContain('Nova');
+  });
+
+  test('the owner revokes a pending invitation once', async () => {
+    const { owner } = await teamApp({ email: new InMemoryEmailSender() });
+    await owner(`${O}/invitations`, json('POST', { email: 'nova@x.com', orgRole: 'member' }));
+    const { invitations } = (await (await owner(O)).json()) as { invitations: { id: string }[] };
+    const id = invitations[0]?.id ?? '';
+
+    const revoked = await owner(`${O}/invitations/${id}/revoke`, { method: 'POST' });
+    const again = await owner(`${O}/invitations/${id}/revoke`, { method: 'POST' });
+
+    expect(revoked.status).toBe(204);
+    expect(again.status).toBe(404);
+    expect(await count("invitations WHERE status = 'revogado'")).toBe(1);
+  });
+
+  test('assign condos makes the member administrador of exactly those condos', async () => {
+    const { owner, member } = await teamApp();
+
+    const first = await owner(
+      `${O}/members/u-equipe/condos`,
+      json('PUT', { condoIds: ['condo-b', TEST_CONDO_ID] }),
+    );
+    expect(first.status).toBe(200);
+    expect(await first.json()).toEqual({ condoIds: ['condo-b', TEST_CONDO_ID] });
+
+    const second = await owner(
+      `${O}/members/u-equipe/condos`,
+      json('PUT', { condoIds: ['condo-b'] }),
+    );
+
+    expect(await second.json()).toEqual({ condoIds: ['condo-b'] });
+    expect(await adminCondosOf('u-equipe')).toEqual(['condo-b']);
+    const mine = (await (await member('/me/condos')).json()) as Record<string, unknown>[];
+    expect(mine).toEqual([
+      expect.objectContaining({ id: 'condo-b', condoRole: 'administrador', orgRole: 'member' }),
+    ]);
+    expect((await member(`${P}/dashboard`)).status).toBe(404);
+    expect((await member('/api/condos/condo-b/dashboard')).status).toBe(200);
+  });
+
+  test('assign condos outside the organization is 404 and writes nothing', async () => {
+    const { owner } = await teamApp();
+    await owner(`${O}/members/u-equipe/condos`, json('PUT', { condoIds: [TEST_CONDO_ID] }));
+
+    const res = await owner(
+      `${O}/members/u-equipe/condos`,
+      json('PUT', { condoIds: ['condo-b', 'condo-x'] }),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await adminCondosOf('u-equipe')).toEqual([TEST_CONDO_ID]);
+    expect(await count("condo_roles WHERE condominium_id = 'condo-x'")).toBe(0);
+  });
+
+  test('assign condos to an owner is 409 and to an outsider is 404', async () => {
+    const { owner } = await teamApp();
+
+    const toOwner = await owner(
+      `${O}/members/u-admin/condos`,
+      json('PUT', { condoIds: ['condo-b'] }),
+    );
+    const toOutsider = await owner(
+      `${O}/members/u-maria/condos`,
+      json('PUT', { condoIds: ['condo-b'] }),
+    );
+
+    expect(toOwner.status).toBe(409);
+    expect(toOutsider.status).toBe(404);
+    expect(await count("condo_roles WHERE condominium_id = 'condo-b'")).toBe(0);
+  });
+
+  test('deactivated member loses access immediately', async () => {
+    const { owner, member } = await teamApp();
+    await pool.query(
+      `INSERT INTO apartments (id, label, condominium_id) VALUES ('apt-x', 'Apto 1', 'condo-x');
+       INSERT INTO residents (id, name, phone, email, status, condominium_id)
+         VALUES ('r-x', 'Equipe', '', '', 'em_dia', 'condo-x');
+       INSERT INTO apartment_residents (id, apartment_id, resident_id, active)
+         VALUES ('occ-x', 'apt-x', 'r-x', TRUE);
+       INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+         VALUES ('role-x', 'condo-x', 'u-equipe', 'morador', 'r-x');`,
+    );
+    await owner(`${O}/members/u-equipe/condos`, json('PUT', { condoIds: ['condo-b'] }));
+    expect((await member('/api/condos/condo-b/dashboard')).status).toBe(200);
+
+    const res = await owner(`${O}/members/u-equipe/deactivate`, { method: 'POST' });
+
+    expect(res.status).toBe(204);
+    expect((await member('/api/condos/condo-b/dashboard')).status).toBe(404);
+    expect((await member('/api/condos/condo-x/dashboard')).status).toBe(200);
+    const team = (await (await owner(O)).json()) as { members: Record<string, unknown>[] };
+    expect(team.members).toContainEqual(
+      expect.objectContaining({ userId: 'u-equipe', active: false, condoIds: [] }),
+    );
+  });
+
+  test('owner cannot deactivate an owner or themselves', async () => {
+    const { owner } = await teamApp();
+    await saveUser('u-socio', 'socio', 'senha-socio-1', 'Sócio');
+    await pool.query(
+      `INSERT INTO organization_members (id, organization_id, user_id, role)
+       VALUES ('om-socio', $1, 'u-socio', 'owner')`,
+      [ORG_ID],
+    );
+
+    const other = await owner(`${O}/members/u-socio/deactivate`, { method: 'POST' });
+    const self = await owner(`${O}/members/u-admin/deactivate`, { method: 'POST' });
+
+    expect(other.status).toBe(409);
+    expect(await other.json()).toEqual({ error: 'Não é possível desativar um dono' });
+    expect(self.status).toBe(409);
+    expect(await self.json()).toEqual({ error: 'Você não pode se desativar' });
+    expect(await count('organization_members WHERE active')).toBe(3);
+  });
+
+  test('member creating a condo gets it in their organization', async () => {
+    const { member } = await teamApp();
+
+    const res = await member('/me/condos', json('POST', { name: 'Residencial Equipe' }));
+
+    expect(res.status).toBe(201);
+    const created = (await res.json()) as { id: string; organizationId: string };
+    expect(created.organizationId).toBe(ORG_ID);
+    expect(await count('organizations')).toBe(2);
+    const mine = (await (await member('/me/condos')).json()) as Record<string, unknown>[];
+    expect(mine).toEqual([
+      expect.objectContaining({
+        id: created.id,
+        condoRole: 'administrador',
+        organizationId: ORG_ID,
+        orgRole: 'member',
+      }),
+    ]);
   });
 });

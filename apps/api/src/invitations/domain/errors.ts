@@ -37,3 +37,11 @@ export class InactiveResidentError extends Error {
     this.name = 'InactiveResidentError';
   }
 }
+
+export class InvitationOrganizationNotFoundError extends Error {
+  readonly status = 404;
+  constructor() {
+    super('Organização não encontrada');
+    this.name = 'InvitationOrganizationNotFoundError';
+  }
+}

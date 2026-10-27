@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 
@@ -31,10 +31,20 @@ function Harness({
   settings,
   categoryRepo,
   condoInfo = defaultCondoInfo(),
+  canManageFees = true,
+  canManageCondo = true,
+  onOpenActivity,
+  onOpenSindico,
+  onOpenTeam,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
   condoInfo?: CondoInfoRepository;
+  canManageFees?: boolean;
+  canManageCondo?: boolean;
+  onOpenActivity?: () => void;
+  onOpenSindico?: () => void;
+  onOpenTeam?: () => void;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -51,6 +61,11 @@ function Harness({
       categoriesReady={categories.isSuccess}
       savingCategories={saveCategories.isPending}
       onSaveCategories={(drafts) => saveCategories.mutateAsync(drafts)}
+      canManageFees={canManageFees}
+      canManageCondo={canManageCondo}
+      onOpenActivity={onOpenActivity}
+      onOpenSindico={onOpenSindico}
+      onOpenTeam={onOpenTeam}
       onBack={() => {}}
     />
   );
@@ -62,6 +77,51 @@ function renderScreen(
 ) {
   return renderWithClient(<Harness settings={repo} categoryRepo={categoryRepo} />);
 }
+
+describe('SettingsScreen permissions', () => {
+  test('sindico sees fee fields read-only', async () => {
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    expect(await screen.findByText('R$ 150,00')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Valor da taxa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Nome do condomínio' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Nome da nova categoria')).toBeInTheDocument();
+  });
+});
+
+describe('SettingsScreen read-only condo name', () => {
+  test('saves without a condominium name error when the person cannot manage the condo', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const condoInfo: CondoInfoRepository = {
+      get: () => Promise.reject(new Error('offline')),
+      rename: () => Promise.reject(new Error('offline')),
+    };
+    act(() => useCondoScope.getState().setCondo(null));
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        condoInfo={condoInfo}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(screen.queryByText('Informe o nome do condomínio')).not.toBeInTheDocument();
+  });
+});
 
 describe('SettingsScreen', () => {
   test('renames the condominium', async () => {
@@ -186,7 +246,9 @@ describe('SettingsScreen', () => {
     fireEvent.change(screen.getByLabelText('Valor da taxa'), { target: { value: '20000' } });
     fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
 
-    await waitFor(() => expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15 }));
+    await waitFor(() =>
+      expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15, pix: null }),
+    );
   });
 
   test('adds a category and shows the reclassified count after saving', async () => {
@@ -235,5 +297,167 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /salvar e reclassificar/i })).toBeEnabled(),
     );
+  });
+
+  test('shows the Atividade row only when an opener is provided and opens it', async () => {
+    const onOpenActivity = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenActivity={onOpenActivity}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Atividade' }));
+
+    expect(onOpenActivity).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Atividade' })).not.toBeInTheDocument();
+  });
+
+  test('shows the Síndico row only when an opener is provided and opens it', async () => {
+    const onOpenSindico = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenSindico={onOpenSindico}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Síndico' }));
+
+    expect(onOpenSindico).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Síndico' })).not.toBeInTheDocument();
+  });
+
+  test('shows the Equipe row only when an opener is provided and opens it', async () => {
+    const onOpenTeam = jest.fn();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    const { unmount } = renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenTeam={onOpenTeam}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Equipe' }));
+
+    expect(onOpenTeam).toHaveBeenCalled();
+    unmount();
+    renderWithClient(
+      <Harness settings={settings} categoryRepo={new InMemoryCategoryRepository([])} />,
+    );
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Equipe' })).not.toBeInTheDocument();
+  });
+});
+
+describe('SettingsScreen Pix', () => {
+  const storedPix = {
+    keyType: 'email' as const,
+    key: 'a@b.com',
+    receiverName: 'Condominio Morada',
+    city: 'Sao Paulo',
+  };
+
+  test('a fee-only save never erases the stored Pix key', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderScreen(settings);
+
+    await screen.findByDisplayValue('a@b.com');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toEqual(storedPix);
+  });
+
+  test('saves a new Pix key with normalization', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderScreen(settings);
+
+    await user.selectOptions(await screen.findByLabelText('Tipo de chave Pix'), 'cpf');
+    await user.type(screen.getByLabelText('Chave Pix'), '529.982.247-25');
+    await user.type(screen.getByLabelText('Nome do recebedor'), 'Condominio Morada');
+    await user.type(screen.getByLabelText('Cidade'), 'Sao Paulo');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toEqual({
+      keyType: 'cpf',
+      key: '52998224725',
+      receiverName: 'Condominio Morada',
+      city: 'Sao Paulo',
+    });
+  });
+
+  test('shows the validation message for an invalid key and does not save', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 });
+    renderScreen(settings);
+
+    await user.type(await screen.findByLabelText('Chave Pix'), '123');
+    await user.type(screen.getByLabelText('Nome do recebedor'), 'Morada');
+    await user.type(screen.getByLabelText('Cidade'), 'Sao Paulo');
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    expect(await screen.findByText('Chave Pix inválida')).toBeInTheDocument();
+    expect(settings.snapshot().pix).toBeNull();
+  });
+
+  test('Remover chave clears the stored Pix on save', async () => {
+    const user = userEvent.setup();
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderScreen(settings);
+
+    await screen.findByDisplayValue('a@b.com');
+    await user.click(screen.getByRole('button', { name: 'Remover chave' }));
+    await user.click(screen.getByRole('button', { name: /salvar e reclassificar/i }));
+
+    await screen.findByText(/configurações salvas/i);
+    expect(settings.snapshot().pix).toBeNull();
+  });
+
+  test('the síndico sees the Pix key read-only', async () => {
+    const settings = new InMemorySettingsRepository({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: storedPix,
+    });
+    renderWithClient(
+      <Harness
+        settings={settings}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        canManageFees={false}
+        canManageCondo={false}
+      />,
+    );
+
+    expect(await screen.findByText('a@b.com')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Chave Pix')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remover chave' })).not.toBeInTheDocument();
   });
 });

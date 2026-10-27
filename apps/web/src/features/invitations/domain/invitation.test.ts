@@ -5,7 +5,9 @@ import {
   formatDayMonth,
   invitationPreviewSchema,
   invitationViewSchema,
+  sindicoViewSchema,
   validateInviteEmail,
+  validateSindicoEmail,
 } from './invitation';
 
 const EMPTY_FORM = { email: '', name: '', password: '', confirmation: '' };
@@ -42,6 +44,8 @@ describe('invitation schemas', () => {
 
   test('parses a preview', () => {
     const preview = {
+      role: 'morador',
+      targetName: 'Morada',
       condoName: 'Morada',
       residentName: 'Ana',
       apt: 'Apto 302',
@@ -49,6 +53,58 @@ describe('invitation schemas', () => {
       accountExists: false,
     };
     expect(invitationPreviewSchema.parse(preview)).toEqual(preview);
+  });
+});
+
+describe('invitation preview roles', () => {
+  test('parses a team preview without condo or resident fields', () => {
+    const preview = { role: 'membro', targetName: 'Aurora', email: 'a@b.com', accountExists: true };
+    expect(invitationPreviewSchema.parse(preview)).toEqual(preview);
+  });
+
+  test('rejects an unknown role', () => {
+    expect(() =>
+      invitationPreviewSchema.parse({
+        role: 'dono',
+        targetName: 'x',
+        email: null,
+        accountExists: false,
+      }),
+    ).toThrow();
+  });
+});
+
+describe('sindicoViewSchema', () => {
+  test('parses an empty síndico view', () => {
+    expect(sindicoViewSchema.parse({ current: null, invitation: null })).toEqual({
+      current: null,
+      invitation: null,
+    });
+  });
+
+  test('parses a current síndico without a name', () => {
+    const view = { current: { name: null, email: 'a@b.com' }, invitation: null };
+    expect(sindicoViewSchema.parse(view)).toEqual(view);
+  });
+});
+
+describe('validateSindicoEmail', () => {
+  test('requires an e-mail', () => {
+    expect(validateSindicoEmail('  ')).toEqual({
+      ok: false,
+      message: 'Informe o e-mail do síndico',
+    });
+  });
+
+  test('rejects an invalid e-mail', () => {
+    expect(validateSindicoEmail('x')).toEqual({ ok: false, message: 'Informe um e-mail válido.' });
+  });
+
+  test('normalizes a valid e-mail', () => {
+    expect(validateSindicoEmail(' Ana@Exemplo.com ')).toEqual({
+      ok: true,
+      data: 'ana@exemplo.com',
+    });
   });
 });
 
@@ -76,7 +132,13 @@ describe('validateInviteEmail', () => {
 });
 
 describe('acceptMode', () => {
-  const base = { condoName: 'Morada', residentName: 'Ana', apt: 'Apto 302' };
+  const base = {
+    role: 'morador' as const,
+    targetName: 'Morada',
+    condoName: 'Morada',
+    residentName: 'Ana',
+    apt: 'Apto 302',
+  };
 
   test('an invite without e-mail is open', () => {
     expect(acceptMode({ ...base, email: null, accountExists: false })).toBe('open');

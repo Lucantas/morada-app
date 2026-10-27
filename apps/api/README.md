@@ -43,6 +43,38 @@ a matching `X-Morada-Proxy-Secret`).
   logged in plaintext); message `author` is derived from the verified role
   (never trusted from the body); `POST` never accepts a client id.
 
+## Roles, team, activity and Pix routes
+
+Permissions come from `condos/domain/permissions.ts`: `administrador` has all seven,
+`sindico` has `view_building`, `publish_notices`, `manage_residents` and
+`manage_money`, `morador` has none. A missing permission in a reachable condo answers
+403 `"Acesso negado"`.
+
+`PUT /settings` is checked twice: `requireRole('admin')` (the staff view, from the
+`/settings` group) and then `requirePermission('manage_fees')`.
+
+| Route                                              | Guard                      | Purpose                                                         |
+| -------------------------------------------------- | -------------------------- | --------------------------------------------------------------- |
+| `PUT /api/condos/:id/settings`                     | staff view + `manage_fees` | Fee, due day and Pix key                                        |
+| `PUT /api/condos/:id/info`                         | `manage_condo`             | Rename the condominium                                          |
+| `GET /api/condos/:id/pix`                          | any member                 | Pix key, receiver and city (or `configured: false`)             |
+| `GET /api/condos/:id/activity`                     | `view_activity`            | Activity log, newest first                                      |
+| `GET /api/condos/:id/sindico`                      | `manage_condo`             | Current síndico and latest invitation                           |
+| `POST /api/condos/:id/sindico/invitation`          | `manage_condo`             | Invite a síndico (e-mail required)                              |
+| `POST /api/condos/:id/sindico/invitation/revoke`   | `manage_condo`             | Revoke the pending invitation                                   |
+| `POST /api/condos/:id/sindico/remove`              | `manage_condo`             | Deactivate the current síndico                                  |
+| `GET /api/orgs/:orgId`                             | org owner                  | Organization, members and pending invitations                   |
+| `PUT /api/orgs/:orgId`                             | org owner                  | Rename the organization                                         |
+| `POST /api/orgs/:orgId/invitations`                | org owner                  | Invite a member or owner                                        |
+| `POST /api/orgs/:orgId/invitations/:id/revoke`     | org owner                  | Revoke a member invitation                                      |
+| `PUT /api/orgs/:orgId/members/:userId/condos`      | org owner                  | Assign the member's condominiums                                |
+| `POST /api/orgs/:orgId/members/:userId/deactivate` | org owner                  | Deactivate a member and their `administrador` grants in the org |
+
+Org routes answer 404 `"Organização não encontrada"` to anyone who is not an owner.
+Only one síndico is active per condominium; accepting a new invitation replaces the
+previous one atomically. The web sends `X-Morada-View: admin | resident` so a staff
+user with a resident grant can switch between "O prédio" and "Minha casa".
+
 ## Seeded login
 
 The database seeds **only the admin login** — **change it before any real

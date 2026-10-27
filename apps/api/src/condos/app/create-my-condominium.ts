@@ -1,18 +1,37 @@
 import { z } from 'zod';
 
 import { isEmailVerified, type User } from '../../users/domain/user';
+import type { OrgRoleName } from '../domain/condo-access';
 import { condominiumSchema } from '../domain/condominium';
 import type { CondoRepository } from '../domain/condo-repository';
 import { CondoValidationError, EmailNotConfirmedError } from '../domain/errors';
-import type { CondoSummary } from './condo-access-views';
+import { summaryOf, type CondoSummary } from './condo-access-views';
 
 const DEFAULT_MONTHLY_FEE_CENTS = 0;
 const DEFAULT_DUE_DAY = 10;
 
 const inputSchema = z.object({ name: condominiumSchema.shape.name });
 
+async function targetOrganization(
+  condos: Pick<CondoRepository, 'ownedOrganization' | 'memberOrganization' | 'createOrganization'>,
+  userId: string,
+  name: string,
+): Promise<{ organization: { id: string }; orgRole: OrgRoleName }> {
+  const owned = await condos.ownedOrganization(userId);
+  if (owned) return { organization: owned, orgRole: 'owner' };
+  const membership = await condos.memberOrganization(userId);
+  if (membership) return { organization: membership, orgRole: 'member' };
+  return {
+    organization: await condos.createOrganization({ name, ownerUserId: userId }),
+    orgRole: 'owner',
+  };
+}
+
 export async function createMyCondominium(
-  condos: Pick<CondoRepository, 'ownedOrganization' | 'createOrganization' | 'create' | 'grant'>,
+  condos: Pick<
+    CondoRepository,
+    'ownedOrganization' | 'memberOrganization' | 'createOrganization' | 'create' | 'grant'
+  >,
   user: User,
   input: unknown,
 ): Promise<CondoSummary> {
@@ -20,9 +39,7 @@ export async function createMyCondominium(
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) throw new CondoValidationError();
   const { name } = parsed.data;
-  const organization =
-    (await condos.ownedOrganization(user.id)) ??
-    (await condos.createOrganization({ name, ownerUserId: user.id }));
+  const { organization, orgRole } = await targetOrganization(condos, user.id, name);
   const condo = await condos.create({
     organizationId: organization.id,
     name,
@@ -35,5 +52,15 @@ export async function createMyCondominium(
     role: 'administrador',
     residentId: null,
   });
-  return { id: condo.id, name: condo.name, role: 'admin' };
+  return summaryOf(
+    {
+      condominiumId: condo.id,
+      name: condo.name,
+      role: 'administrador',
+      residentId: null,
+      organizationId: organization.id,
+      orgRole,
+    },
+    'admin',
+  );
 }

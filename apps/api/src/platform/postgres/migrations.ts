@@ -436,4 +436,49 @@ WHERE status = 'pendente' AND id NOT IN (
 CREATE UNIQUE INDEX idx_invitations_one_pending ON invitations (resident_id) WHERE status = 'pendente';
 `,
   },
+  {
+    id: '024_activity_log',
+    sql: `
+CREATE TABLE activity_log (
+  id TEXT PRIMARY KEY,
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  actor_user_id TEXT NOT NULL REFERENCES users(id),
+  action TEXT NOT NULL,
+  subject_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_activity_log_condo_created ON activity_log (condominium_id, created_at DESC);
+`,
+  },
+  {
+    id: '025_staff_invitations',
+    sql: `
+ALTER TABLE invitations ALTER COLUMN resident_id DROP NOT NULL;
+ALTER TABLE invitations ALTER COLUMN condominium_id DROP NOT NULL;
+ALTER TABLE invitations ADD COLUMN organization_id TEXT REFERENCES organizations(id);
+ALTER TABLE invitations ADD COLUMN org_role TEXT CHECK (org_role IN ('owner', 'member'));
+ALTER TABLE invitations DROP CONSTRAINT invitations_role_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_role_check CHECK (role IN ('morador', 'sindico', 'membro'));
+ALTER TABLE invitations ADD CONSTRAINT invitations_shape_check CHECK (
+  (role = 'morador' AND condominium_id IS NOT NULL AND resident_id IS NOT NULL AND organization_id IS NULL) OR
+  (role = 'sindico' AND condominium_id IS NOT NULL AND resident_id IS NULL AND organization_id IS NULL AND email IS NOT NULL) OR
+  (role = 'membro' AND organization_id IS NOT NULL AND condominium_id IS NULL AND resident_id IS NULL AND email IS NOT NULL AND org_role IS NOT NULL)
+);
+CREATE UNIQUE INDEX idx_invitations_one_pending_sindico ON invitations (condominium_id) WHERE role = 'sindico' AND status = 'pendente';
+CREATE UNIQUE INDEX idx_invitations_one_pending_member ON invitations (organization_id, email) WHERE role = 'membro' AND status = 'pendente';
+`,
+  },
+  {
+    id: '026_condo_pix',
+    sql: `
+ALTER TABLE condo_settings ADD COLUMN pix_key_type TEXT CHECK (pix_key_type IN ('cpf','cnpj','email','telefone','aleatoria'));
+ALTER TABLE condo_settings ADD COLUMN pix_key TEXT;
+ALTER TABLE condo_settings ADD COLUMN pix_receiver_name TEXT;
+ALTER TABLE condo_settings ADD COLUMN pix_city TEXT;
+ALTER TABLE condo_settings ADD CONSTRAINT condo_settings_pix_all_or_none CHECK (
+  (pix_key_type IS NULL AND pix_key IS NULL AND pix_receiver_name IS NULL AND pix_city IS NULL) OR
+  (pix_key_type IS NOT NULL AND pix_key IS NOT NULL AND pix_receiver_name IS NOT NULL AND pix_city IS NOT NULL)
+);
+`,
+  },
 ];

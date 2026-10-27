@@ -26,14 +26,25 @@ export const createdInvitationSchema = invitationViewSchema.extend({
 });
 export type CreatedInvitation = z.infer<typeof createdInvitationSchema>;
 
+export const invitationRoleSchema = z.enum(['morador', 'sindico', 'membro']);
+export type InvitationRole = z.infer<typeof invitationRoleSchema>;
+
 export const invitationPreviewSchema = z.object({
-  condoName: z.string(),
-  residentName: z.string(),
-  apt: z.string(),
+  role: invitationRoleSchema,
+  targetName: z.string(),
+  condoName: z.string().optional(),
+  residentName: z.string().optional(),
+  apt: z.string().optional(),
   email: z.string().nullable(),
   accountExists: z.boolean(),
 });
 export type InvitationPreview = z.infer<typeof invitationPreviewSchema>;
+
+export const sindicoViewSchema = z.object({
+  current: z.object({ name: z.string().nullable(), email: z.string().nullable() }).nullable(),
+  invitation: invitationViewSchema.nullable(),
+});
+export type SindicoView = z.infer<typeof sindicoViewSchema>;
 
 export const legacyLoginSchema = z.object({ username: z.string().nullable() });
 
@@ -52,6 +63,13 @@ export function formatDayMonth(iso: string): string {
 
 export function validateInviteEmail(email: string): Validation<string> {
   if (email.trim() === '') return { ok: true, data: '' };
+  return validate(emailSchema, email);
+}
+
+export const SINDICO_EMAIL_REQUIRED = 'Informe o e-mail do síndico';
+
+export function validateSindicoEmail(email: string): Validation<string> {
+  if (email.trim() === '') return { ok: false, message: SINDICO_EMAIL_REQUIRED };
   return validate(emailSchema, email);
 }
 

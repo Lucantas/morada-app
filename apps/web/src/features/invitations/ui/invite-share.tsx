@@ -4,7 +4,13 @@ import { formatDayMonth, type CreatedInvitation } from '../domain/invitation';
 
 import { CopyButton } from './copy-button';
 
-export function InviteShare({ created }: { created: CreatedInvitation }) {
+export function InviteShare({
+  created,
+  recipient = 'morador',
+}: {
+  created: CreatedInvitation;
+  recipient?: string;
+}) {
   return (
     <div>
       <SurfaceCard>
@@ -12,7 +18,7 @@ export function InviteShare({ created }: { created: CreatedInvitation }) {
           {`Convite criado · vence em ${formatDayMonth(created.expiresAt)}`}
         </p>
         <p style={{ color: 'var(--ink-500)', fontSize: '.86rem', margin: '0 0 10px' }}>
-          O link vale para uma pessoa só. Envie apenas para o morador.
+          {`O link vale para uma pessoa só. Envie apenas para o ${recipient}.`}
         </p>
         <div
           data-testid="invite-link"

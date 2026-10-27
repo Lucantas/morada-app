@@ -69,3 +69,31 @@ export function invitationMessage(to: string, condoName: string, link: string): 
     link,
   );
 }
+
+export function sindicoInvitationMessage(
+  to: string,
+  condoName: string,
+  link: string,
+): EmailMessage {
+  return compose(
+    to,
+    `Você foi convidado para ser síndico do ${condoName}`,
+    `Você foi convidado para ser síndico do ${condoName} no Morada. O convite vale por 7 dias.`,
+    'Aceitar convite',
+    link,
+  );
+}
+
+export function membroInvitationMessage(
+  to: string,
+  organizationName: string,
+  link: string,
+): EmailMessage {
+  return compose(
+    to,
+    `Você foi convidado para a equipe ${organizationName}`,
+    `Você foi convidado para a equipe ${organizationName} no Morada. O convite vale por 7 dias.`,
+    'Aceitar convite',
+    link,
+  );
+}

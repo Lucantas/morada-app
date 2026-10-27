@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 
 import type { Category, CategoryDraft } from '@/features/categories/domain/category';
 import { useCondoName } from '@/shared/lib/condo-scope';
+import { formatBRL } from '@/shared/lib/money';
 import { MoneyInput } from '@/shared/ui/money-input';
 import { Icon } from '@/shared/ui/icon';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { Field, PrimaryButton, SectionLabel, SurfaceCard } from '@/shared/ui/primitives';
 
+import { EMPTY_PIX_DRAFT, draftFromPix, pixUpdateFor, type PixDraft } from '../domain/pix-draft';
 import type { SettingsRepository } from '../domain/settings-repository';
+import { PixSection } from './pix-section';
 import { useSettings, useSaveSettings } from './use-settings';
 import { SettingsSkeleton } from './settings-skeleton';
 
@@ -21,10 +24,53 @@ type Props = {
   categoriesReady: boolean;
   savingCategories: boolean;
   onSaveCategories: (drafts: CategoryDraft[]) => Promise<{ reclassified: number }>;
+  canManageFees: boolean;
+  canManageCondo: boolean;
+  onOpenActivity?: () => void;
+  onOpenSindico?: () => void;
+  onOpenTeam?: () => void;
   onBack: () => void;
 };
 
 const MAX_CONDO_NAME_LENGTH = 80;
+
+function ReadOnlyValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: '.82rem', color: 'var(--ink-500)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 600 }}>{value}</div>
+    </div>
+  );
+}
+
+function SettingsLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 48,
+        padding: '0 14px',
+        marginBottom: 16,
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-md)',
+        fontFamily: "'Inter', sans-serif",
+        fontWeight: 600,
+        fontSize: '.95rem',
+        color: 'var(--ink-900)',
+        cursor: 'pointer',
+      }}
+    >
+      {label}
+      <Icon name="chevronRight" size={18} color="var(--ink-500)" />
+    </button>
+  );
+}
 
 function reclassifiedMessage(count: number): string {
   if (count === 0) return 'Configurações salvas. Nenhuma conta precisou ser reclassificada.';
@@ -42,6 +88,11 @@ export function SettingsScreen({
   categoriesReady,
   savingCategories,
   onSaveCategories,
+  canManageFees,
+  canManageCondo,
+  onOpenActivity,
+  onOpenSindico,
+  onOpenTeam,
   onBack,
 }: Props) {
   const scopeCondoName = useCondoName();
@@ -52,6 +103,7 @@ export function SettingsScreen({
   const [condoName, setCondoName] = useState('');
   const [feeCents, setFeeCents] = useState(0);
   const [dueDay, setDueDay] = useState('15');
+  const [pixDraft, setPixDraft] = useState<PixDraft>(EMPTY_PIX_DRAFT);
   const [localCategories, setLocalCategories] = useState<CategoryDraft[]>([]);
   const [newCat, setNewCat] = useState<CategoryDraft>({ name: '', keywords: '' });
   const [reclassifiedMsg, setReclassifiedMsg] = useState<string | null>(null);
@@ -61,6 +113,7 @@ export function SettingsScreen({
     if (settings.data) {
       setFeeCents(settings.data.monthlyFeeCents);
       setDueDay(String(settings.data.dueDay));
+      setPixDraft(draftFromPix(settings.data.pix));
     }
   }, [settings.data]);
 
@@ -98,25 +151,30 @@ export function SettingsScreen({
 
   const submit = async () => {
     try {
+      const pixUpdate =
+        canManageFees && settings.data ? pixUpdateFor(settings.data.pix, pixDraft) : undefined;
       const trimmedName = condoName.trim();
-      if (trimmedName === '') {
+      if (canManageCondo && trimmedName === '') {
         setReclassifiedMsg(null);
         setSaveError('Informe o nome do condomínio');
         return;
       }
-      if (trimmedName.length > MAX_CONDO_NAME_LENGTH) {
+      if (canManageCondo && trimmedName.length > MAX_CONDO_NAME_LENGTH) {
         setReclassifiedMsg(null);
         setSaveError('Nome muito longo');
         return;
       }
-      if (trimmedName !== savedCondoName) {
+      if (canManageCondo && trimmedName !== savedCondoName) {
         await onRenameCondo(trimmedName);
       }
-      const day = Number.parseInt(dueDay, 10);
-      await saveSettings.mutateAsync({
-        monthlyFeeCents: feeCents,
-        dueDay: Number.isFinite(day) ? day : 15,
-      });
+      if (canManageFees) {
+        const day = Number.parseInt(dueDay, 10);
+        await saveSettings.mutateAsync({
+          monthlyFeeCents: feeCents,
+          dueDay: Number.isFinite(day) ? day : 15,
+          ...(pixUpdate === undefined ? {} : { pix: pixUpdate }),
+        });
+      }
       const result = await onSaveCategories(localCategories);
       setSaveError(null);
       setReclassifiedMsg(reclassifiedMessage(result.reclassified));
@@ -161,16 +219,47 @@ export function SettingsScreen({
         </div>
       </div>
       <ScreenBody>
+        {onOpenSindico && <SettingsLink label="Síndico" onClick={onOpenSindico} />}
+        {onOpenTeam && <SettingsLink label="Equipe" onClick={onOpenTeam} />}
+        {onOpenActivity && <SettingsLink label="Atividade" onClick={onOpenActivity} />}
         {(settings.isError || categoriesError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
         )}
         {settings.isLoading && <SettingsSkeleton />}
         {settings.isSuccess && (
           <div style={{ paddingTop: 2 }}>
-            <Field label="Nome do condomínio" value={condoName} onChange={setCondoName} />
-            <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
-            <Field label="Dia de vencimento" value={dueDay} onChange={setDueDay} type="number" />
+            {canManageCondo ? (
+              <Field label="Nome do condomínio" value={condoName} onChange={setCondoName} />
+            ) : (
+              <ReadOnlyValue label="Nome do condomínio" value={savedCondoName} />
+            )}
+            {canManageFees ? (
+              <>
+                <MoneyInput label="Valor da taxa" value={feeCents} onChange={setFeeCents} />
+                <Field
+                  label="Dia de vencimento"
+                  value={dueDay}
+                  onChange={setDueDay}
+                  type="number"
+                />
+              </>
+            ) : (
+              <>
+                <ReadOnlyValue label="Valor da taxa" value={`R$ ${formatBRL(feeCents)}`} />
+                <ReadOnlyValue label="Dia de vencimento" value={dueDay} />
+              </>
+            )}
           </div>
+        )}
+
+        {settings.isSuccess && (
+          <PixSection
+            editable={canManageFees}
+            stored={settings.data.pix}
+            draft={pixDraft}
+            onChange={setPixDraft}
+            onRemove={() => setPixDraft(EMPTY_PIX_DRAFT)}
+          />
         )}
 
         <SectionLabel>Categorias de contas</SectionLabel>

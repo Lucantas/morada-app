@@ -1,6 +1,10 @@
 import type { ApiClient } from '@/shared/lib/api-client';
 
-import { condoSettingsSchema, type CondoSettings } from '../domain/condo-settings';
+import {
+  condoSettingsSchema,
+  type CondoSettings,
+  type CondoSettingsUpdate,
+} from '../domain/condo-settings';
 import type { SettingsRepository } from '../domain/settings-repository';
 
 export class HttpSettingsRepository implements SettingsRepository {
@@ -10,7 +14,7 @@ export class HttpSettingsRepository implements SettingsRepository {
     return condoSettingsSchema.parse(await this.api.get('/api/settings'));
   }
 
-  async save(settings: CondoSettings): Promise<CondoSettings> {
+  async save(settings: CondoSettingsUpdate): Promise<CondoSettings> {
     return condoSettingsSchema.parse(await this.api.put('/api/settings', settings));
   }
 }

@@ -4,13 +4,16 @@ import {
   INVITE_NOW,
   fakeCondos,
   fakeResidentsFor,
+  ORG_A,
   inMemoryInvitationTokens,
   invitationFixture,
+  membroInvitationFixture,
   residentFixture,
+  sindicoInvitationFixture,
 } from '../../test-support/in-memory-invitations';
 import { inMemoryUsers } from '../../test-support/in-memory-users';
 import type { User } from '../../users/domain/user';
-import type { Invitation } from '../domain/invitation';
+import type { Invitation, MoradorInvitation } from '../domain/invitation';
 
 import { previewInvitation } from './preview-invitation';
 
@@ -28,21 +31,25 @@ const maria: User = {
   sessionVersion: 0,
 };
 
-function deps(invitation: Partial<Invitation> = {}, users: User[] = [], condoActive = true) {
+function storedDeps(stored: Invitation, users: User[] = [], condoActive = true) {
   return {
-    invitations: inMemoryInvitationTokens([
-      { invitation: invitationFixture(invitation), tokenHash: hashToken(TOKEN) },
-    ]),
-    condos: fakeCondos([{ ...CONDO_A, active: condoActive }]),
+    invitations: inMemoryInvitationTokens([{ invitation: stored, tokenHash: hashToken(TOKEN) }]),
+    condos: fakeCondos([{ ...CONDO_A, active: condoActive }], [ORG_A]),
     residentsFor: fakeResidentsFor({ 'condo-a': [residentFixture()] }),
     users: inMemoryUsers(users),
     now: () => INVITE_NOW,
   };
 }
 
+function deps(invitation: Partial<MoradorInvitation> = {}, users: User[] = [], condoActive = true) {
+  return storedDeps(invitationFixture(invitation), users, condoActive);
+}
+
 describe('previewInvitation', () => {
   test('returns only the condo, resident name, apartment and e-mail', async () => {
     expect(await previewInvitation(deps(), TOKEN)).toEqual({
+      role: 'morador',
+      targetName: 'Morada Bloco 2',
       condoName: 'Morada Bloco 2',
       residentName: 'Maria Ribeiro',
       apt: 'Apto 302',
@@ -66,6 +73,27 @@ describe('previewInvitation', () => {
     });
     await expect(previewInvitation(deps({}, [], false), TOKEN)).rejects.toMatchObject({
       status: 404,
+    });
+  });
+
+  test('a sindico invite names the role and the condominium', async () => {
+    expect(await previewInvitation(storedDeps(sindicoInvitationFixture(), [maria]), TOKEN)).toEqual(
+      {
+        role: 'sindico',
+        targetName: 'Morada Bloco 2',
+        condoName: 'Morada Bloco 2',
+        email: 'maria@x.com',
+        accountExists: true,
+      },
+    );
+  });
+
+  test('a membro invite names the role and the organization', async () => {
+    expect(await previewInvitation(storedDeps(membroInvitationFixture()), TOKEN)).toEqual({
+      role: 'membro',
+      targetName: 'Contábil Aurora',
+      email: 'maria@x.com',
+      accountExists: false,
     });
   });
 });

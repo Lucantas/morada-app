@@ -51,8 +51,10 @@ export function accountRoutes(scope: Scoped<AccountRoutesDeps>) {
 
   app.put('/:id', async (c) => {
     const { accounts: repo } = scope(c.get('condoId'));
-    const draft = accountDraftSchema.parse({ ...(await c.req.json()), id: c.req.param('id') });
-    return c.json(await saveAccount(repo, draft));
+    const id = c.req.param('id');
+    const draft = accountDraftSchema.parse({ ...(await c.req.json()), id });
+    const existed = (await repo.getById(id)) !== null;
+    return c.json(await saveAccount(repo, draft), existed ? 200 : 201);
   });
 
   app.delete('/:id', async (c) => {

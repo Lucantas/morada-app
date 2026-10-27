@@ -22,6 +22,8 @@ describe('SettingsScreen loading', () => {
         categoriesReady
         savingCategories={false}
         onSaveCategories={async () => ({ reclassified: 0 })}
+        canManageFees
+        canManageCondo
         onBack={() => {}}
       />,
     );

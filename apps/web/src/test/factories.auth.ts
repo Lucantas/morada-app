@@ -1,12 +1,27 @@
 import type { AuthRepository } from '@/features/auth/domain/auth-repository';
+import { ALL_PERMISSIONS } from '@/shared/lib/permissions';
 import type { LoginCondo, LoginResponse } from '@/features/session/domain/login-response';
 
+export function loginCondo(overrides: Partial<LoginCondo> = {}): LoginCondo {
+  return {
+    id: 'c1',
+    name: 'Morada',
+    role: 'admin',
+    condoRole: 'administrador',
+    permissions: [...ALL_PERMISSIONS],
+    hasHome: false,
+    organizationId: 'o1',
+    orgRole: 'owner',
+    ...overrides,
+  };
+}
+
 export const ADMIN_LOGIN: LoginResponse = {
-  condos: [{ id: 'c1', name: 'Morada', role: 'admin' }],
+  condos: [loginCondo()],
   emailVerified: true,
 };
 
-export const CREATED_CONDO: LoginCondo = { id: 'c9', name: 'Edifício Sol', role: 'admin' };
+export const CREATED_CONDO: LoginCondo = loginCondo({ id: 'c9', name: 'Edifício Sol' });
 
 type MockOf<F extends (...args: never[]) => unknown> = jest.Mock<ReturnType<F>, Parameters<F>>;
 

@@ -354,6 +354,20 @@ GitHub repo secrets (`Lucantas/morada-app`):
 > pnpm dlx wrangler@4 pages deploy apps/web/dist --project-name=morada --branch=main
 > ```
 
+## Roles, activity and Pix release
+
+Migrations `024` (`activity_log`), `025` (staff invitations) and `026` (Pix columns on
+`condo_settings`) are non-destructive: `025` drops the `NOT NULL` on
+`invitations.resident_id`/`condominium_id` and replaces the role `CHECK`, but no data is
+removed and existing rows stay valid. The Fly `release_command` applies them on the next
+deploy. No new secrets are needed.
+
+Rollback: once síndico or membro invitation rows exist, the SP2 build cannot parse them,
+so do not roll back to it; restore the pre-deploy database dump instead.
+
+Manual `wrangler pages deploy` runs leave `.wrangler/` bundles at the repo root; the
+directory is git-ignored.
+
 ## Verify
 
 ```bash

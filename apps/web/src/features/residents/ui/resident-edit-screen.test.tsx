@@ -12,8 +12,9 @@ import { InMemoryResidentRepository } from '../data/in-memory-resident-repositor
 
 import { ResidentEditScreen } from './resident-edit-screen';
 import { useCondoScope } from '@/shared/lib/condo-scope';
+import { testCondo } from '@/test/condo';
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: 'Morada' }));
+beforeEach(() => useCondoScope.getState().setCondo(testCondo({ name: 'Morada' })));
 
 const noReceipts = () => new InMemoryReceiptRepository([]);
 

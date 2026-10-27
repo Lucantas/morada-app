@@ -1,13 +1,52 @@
 import { parseLoginResponse } from './login-response';
 
+const SINDICO = {
+  id: 'c1',
+  name: 'Morada',
+  role: 'admin',
+  condoRole: 'sindico',
+  permissions: ['view_building', 'publish_notices', 'manage_residents', 'manage_money'],
+  hasHome: true,
+  organizationId: 'o1',
+  orgRole: null,
+};
+
 describe('parseLoginResponse', () => {
+  test('accepts a síndico condo with its permissions and home', () => {
+    const parsed = parseLoginResponse({ condos: [SINDICO], emailVerified: true });
+
+    expect(parsed.condos[0]).toMatchObject({ condoRole: 'sindico', hasHome: true, orgRole: null });
+    expect(parsed.condos[0]?.permissions).toHaveLength(4);
+  });
+
+  test('rejects an unknown permission', () => {
+    const condo = { ...SINDICO, permissions: ['view_building', 'fly'] };
+
+    expect(() => parseLoginResponse({ condos: [condo], emailVerified: true })).toThrow();
+  });
+
   test('returns the condos and the e-mail verification flag', () => {
-    const condos = [{ id: 'c1', name: 'Morada', role: 'admin' }];
+    const condos = [SINDICO];
 
     expect(parseLoginResponse({ condos, emailVerified: true })).toEqual({
       condos,
       emailVerified: true,
     });
+  });
+
+  test('keeps the invited condo id of an accepted invitation', () => {
+    expect(
+      parseLoginResponse({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' }),
+    ).toEqual({ condos: [SINDICO], emailVerified: true, invitedCondoId: 'c1' });
+    expect(
+      parseLoginResponse({ condos: [], emailVerified: true, invitedCondoId: null }).invitedCondoId,
+    ).toBeNull();
+  });
+
+  test('rejects an empty invited condo id', () => {
+    expect(() =>
+      parseLoginResponse({ condos: [], emailVerified: true, invitedCondoId: '' }),
+    ).toThrow();
   });
 
   test('accepts an empty condo list', () => {

@@ -1,5 +1,6 @@
 import type { ApiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/api-client';
+import { loginCondo } from '@/test/factories.auth';
 
 import { AuthError } from '../domain/errors';
 
@@ -9,7 +10,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return { get: jest.fn(), post: jest.fn(), put: jest.fn(), del: jest.fn(), ...overrides };
 }
 
-const LOGIN_BODY = { condos: [{ id: 'c1', name: 'Morada', role: 'admin' }], emailVerified: true };
+const LOGIN_BODY = { condos: [loginCondo()], emailVerified: true };
 
 function repositoryWith(publicApi: ApiClient, api: ApiClient = fakeApi()) {
   return new HttpAuthRepository({ api, publicApi });
@@ -131,7 +132,7 @@ describe('HttpAuthRepository', () => {
   });
 
   test('createCondo posts the name on the session client and parses the condo', async () => {
-    const created = { id: 'c9', name: 'Edifício Sol', role: 'admin' };
+    const created = loginCondo({ id: 'c9', name: 'Edifício Sol' });
     const api = fakeApi({ post: jest.fn().mockResolvedValue(created) });
 
     const result = await repositoryWith(fakeApi(), api).createCondo('Edifício Sol');

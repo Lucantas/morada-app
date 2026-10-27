@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
+import { moneyActivityResolver } from './activity/adapters/http/money-activity';
+import { recordActivity } from './activity/adapters/http/record-activity';
+import { activityRoutes } from './activity/adapters/http/routes';
 import { accountProofRoutes, accountRoutes } from './accounts/adapters/http/routes';
 import { categoryRoutes } from './categories/adapters/http/routes';
 import { condoInfoRoutes, meRoutes } from './condos/adapters/http/routes';
@@ -10,11 +13,14 @@ import { dashboardRoutes } from './dashboard/adapters/http/routes';
 import { incomeRoutes } from './income/adapters/http/routes';
 import { publicInvitationRoutes } from './invitations/adapters/http/public-routes';
 import { invitationRoutes } from './invitations/adapters/http/routes';
+import { sindicoRoutes } from './invitations/adapters/http/sindico-routes';
 import { activateClaimedInvitations } from './invitations/app/activate-claimed-invitations';
 import { threadRoutes } from './messages/adapters/http/routes';
 import { noticeRoutes } from './notices/adapters/http/routes';
+import { orgOwnerMiddleware } from './organizations/adapters/http/org-access';
+import { organizationRoutes } from './organizations/adapters/http/routes';
 import { authMiddleware, requireRole, type ApiEnv, type Role } from './platform/auth';
-import { condoAccessMiddleware, type Scoped } from './platform/condo-scope';
+import { condoAccessMiddleware, VIEW_HEADER, type Scoped } from './platform/condo-scope';
 import { csrfMiddleware } from './platform/csrf';
 import { config } from './platform/config';
 import { createRepositories, type CondoRepositories, type Repositories } from './repositories';
@@ -28,6 +34,7 @@ import { receiptRoutes } from './receipts/adapters/http/routes';
 import { apartmentResidentRoutes } from './residents/adapters/http/apartment-routes';
 import { residentRoutes } from './residents/adapters/http/routes';
 import { seedAdmin } from './seed-data';
+import { pixRoutes } from './settings/adapters/http/pix-routes';
 import { settingsRoutes } from './settings/adapters/http/routes';
 import { authRoutes } from './users/adapters/http/auth-routes';
 import { BcryptPasswordHasher } from './users/adapters/bcrypt/bcrypt-password-hasher';
@@ -70,7 +77,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       origin: config.webOrigins,
       credentials: true,
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'X-CSRF-Token'],
+      allowHeaders: ['Content-Type', 'X-CSRF-Token', VIEW_HEADER],
     }),
   );
   app.use(
@@ -146,7 +153,17 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
+  const logMoneyActivity = recordActivity(
+    moneyActivityResolver,
+    scoped(({ activity }) => ({ record: (entry) => activity.record(entry) })),
+    now,
+  );
+  for (const prefix of ['accounts', 'incomes', 'categories', 'receipts', 'residents']) {
+    api.use(`/${prefix}/*`, logMoneyActivity);
+  }
+
   api.route('/info', condoInfoRoutes(condos));
+  api.route('/activity', activityRoutes(scoped(({ activity }) => ({ activity }))));
 
   // Residents router self-guards per-route: '/me' is resident-accessible,
   // everything else (including '/:id/login*') is admin-only.
@@ -162,6 +179,14 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     '/residents',
     invitationRoutes(
       scoped(({ residents, invitations }) => ({ residents, invitations })),
+      { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
+    ),
+  );
+
+  api.route(
+    '/sindico',
+    sindicoRoutes(
+      scoped(({ invitations }) => ({ invitations })),
       { condos, email, appUrl: config.appUrl, now, limiter: invitationCreateLimiter },
     ),
   );
@@ -185,6 +210,8 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
     '/settings',
     guarded('admin', settingsRoutes(scoped(({ settings }) => ({ settings })))),
   );
+
+  api.route('/pix', pixRoutes(scoped(({ settings }) => ({ settings }))));
 
   // Admin: apartment-scoped views — full receipt ledger and occupant history,
   // across every resident who has occupied the apartment (the resident-facing
@@ -228,6 +255,23 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   );
 
   app.route('/api/condos/:condoId', api);
+
+  const org = new Hono<ApiEnv>();
+  org.use('*', auth);
+  org.use('*', csrfMiddleware);
+  org.use('*', orgOwnerMiddleware(repos.organizations));
+  org.route(
+    '/',
+    organizationRoutes({
+      organizations: repos.organizations,
+      invitations: repos.orgInvitations,
+      email,
+      appUrl: config.appUrl,
+      now,
+      limiter: invitationCreateLimiter,
+    }),
+  );
+  app.route('/api/orgs/:orgId', org);
 
   return app;
 }

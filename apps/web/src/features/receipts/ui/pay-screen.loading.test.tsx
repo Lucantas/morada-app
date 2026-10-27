@@ -10,7 +10,14 @@ jest.mock('../domain/get-receipt', () => ({
 
 describe('PayScreen loading', () => {
   test('renders the skeleton while the receipt loads', () => {
-    renderWithClient(<PayScreen repository={{} as never} receiptId="rc-1" onDone={() => {}} />);
+    renderWithClient(
+      <PayScreen
+        repository={{} as never}
+        pixRepository={{} as never}
+        receiptId="rc-1"
+        onDone={() => {}}
+      />,
+    );
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(document.querySelectorAll('.skeleton').length).toBeGreaterThan(0);
   });

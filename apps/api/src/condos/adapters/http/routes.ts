@@ -1,7 +1,7 @@
 import { Hono, type MiddlewareHandler } from 'hono';
 
 import { csrfMiddleware } from '../../../platform/csrf';
-import { requireRole, type ApiEnv } from '../../../platform/auth';
+import { requirePermission, type ApiEnv } from '../../../platform/auth';
 import { getCondoInfo, renameCondo } from '../../app/condo-info';
 import { createMyCondominium } from '../../app/create-my-condominium';
 import { listMyCondos } from '../../app/condo-access-views';
@@ -13,7 +13,12 @@ export function meRoutes(deps: {
   auth: MiddlewareHandler<ApiEnv>;
   condos: Pick<
     CondoRepository,
-    'listForUser' | 'ownedOrganization' | 'createOrganization' | 'create' | 'grant'
+    | 'listForUser'
+    | 'ownedOrganization'
+    | 'memberOrganization'
+    | 'createOrganization'
+    | 'create'
+    | 'grant'
   >;
   users: Pick<UserRepository, 'findById'>;
 }) {
@@ -45,7 +50,7 @@ export function meRoutes(deps: {
 export function condoInfoRoutes(condos: Pick<CondoRepository, 'getById' | 'rename'>) {
   const app = new Hono<ApiEnv>();
   app.get('/', async (c) => c.json(await getCondoInfo(condos, c.get('condoId'))));
-  app.put('/', requireRole('admin'), async (c) =>
+  app.put('/', requirePermission('manage_condo'), async (c) =>
     c.json(await renameCondo(condos, c.get('condoId'), await c.req.json().catch(() => undefined))),
   );
   return app;

@@ -3,16 +3,19 @@ import { hashToken } from '../../platform/tokens';
 import {
   CONDO_A,
   INVITE_NOW,
+  ORG_A,
   fakeCondos,
   fakeResidentsFor,
   inMemoryInvitationTokens,
   invitationFixture,
+  membroInvitationFixture,
   residentFixture,
+  sindicoInvitationFixture,
 } from '../../test-support/in-memory-invitations';
 import { inMemoryAuthTokens, inMemoryUsers } from '../../test-support/in-memory-users';
 import type { PasswordHasher } from '../../users/domain/password-hasher';
 import type { User } from '../../users/domain/user';
-import type { Invitation } from '../domain/invitation';
+import type { Invitation, MoradorInvitation } from '../domain/invitation';
 
 import { acceptInvitation } from './accept-invitation';
 
@@ -38,11 +41,21 @@ function account(overrides: Partial<User> = {}): User {
   };
 }
 
-function setup(opts: { invitation?: Partial<Invitation>; users?: User[]; active?: boolean } = {}) {
+interface SetupOptions {
+  invitation?: Partial<MoradorInvitation>;
+  stored?: Invitation;
+  users?: User[];
+  active?: boolean;
+}
+
+function setup(opts: SetupOptions = {}) {
   const invitations = inMemoryInvitationTokens([
-    { invitation: invitationFixture(opts.invitation), tokenHash: hashToken(TOKEN) },
+    {
+      invitation: opts.stored ?? invitationFixture(opts.invitation),
+      tokenHash: hashToken(TOKEN),
+    },
   ]);
-  const condos = fakeCondos([CONDO_A]);
+  const condos = fakeCondos([CONDO_A], [ORG_A]);
   const users = inMemoryUsers(opts.users ?? []);
   const email = new InMemoryEmailSender();
   const activated: string[] = [];
@@ -71,7 +84,10 @@ describe('acceptInvitation', () => {
   test('an e-mail invite with a new account creates a verified resident and grants now', async () => {
     const { deps, invitations, condos, email } = setup();
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' });
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
 
     expect(user).toMatchObject({
       email: 'maria@x.com',
@@ -93,7 +109,7 @@ describe('acceptInvitation', () => {
   test('a WhatsApp invite with a new account claims and sends the confirmation', async () => {
     const { deps, invitations, condos, email } = setup({ invitation: { email: null } });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: ' Nova@X.com ',
       password: 'senha-segura',
       name: 'Maria',
@@ -141,7 +157,7 @@ describe('acceptInvitation', () => {
       invitation: { email: null },
     });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
       name: 'Maria',
@@ -157,7 +173,7 @@ describe('acceptInvitation', () => {
       users: [account({ emailVerifiedAt: null })],
     });
 
-    const user = await acceptInvitation(deps, TOKEN, { password: 'senha-antiga' });
+    const { user } = await acceptInvitation(deps, TOKEN, { password: 'senha-antiga' });
 
     expect(user).toMatchObject({ emailVerifiedAt: INVITE_NOW, sessionVersion: 4 });
     expect((await users.findById('u-maria'))?.sessionVersion).toBe(4);
@@ -171,7 +187,7 @@ describe('acceptInvitation', () => {
       invitation: { email: null },
     });
 
-    const user = await acceptInvitation(deps, TOKEN, {
+    const { user } = await acceptInvitation(deps, TOKEN, {
       email: 'maria@x.com',
       password: 'senha-antiga',
       name: 'Maria',
@@ -261,6 +277,146 @@ describe('acceptInvitation', () => {
     ).rejects.toMatchObject({ status: 404 });
     expect(condos.grants()).toEqual([]);
     expect(condos.deactivations()).toEqual([]);
+  });
+
+  test('sindico invite grants sindico and retires the previous sindico', async () => {
+    const { deps, invitations, condos } = setup({ stored: sindicoInvitationFixture() });
+
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(user).toMatchObject({ email: 'maria@x.com', emailVerifiedAt: INVITE_NOW });
+    expect(condos.grants()).toEqual([
+      { condominiumId: 'condo-a', userId: user.id, role: 'sindico', residentId: null },
+    ]);
+    expect(condos.sindicoRetirements()).toEqual([
+      { condominiumId: 'condo-a', keepUserId: user.id },
+    ]);
+    expect(condos.deactivations()).toEqual([]);
+    expect(invitations.byId('inv-sindico')).toMatchObject({ status: 'aceito', claimedBy: user.id });
+  });
+
+  test('sindico invite of an existing account needs its password and grants on that account', async () => {
+    const { deps, condos } = setup({ stored: sindicoInvitationFixture(), users: [account()] });
+
+    await expect(acceptInvitation(deps, TOKEN, { password: 'errada' })).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(condos.grants()).toEqual([]);
+
+    await acceptInvitation(deps, TOKEN, { password: 'senha-antiga' });
+
+    expect(condos.grants()).toEqual([
+      { condominiumId: 'condo-a', userId: 'u-maria', role: 'sindico', residentId: null },
+    ]);
+  });
+
+  test.each([
+    ['sindico', sindicoInvitationFixture()],
+    ['membro', membroInvitationFixture()],
+    ['morador', invitationFixture()],
+  ])('staff invite requires the invited e-mail (%s)', async (_label, stored) => {
+    const other = account({ id: 'u-other', email: 'outra@x.com' });
+    const { deps, invitations, condos, users } = setup({ stored, users: [other] });
+
+    const answers = await Promise.all(
+      [
+        { email: 'outra@x.com', password: 'senha-antiga' },
+        { email: 'nova@x.com', password: 'senha-segura', name: 'Nova' },
+      ].map((body) => acceptInvitation(deps, TOKEN, body).catch((error: unknown) => error)),
+    );
+
+    expect(answers).toEqual([
+      expect.objectContaining({ status: 401, message: 'Usuário ou senha inválidos' }),
+      expect.objectContaining({ status: 401, message: 'Usuário ou senha inválidos' }),
+    ]);
+    expect(invitations.byId(stored.id)).toMatchObject({ status: 'pendente', claimedBy: null });
+    expect(condos.grants()).toEqual([]);
+    expect(condos.orgMembers()).toEqual([]);
+    expect(users.all()).toEqual([other]);
+  });
+
+  test('an invited e-mail repeated in the body is accepted after normalization', async () => {
+    const { deps, condos } = setup({ stored: sindicoInvitationFixture() });
+
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      email: ' Maria@X.com ',
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(condos.grants()).toEqual([
+      { condominiumId: 'condo-a', userId: user.id, role: 'sindico', residentId: null },
+    ]);
+  });
+
+  test('membro invite adds an org membership with the invited org role', async () => {
+    const { deps, invitations, condos } = setup({
+      stored: membroInvitationFixture({ orgRole: 'owner' }),
+    });
+
+    const { user } = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(condos.orgMembers()).toEqual([
+      { organizationId: 'org-a', userId: user.id, role: 'owner' },
+    ]);
+    expect(condos.grants()).toEqual([]);
+    expect(invitations.byId('inv-membro')?.status).toBe('aceito');
+  });
+
+  test('a membro invite of an unknown or inactive organization is invalid', async () => {
+    const { deps, users } = setup({
+      stored: membroInvitationFixture({ organizationId: 'org-ghost' }),
+    });
+
+    await expect(
+      acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' }),
+    ).rejects.toMatchObject({ status: 404, message: 'Convite inválido ou expirado' });
+    expect(users.all()).toEqual([]);
+  });
+
+  test('a sindico invite of an inactive condominium is invalid', async () => {
+    const { deps, condos } = setup({
+      stored: sindicoInvitationFixture({ condominiumId: 'condo-ghost' }),
+    });
+
+    await expect(
+      acceptInvitation(deps, TOKEN, { password: 'senha-segura', name: 'Maria' }),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(condos.grants()).toEqual([]);
+  });
+
+  test.each([
+    ['morador', invitationFixture(), 'condo-a'],
+    ['sindico', sindicoInvitationFixture(), 'condo-a'],
+    ['membro', membroInvitationFixture(), null],
+  ])('reports the invited condo of a %s invite', async (_label, stored, expected) => {
+    const { deps } = setup({ stored });
+
+    const accepted = await acceptInvitation(deps, TOKEN, {
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(accepted.invitedCondoId).toBe(expected);
+  });
+
+  test('a WhatsApp invite still reports its condo before the grant', async () => {
+    const { deps, condos } = setup({ invitation: { email: null } });
+
+    const accepted = await acceptInvitation(deps, TOKEN, {
+      email: 'nova@x.com',
+      password: 'senha-segura',
+      name: 'Maria',
+    });
+
+    expect(condos.grants()).toEqual([]);
+    expect(accepted.invitedCondoId).toBe('condo-a');
   });
 
   test('accept is single use', async () => {

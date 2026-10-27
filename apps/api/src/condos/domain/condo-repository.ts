@@ -1,4 +1,4 @@
-import type { CondoAccess } from './condo-access';
+import type { CondoAccess, OrgRoleName } from './condo-access';
 import type { Condominium, CondoRoleName } from './condominium';
 
 export interface CreateCondominiumInput {
@@ -15,6 +15,12 @@ export interface CondoGrant {
   residentId: string | null;
 }
 
+export interface CondoSindico {
+  userId: string;
+  name: string | null;
+  email: string | null;
+}
+
 export interface CondoRepository {
   listForUser(userId: string): Promise<CondoAccess[]>;
   accessFor(userId: string, condominiumId: string): Promise<CondoAccess | null>;
@@ -23,6 +29,7 @@ export interface CondoRepository {
   rename(condominiumId: string, name: string): Promise<Condominium>;
   create(input: CreateCondominiumInput): Promise<Condominium>;
   ownedOrganization(userId: string): Promise<{ id: string } | null>;
+  memberOrganization(userId: string): Promise<{ id: string } | null>;
   createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }>;
   grant(input: CondoGrant): Promise<void>;
   deactivateResidentGrants(
@@ -30,4 +37,9 @@ export interface CondoRepository {
     residentId: string,
     exceptUserId: string,
   ): Promise<void>;
+  grantSindico(condominiumId: string, userId: string): Promise<void>;
+  currentSindico(condominiumId: string): Promise<CondoSindico | null>;
+  removeSindico(condominiumId: string): Promise<void>;
+  addOrgMember(organizationId: string, userId: string, role: OrgRoleName): Promise<void>;
+  getOrganization(organizationId: string): Promise<{ id: string; name: string } | null>;
 }

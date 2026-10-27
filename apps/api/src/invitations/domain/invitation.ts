@@ -3,11 +3,10 @@ export type InvitationStatus = StoredInvitationStatus | 'expirado';
 
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface Invitation {
+export type InvitationRole = 'morador' | 'sindico' | 'membro';
+
+export interface InvitationBase {
   id: string;
-  condominiumId: string;
-  residentId: string;
-  role: 'morador';
   email: string | null;
   status: InvitationStatus;
   expiresAt: Date;
@@ -16,6 +15,27 @@ export interface Invitation {
   acceptedAt: Date | null;
   createdAt: Date;
 }
+
+export type MoradorInvitation = InvitationBase & {
+  role: 'morador';
+  condominiumId: string;
+  residentId: string;
+};
+
+export type SindicoInvitation = InvitationBase & {
+  role: 'sindico';
+  condominiumId: string;
+  email: string;
+};
+
+export type MembroInvitation = InvitationBase & {
+  role: 'membro';
+  organizationId: string;
+  orgRole: 'owner' | 'member';
+  email: string;
+};
+
+export type Invitation = MoradorInvitation | SindicoInvitation | MembroInvitation;
 
 export function effectiveStatus(
   stored: StoredInvitationStatus,

@@ -13,6 +13,7 @@ type SessionState = {
   subject: string | null;
   pendingUser: PendingUser | null;
   authenticate: (role: Role, subject: string | null) => void;
+  switchView: (role: Role) => void;
   signOut: () => void;
 };
 
@@ -23,6 +24,7 @@ export const useSessionStore = create<SessionState>()(
       subject: null,
       pendingUser: null,
       authenticate: (role, subject) => set({ role, subject, pendingUser: null }),
+      switchView: (role) => set({ role }),
       signOut: () => {
         set({ role: null, subject: null, pendingUser: null });
         useCondoScope.getState().setCondo(null);
@@ -39,20 +41,34 @@ export const useSessionStore = create<SessionState>()(
   ),
 );
 
-export function applyLogin({ condos, emailVerified }: LoginResponse): Role | null {
-  const [first] = condos;
+export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginResponse): Role | null {
+  const first = condos.find((condo) => condo.id === invitedCondoId) ?? condos[0];
   if (!first) {
     useCondoScope.getState().setCondo(null);
     useSessionStore.setState({ role: null, subject: null, pendingUser: { emailVerified } });
     return null;
   }
-  useCondoScope.getState().setCondo({ id: first.id, name: first.name });
+  useCondoScope.getState().setCondo({
+    id: first.id,
+    name: first.name,
+    condoRole: first.condoRole,
+    permissions: first.permissions,
+    hasHome: first.hasHome,
+    organizationId: first.organizationId,
+    orgRole: first.orgRole,
+  });
   useSessionStore.getState().authenticate(first.role, null);
   return first.role;
 }
 
-export function signOutIfCondoMissing(): void {
-  if (useSessionStore.getState().role && !useCondoScope.getState().condo) {
-    useSessionStore.getState().signOut();
+export function restoreSession(): void {
+  const { role, signOut, switchView } = useSessionStore.getState();
+  const { condo } = useCondoScope.getState();
+  if (!role) return;
+  if (!condo) {
+    signOut();
+    return;
   }
+  const isHomelessStaff = !condo.hasHome && condo.condoRole !== 'morador';
+  if (role === 'resident' && isHomelessStaff) switchView('admin');
 }

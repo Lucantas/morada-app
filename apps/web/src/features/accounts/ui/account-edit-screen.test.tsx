@@ -9,9 +9,9 @@ import { InMemoryAccountRepository } from '../data/in-memory-account-repository'
 
 import { AccountEditScreen } from './account-edit-screen';
 import { useCondoScope } from '@/shared/lib/condo-scope';
-import { TEST_CONDO_NAME } from '@/test/condo';
+import { TEST_CONDO_NAME, testCondo } from '@/test/condo';
 
-beforeEach(() => useCondoScope.getState().setCondo({ id: 'c1', name: TEST_CONDO_NAME }));
+beforeEach(() => useCondoScope.getState().setCondo(testCondo({ name: TEST_CONDO_NAME })));
 
 function makeSpyRepo(): { repo: AccountRepository; saved: unknown[] } {
   const saved: unknown[] = [];

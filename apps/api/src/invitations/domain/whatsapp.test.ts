@@ -1,4 +1,4 @@
-import { invitationWhatsappUrl } from './whatsapp';
+import { invitationWhatsappUrl, membroInvitationWhatsappUrl } from './whatsapp';
 
 const LINK = 'https://app.test/#/convite/tok';
 const message = (name: string) => `Olá, ${name}! Seu acesso ao Morada Bloco 2 no Morada: ${LINK}`;
@@ -36,6 +36,16 @@ describe('invitationWhatsappUrl', () => {
   test('greets with the first word of the name', () => {
     expect(invitationWhatsappUrl('', '  João   Pereira ', 'Morada Bloco 2', LINK)).toContain(
       encodeURIComponent('Olá, João!'),
+    );
+  });
+});
+
+describe('membroInvitationWhatsappUrl', () => {
+  test('invites to the team of the organization', () => {
+    expect(membroInvitationWhatsappUrl('(11) 98888-7777', 'Equipe A', LINK)).toBe(
+      `https://wa.me/5511988887777?text=${encodeURIComponent(
+        `Olá! Você foi convidado para a equipe Equipe A no Morada: ${LINK}`,
+      )}`,
     );
   });
 });

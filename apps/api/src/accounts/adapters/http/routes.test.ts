@@ -89,4 +89,26 @@ describe('accountRoutes', () => {
     const body = (await res.json()) as { description: string };
     expect(body.description).toBe('Gás');
   });
+
+  test('PUT /:id responds 201 when it creates and 200 when it updates', async () => {
+    const { app } = mountApp();
+    const send = () =>
+      app.request('/a-new', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: 'Luz',
+          category: 'Utilidades',
+          date: '2026-04-05',
+          valueCents: 5000,
+          status: 'pago',
+        }),
+      });
+
+    const first = await send();
+    const second = await send();
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+  });
 });
