@@ -83,6 +83,14 @@ const condoRowSchema = z.object({
 const createInputSchema = condoSettingsSchema.extend({
   organizationId: z.string().min(1).max(64),
   name: condominiumSchema.shape.name,
+  apartments: z.array(
+    z.object({
+      label: z.string().min(1).max(80),
+      block: z.string().min(1).max(30).nullable(),
+      floor: z.number().int().min(1),
+      position: z.number().int().min(1),
+    }),
+  ),
 });
 
 const organizationInputSchema = z.object({
@@ -175,9 +183,35 @@ export class PostgresCondoRepository implements CondoRepository {
         [id, parsed.organizationId, parsed.name],
       );
       await client.query(
-        'INSERT INTO condo_settings (condominium_id, monthly_fee_cents, due_day) VALUES ($1, $2, $3)',
-        [id, parsed.monthlyFeeCents, parsed.dueDay],
+        `INSERT INTO condo_settings
+           (condominium_id, monthly_fee_cents, due_day,
+            pix_key_type, pix_key, pix_receiver_name, pix_city)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          id,
+          parsed.monthlyFeeCents,
+          parsed.dueDay,
+          parsed.pix?.keyType ?? null,
+          parsed.pix?.key ?? null,
+          parsed.pix?.receiverName ?? null,
+          parsed.pix?.city ?? null,
+        ],
       );
+      if (parsed.apartments.length > 0) {
+        await client.query(
+          `INSERT INTO apartments (id, label, condominium_id, block, floor, position)
+           SELECT gen_random_uuid()::text, label, $1, block, floor, position
+           FROM unnest($2::text[], $3::text[], $4::int[], $5::int[])
+             AS t(label, block, floor, position)`,
+          [
+            id,
+            parsed.apartments.map((a) => a.label),
+            parsed.apartments.map((a) => a.block),
+            parsed.apartments.map((a) => a.floor),
+            parsed.apartments.map((a) => a.position),
+          ],
+        );
+      }
       for (const [position, category] of DEFAULT_CATEGORIES.entries()) {
         await client.query(
           `INSERT INTO categories (id, name, keywords, position, condominium_id)

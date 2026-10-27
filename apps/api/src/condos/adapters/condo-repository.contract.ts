@@ -58,6 +58,43 @@ export function runCondoRepositoryContract(
   makeRepo: () => Promise<CondoRepositoryHarness>,
 ): void {
   describe(label, () => {
+    test('create inserts the generated apartments and the pix settings', async () => {
+      const { repo, pool } = await makeRepo();
+      await insertUser(pool, 'u-owner');
+      const org = await repo.createOrganization({ name: 'Contábil', ownerUserId: 'u-owner' });
+
+      const condo = await repo.create({
+        organizationId: org.id,
+        name: 'Residencial Ipê',
+        monthlyFeeCents: 35000,
+        dueDay: 10,
+        pix: {
+          keyType: 'cpf',
+          key: '52998224725',
+          receiverName: 'Condominio Ipe',
+          city: 'Sao Paulo',
+        },
+        apartments: [
+          { label: 'Apto 101 · Bloco A', block: 'A', floor: 1, position: 1 },
+          { label: 'Apto 102 · Bloco A', block: 'A', floor: 1, position: 2 },
+        ],
+      });
+
+      const apartments = await pool.query(
+        'SELECT label, block, floor, position, active FROM apartments WHERE condominium_id = $1 ORDER BY label',
+        [condo.id],
+      );
+      const settings = await pool.query(
+        'SELECT pix_key_type, pix_key FROM condo_settings WHERE condominium_id = $1',
+        [condo.id],
+      );
+      expect(apartments.rows).toEqual([
+        { label: 'Apto 101 · Bloco A', block: 'A', floor: 1, position: 1, active: true },
+        { label: 'Apto 102 · Bloco A', block: 'A', floor: 1, position: 2, active: true },
+      ]);
+      expect(settings.rows).toEqual([{ pix_key_type: 'cpf', pix_key: '52998224725' }]);
+    });
+
     test('create inserts settings and default categories for the new condo', async () => {
       const { repo, pool } = await makeRepo();
       await insertUser(pool, 'u-owner');
@@ -68,6 +105,8 @@ export function runCondoRepositoryContract(
         name: 'Residencial Ipê',
         monthlyFeeCents: 32000,
         dueDay: 10,
+        pix: null,
+        apartments: [],
       });
 
       expect(condo).toMatchObject({
@@ -137,12 +176,16 @@ export function runCondoRepositoryContract(
         name: 'Ipê',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       const aurora = await repo.create({
         organizationId: org.id,
         name: 'Aurora',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       await createTestCondo(pool, 'condo-other', { name: 'Outro' });
 
@@ -179,6 +222,8 @@ export function runCondoRepositoryContract(
         name: 'Ipê',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       await repo.grant({
         condominiumId: condo.id,
@@ -203,6 +248,8 @@ export function runCondoRepositoryContract(
         name: 'Ipê',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       await pool.query("UPDATE organization_members SET active = FALSE WHERE user_id = 'u-owner'");
 
@@ -434,6 +481,8 @@ export function runCondoRepositoryContract(
         name: 'Ipê',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       await repo.grant({
         condominiumId: condo.id,
@@ -460,6 +509,8 @@ export function runCondoRepositoryContract(
         name: 'Ipê',
         monthlyFeeCents: 1000,
         dueDay: 5,
+        pix: null,
+        apartments: [],
       });
       await insertOccupiedResident(pool, condo.id, 'r-lucia');
       await repo.grant({

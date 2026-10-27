@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { generateApartments, structureSchema } from '../../building/domain/structure';
+import { pixSettingsSchema } from '../../settings/domain/pix-key';
 import { isEmailVerified, type User } from '../../users/domain/user';
 import type { OrgRoleName } from '../domain/condo-access';
 import { condominiumSchema } from '../domain/condominium';
@@ -9,8 +11,21 @@ import { summaryOf, type CondoSummary } from './condo-access-views';
 
 const DEFAULT_MONTHLY_FEE_CENTS = 0;
 const DEFAULT_DUE_DAY = 10;
+const MAX_MONTHLY_FEE_CENTS = 1_000_000_000;
+const MAX_DUE_DAY = 28;
 
-const inputSchema = z.object({ name: condominiumSchema.shape.name });
+const inputSchema = z.object({
+  name: condominiumSchema.shape.name,
+  structure: structureSchema.optional(),
+  monthlyFeeCents: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_MONTHLY_FEE_CENTS)
+    .default(DEFAULT_MONTHLY_FEE_CENTS),
+  dueDay: z.number().int().min(1).max(MAX_DUE_DAY).default(DEFAULT_DUE_DAY),
+  pix: pixSettingsSchema.nullable().default(null),
+});
 
 async function targetOrganization(
   condos: Pick<CondoRepository, 'ownedOrganization' | 'memberOrganization' | 'createOrganization'>,
@@ -38,13 +53,15 @@ export async function createMyCondominium(
   if (!isEmailVerified(user)) throw new EmailNotConfirmedError();
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) throw new CondoValidationError();
-  const { name } = parsed.data;
+  const { name, structure, monthlyFeeCents, dueDay, pix } = parsed.data;
   const { organization, orgRole } = await targetOrganization(condos, user.id, name);
   const condo = await condos.create({
     organizationId: organization.id,
     name,
-    monthlyFeeCents: DEFAULT_MONTHLY_FEE_CENTS,
-    dueDay: DEFAULT_DUE_DAY,
+    monthlyFeeCents,
+    dueDay,
+    pix,
+    apartments: structure ? generateApartments(structure) : [],
   });
   await condos.grant({
     condominiumId: condo.id,

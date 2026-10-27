@@ -956,6 +956,45 @@ describe('Morada API — real credentials', () => {
     expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
   });
 
+  test('POST /me/condos creates the building', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const res = await createCondo(app, auth, {
+      name: 'Residencial Ipê',
+      structure: { blocks: [{ name: null, floors: 4, perFloor: 4 }] },
+      monthlyFeeCents: 35000,
+      dueDay: 10,
+      pix: {
+        keyType: 'cpf',
+        key: '529.982.247-25',
+        receiverName: 'Condominio Ipe',
+        city: 'Sao Paulo',
+      },
+    });
+    const created = (await res.json()) as { id: string };
+    const apartments = await pool.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM apartments WHERE condominium_id = $1',
+      [created.id],
+    );
+    const settings = await app.request(`/api/condos/${created.id}/settings`, {
+      headers: { Cookie: auth.cookie },
+    });
+
+    expect(res.status).toBe(201);
+    expect(apartments.rows[0]?.n).toBe(16);
+    expect(await settings.json()).toEqual({
+      monthlyFeeCents: 35000,
+      dueDay: 10,
+      pix: {
+        keyType: 'cpf',
+        key: '52998224725',
+        receiverName: 'Condominio Ipe',
+        city: 'Sao Paulo',
+      },
+    });
+  });
+
   test('a second condominium reuses the same organization', async () => {
     const app = await makeApp();
     const auth = await verifiedEmailAuth(app, 'ana@x.com');

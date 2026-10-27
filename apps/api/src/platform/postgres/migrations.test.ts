@@ -35,7 +35,15 @@ async function count(sql: string, params: unknown[] = []): Promise<number> {
 }
 
 async function seedLegacyData(): Promise<void> {
-  await insertRows(pool, 'apartments', ['id', 'label'], [{ id: 'apt-302', label: 'Apto 302' }]);
+  await insertRows(
+    pool,
+    'apartments',
+    ['id', 'label'],
+    [
+      { id: 'apt-302', label: 'Apto 302' },
+      { id: 'apt-loja', label: 'Loja' },
+    ],
+  );
   await insertRows(
     pool,
     'residents',
@@ -170,7 +178,31 @@ describe('migrating a database that holds legacy single-condominium data', () =>
         n: 0,
       });
     }
-    expect(countsBefore.get('apartments')).toBe(1);
+    expect(countsBefore.get('apartments')).toBe(2);
+  });
+
+  test('027 places a legacy numbered apartment and leaves other labels unplaced', async () => {
+    const { rows } = await pool.query(
+      "SELECT label, floor, position, active, block FROM apartments WHERE condominium_id = 'condo-legacy' ORDER BY label",
+    );
+
+    expect(rows).toEqual([
+      { label: 'Apto 302', floor: 3, position: 2, active: true, block: null },
+      { label: 'Loja', floor: null, position: null, active: true, block: null },
+    ]);
+  });
+
+  test('027 marks every existing condominium as onboarded', async () => {
+    expect(await count('condominiums WHERE onboarded_at IS NULL')).toBe(0);
+    expect(await count('condominiums WHERE onboarded_at IS NOT NULL')).toBeGreaterThan(0);
+  });
+
+  test('027 keeps the opening balance all-or-none', async () => {
+    await expect(
+      pool.query(
+        "UPDATE condo_settings SET opening_balance_cents = 100 WHERE condominium_id = 'condo-legacy'",
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
   });
 
   test('015 keeps condo settings values under condo-legacy', async () => {
