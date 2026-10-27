@@ -120,13 +120,6 @@ export function startConversation(): ConversationState {
   return stateOf([]);
 }
 
-export function restoreConversation(answers: readonly Answer[]): ConversationState | null {
-  const inOrder = answers.every(
-    (item, index) => questionPlan(answers.slice(0, index))[index] === item.question,
-  );
-  return inOrder ? stateOf([...answers]) : null;
-}
-
 export function undo(state: ConversationState): ConversationState {
   return stateOf(state.answers.slice(0, -1));
 }
@@ -241,6 +234,35 @@ export function answer(state: ConversationState, input: AnswerInput): Result {
   const next = toAnswer(state, input);
   if (typeof next === 'string') return { error: next };
   return { state: stateOf([...state.answers, next]) };
+}
+
+function inputOf(stored: Answer): AnswerInput {
+  switch (stored.question) {
+    case 'name':
+      return { question: 'name', name: stored.name };
+    case 'hasBlocks':
+      return { question: 'hasBlocks', hasBlocks: stored.hasBlocks };
+    case 'blockCount':
+      return { question: 'blockCount', count: stored.count };
+    case 'blockNames':
+      return { question: 'blockNames', names: stored.names.join(', ') };
+    case 'sameShape':
+      return { question: 'sameShape', same: stored.same };
+    case 'shape':
+      return { question: 'shape', floors: stored.floors, perFloor: stored.perFloor };
+    case 'fee':
+      return { question: 'fee', fee: stored.fee };
+    case 'pix':
+      return { question: 'pix', draft: stored.pix };
+  }
+}
+
+export function restoreConversation(answers: readonly Answer[]): ConversationState | null {
+  return answers.reduce<ConversationState | null>((state, stored) => {
+    if (state === null) return null;
+    const result = answer(state, inputOf(stored));
+    return 'error' in result ? null : result.state;
+  }, startConversation());
 }
 
 function condoName(state: ConversationState): string {

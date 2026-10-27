@@ -319,6 +319,30 @@ describe('conversation', () => {
     ]);
   });
 
+  test('restoring re-applies the limits of every answer', () => {
+    const blank = { question: 'name', name: '', text: '' } as const;
+    const tooManyBlocks = [
+      { question: 'name', name: 'Ipê', text: 'Ipê' },
+      { question: 'hasBlocks', hasBlocks: true, text: 'Tem blocos' },
+      { question: 'blockCount', count: 99, text: '99 blocos' },
+    ] as const;
+    const badPix = [
+      ...play(SINGLE.slice(0, 4)).answers,
+      {
+        question: 'pix',
+        pix: { keyType: 'cpf', key: '111', receiverName: 'Ipê', city: 'Recife' },
+        text: 'CPF · 111',
+      },
+    ] as const;
+
+    expect(restoreConversation([blank])).toBeNull();
+    expect(restoreConversation([...tooManyBlocks])).toBeNull();
+    expect(restoreConversation([...badPix])).toBeNull();
+    expect(restoreConversation(play(SINGLE).answers)).toEqual(play(SINGLE));
+    const blocks = play([...TWO_BLOCKS, { question: 'sameShape', same: false }]);
+    expect(restoreConversation(blocks.answers)).toEqual(blocks);
+  });
+
   test('pairs every answer with the question it answered', () => {
     const state = play(SINGLE.slice(0, 2));
 

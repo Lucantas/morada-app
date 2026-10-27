@@ -46,6 +46,30 @@ describe('local draft store', () => {
     expect(loadDraft()).toBeNull();
   });
 
+  test('a draft with out-of-limit values gives null', () => {
+    const answers = [
+      { question: 'name', name: 'Ipê', text: 'Ipê' },
+      { question: 'hasBlocks', hasBlocks: false, text: 'Só um prédio' },
+      { question: 'shape', floors: 999, perFloor: 4, text: '999 andares, 4 por andar' },
+    ];
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers }));
+
+    expect(loadDraft()).toBeNull();
+  });
+
+  test('a draft whose block names do not match the block count gives null', () => {
+    const answers = [
+      { question: 'name', name: 'Ipê', text: 'Ipê' },
+      { question: 'hasBlocks', hasBlocks: true, text: 'Tem blocos' },
+      { question: 'blockCount', count: 3, text: '3 blocos' },
+      { question: 'blockNames', names: ['A', 'B'], text: 'A, B' },
+      { question: 'sameShape', same: false, text: 'Não' },
+    ];
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers }));
+
+    expect(loadDraft()).toBeNull();
+  });
+
   test('clears the draft', () => {
     saveDraft(namedDraft());
 
