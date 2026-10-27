@@ -7,6 +7,7 @@ import { Field, PrimaryButton } from '@/shared/ui/primitives';
 import {
   addCategory,
   selectedCategories,
+  setCash,
   setCategorySpend,
   toggleCategory,
   type CashMode,
@@ -140,7 +141,7 @@ function CashCard({ form, onChange }: Props) {
         <MoneyInput
           label="Valor em caixa"
           value={form.cashCents}
-          onChange={(cents) => onChange({ ...form, cashCents: cents })}
+          onChange={(cents) => onChange(setCash(form, cents))}
         />
       )}
     </GroundCard>

@@ -11,6 +11,7 @@ export type GroundForm = {
   totalCents: number;
   cashMode: CashMode;
   cashCents: number;
+  cashTyped: boolean;
 };
 
 const MAX_CATEGORY_NAME = 60;
@@ -24,6 +25,7 @@ export function initialGroundForm(names: readonly string[]): GroundForm {
     totalCents: 0,
     cashMode: 'value',
     cashCents: 0,
+    cashTyped: false,
   };
 }
 
@@ -40,6 +42,10 @@ export function toggleCategory(form: GroundForm, name: string): GroundForm {
 
 export function setCategorySpend(form: GroundForm, name: string, cents: number): GroundForm {
   return { ...form, perCategory: { ...form.perCategory, [name]: cents } };
+}
+
+export function setCash(form: GroundForm, cents: number): GroundForm {
+  return { ...form, cashCents: cents, cashTyped: true };
 }
 
 export function addCategory(
@@ -59,7 +65,7 @@ export function addCategory(
 function cashFrom(form: GroundForm): number | null {
   if (form.cashMode === 'empty') return 0;
   if (form.cashMode === 'later') return null;
-  return form.cashCents > 0 ? form.cashCents : null;
+  return form.cashTyped || form.cashCents > 0 ? form.cashCents : null;
 }
 
 function spendFrom(form: GroundForm, categories: string[]): GroundInput['spend'] {

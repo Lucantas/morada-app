@@ -75,6 +75,15 @@ function spendAccounts(input: GroundInput, month: string): GroundAccount[] {
     }));
 }
 
+function openingBalanceOf(
+  cashCents: number | null,
+  spendTotal: number,
+  today: string,
+): GroundPlan['openingBalance'] {
+  if (cashCents === null && spendTotal === 0) return null;
+  return { valueCents: openingBalanceFor(cashCents ?? 0, spendTotal), date: today };
+}
+
 export function planGround(input: GroundInput, current: string[], today: string): GroundPlan {
   const accounts = spendAccounts(input, formatMonthName(today));
   const spendTotal = accounts.reduce((sum, account) => sum + account.valueCents, 0);
@@ -82,10 +91,7 @@ export function planGround(input: GroundInput, current: string[], today: string)
   return {
     categories: sameNames(names, current) ? null : names,
     accounts,
-    openingBalance:
-      input.cashCents === null
-        ? null
-        : { valueCents: openingBalanceFor(input.cashCents, spendTotal), date: today },
+    openingBalance: openingBalanceOf(input.cashCents, spendTotal, today),
   };
 }
 

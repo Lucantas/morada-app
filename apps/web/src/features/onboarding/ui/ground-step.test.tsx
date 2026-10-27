@@ -121,4 +121,14 @@ describe('GroundStep', () => {
     await user.click(caixa.getByRole('button', { name: 'Depois eu vejo' }));
     expect(caixa.getByLabelText('Valor em caixa')).toBeInTheDocument();
   });
+
+  test('typing R$ 0,00 as cash means an empty till', async () => {
+    const user = userEvent.setup();
+    const { last } = renderStep();
+    const caixa = within(screen.getByRole('group', { name: 'Em caixa hoje' }));
+
+    await user.type(caixa.getByLabelText('Valor em caixa'), '0');
+
+    expect(last()?.cashCents).toBe(0);
+  });
 });

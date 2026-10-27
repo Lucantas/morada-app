@@ -2,6 +2,7 @@ import {
   addCategory,
   groundInputFromForm,
   initialGroundForm,
+  setCash,
   setCategorySpend,
   toggleCategory,
   type GroundForm,
@@ -56,6 +57,11 @@ describe('ground form', () => {
     expect(groundInputFromForm(form({ cashMode: 'later', cashCents: 900 })).cashCents).toBeNull();
     expect(groundInputFromForm(form({ cashMode: 'value', cashCents: 900 })).cashCents).toBe(900);
     expect(groundInputFromForm(form({ cashMode: 'value', cashCents: 0 })).cashCents).toBeNull();
+  });
+
+  test('a typed zero cash means zero, not later', () => {
+    expect(groundInputFromForm(setCash(form(), 0)).cashCents).toBe(0);
+    expect(groundInputFromForm(setCash(form(), 900)).cashCents).toBe(900);
   });
 
   test('adds another category selected', () => {

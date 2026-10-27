@@ -85,12 +85,18 @@ describe('planGround', () => {
     expect(plan.openingBalance).toEqual({ valueCents: 0, date: TODAY });
   });
 
-  test('skipped cash means no opening balance', () => {
+  test('unknown cash with spend opens at the spend so the till never goes negative', () => {
     const plan = planGround(
       input({ spend: { kind: 'total', cents: 348_000 }, cashCents: null }),
       CURRENT,
       TODAY,
     );
+
+    expect(plan.openingBalance).toEqual({ valueCents: 348_000, date: TODAY });
+  });
+
+  test('unknown cash without spend means no opening balance', () => {
+    const plan = planGround(input({ cashCents: null }), CURRENT, TODAY);
 
     expect(plan.openingBalance).toBeNull();
   });
