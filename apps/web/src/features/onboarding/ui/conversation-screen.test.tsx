@@ -205,6 +205,27 @@ describe('ConversationScreen', () => {
     );
   });
 
+  test('hides Corrigir and Sair while the condominium is being created', async () => {
+    const repository = fakeAuthRepository({
+      createCondo: jest.fn().mockReturnValue(new Promise<never>(() => undefined)),
+    });
+    renderScreen(
+      fakeDrafts(
+        play([...AT_FEE, { question: 'fee', fee: null }, { question: 'pix', draft: null }]),
+      ),
+      repository,
+    );
+    const user = userEvent.setup();
+    expect(screen.getByRole('button', { name: 'Corrigir' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Criar o Residencial Ipê' }));
+
+    expect(await screen.findByRole('button', { name: 'Criando…' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Corrigir' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sair' })).not.toBeInTheDocument();
+    expect(repository.createCondo).toHaveBeenCalledTimes(1);
+  });
+
   test('signs out', async () => {
     const { onSignOut } = renderScreen();
     const user = userEvent.setup();

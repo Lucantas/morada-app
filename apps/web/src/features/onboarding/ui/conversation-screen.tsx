@@ -67,7 +67,13 @@ function Bubble({ mine = false, children }: { mine?: boolean; children: ReactNod
   );
 }
 
-function Transcript({ state, onCorrect }: { state: ConversationState; onCorrect: () => void }) {
+function Transcript({
+  state,
+  onCorrect,
+}: {
+  state: ConversationState;
+  onCorrect: (() => void) | null;
+}) {
   const lines = transcript(state);
   const lastIndex = lines.length - 1;
   return (
@@ -76,7 +82,7 @@ function Transcript({ state, onCorrect }: { state: ConversationState; onCorrect:
         <div key={`${index}-${line.question}`} style={{ display: 'contents' }}>
           <Bubble>{line.question}</Bubble>
           <Bubble mine>{line.answer}</Bubble>
-          {index === lastIndex && (
+          {index === lastIndex && onCorrect && (
             <div style={{ alignSelf: 'flex-end', marginTop: -8 }}>
               <TextLink onClick={onCorrect}>Corrigir</TextLink>
             </div>
@@ -95,7 +101,7 @@ function Transcript({ state, onCorrect }: { state: ConversationState; onCorrect:
   );
 }
 
-function Header({ onSignOut }: { onSignOut: () => void }) {
+function Header({ onSignOut }: { onSignOut: (() => void) | null }) {
   return (
     <div
       style={{
@@ -118,7 +124,7 @@ function Header({ onSignOut }: { onSignOut: () => void }) {
       >
         <Icon name="bank" size={20} color="currentColor" />
       </div>
-      <TextLink onClick={onSignOut}>Sair</TextLink>
+      {onSignOut && <TextLink onClick={onSignOut}>Sair</TextLink>}
     </div>
   );
 }
@@ -155,15 +161,21 @@ export function ConversationScreen({ repository, drafts, onCreated, onSignOut }:
     change(result.state);
   };
 
+  const submit = () => {
+    if (create.isPending) return;
+    create.mutate(state);
+  };
+
+  const busy = create.isPending;
   const error = invalid ?? (create.isError ? createErrorMessage(create.error) : null);
   const name = state.answers.find((item) => item.question === 'name')?.text ?? '';
 
   return (
     <Screen>
-      <Header onSignOut={onSignOut} />
+      <Header onSignOut={busy ? null : onSignOut} />
       <ScreenBody>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
-          <Transcript state={state} onCorrect={() => change(undo(state))} />
+          <Transcript state={state} onCorrect={busy ? null : () => change(undo(state))} />
           <div ref={endRef} />
         </div>
       </ScreenBody>
@@ -177,8 +189,8 @@ export function ConversationScreen({ repository, drafts, onCreated, onSignOut }:
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <FormError message={error} />
           {state.current === 'review' ? (
-            <PrimaryButton disabled={create.isPending} onClick={() => create.mutate(state)}>
-              {create.isPending ? 'Criando…' : `Criar o ${name}`}
+            <PrimaryButton disabled={busy} onClick={submit}>
+              {busy ? 'Criando…' : `Criar o ${name}`}
             </PrimaryButton>
           ) : (
             <Composer key={`${state.current}-${state.answers.length}`} state={state} send={send} />
