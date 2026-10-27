@@ -12,6 +12,7 @@ export type View =
   | 'a-activity'
   | 'a-sindico'
   | 'a-team'
+  | 'a-building'
   | 'a-notice'
   | 'a-messages'
   | 'r-home'

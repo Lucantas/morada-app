@@ -37,6 +37,7 @@ import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
+import { BuildingStructureScreen } from '@/features/building/ui/building-structure-screen';
 import { ActivityScreen } from '@/features/activity/ui/activity-screen';
 import { TeamScreen } from '@/features/team/ui/team-screen';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
@@ -90,6 +91,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-activity': 'settings',
   'a-sindico': 'settings',
   'a-team': 'settings',
+  'a-building': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -309,6 +311,7 @@ function AdminRouter({ view, residentId, incomeId, apt, go, signOut, headerActio
           onOpenActivity={() => go('a-activity')}
           onOpenSindico={() => go('a-sindico')}
           onOpenTeam={() => go('a-team')}
+          onOpenBuilding={() => go('a-building')}
         />
       );
     case 'a-sindico':
@@ -321,6 +324,10 @@ function AdminRouter({ view, residentId, incomeId, apt, go, signOut, headerActio
           inviteShare={InviteShare}
           onBack={() => go('a-settings')}
         />
+      );
+    case 'a-building':
+      return (
+        <BuildingStructureScreen repository={buildingRepository} onBack={() => go('a-settings')} />
       );
     case 'a-activity':
       return <ActivityScreen repository={activityRepository} onBack={() => go('a-settings')} />;
@@ -365,11 +372,13 @@ function AdminSettings({
   onOpenActivity,
   onOpenSindico,
   onOpenTeam,
+  onOpenBuilding,
 }: {
   onBack: () => void;
   onOpenActivity: () => void;
   onOpenSindico: () => void;
   onOpenTeam: () => void;
+  onOpenBuilding: () => void;
 }) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
@@ -394,6 +403,7 @@ function AdminSettings({
       canManageCondo={canManageCondo}
       onOpenSindico={canManageCondo ? onOpenSindico : undefined}
       onOpenTeam={isOrgOwner ? onOpenTeam : undefined}
+      onOpenBuilding={canManageCondo ? onOpenBuilding : undefined}
       onOpenActivity={canViewActivity ? onOpenActivity : undefined}
       onBack={onBack}
     />
