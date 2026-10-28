@@ -45,11 +45,11 @@ const seed: StreetSeed = {
       );
     }
   },
-  receipt: async (condoId, residentId, status, dueDate) => {
+  receipt: async (condoId, residentId, status, dueDate, visible = true) => {
     await pool.query(
-      `INSERT INTO receipts (id, ref, title, value_cents, status, resident_id, due_date, condominium_id)
-       VALUES ($1, 'ref', 'Taxa', 15000, $2, $3, $4, $5)`,
-      [randomUUID(), status, residentId, dueDate, condoId],
+      `INSERT INTO receipts (id, ref, title, value_cents, status, resident_id, due_date, condominium_id, visible)
+       VALUES ($1, 'ref', 'Taxa', 15000, $2, $3, $4, $5, $6)`,
+      [randomUUID(), status, residentId, dueDate, condoId, visible],
     );
   },
   account: async (condoId, status, dueDate, visible = true) => {

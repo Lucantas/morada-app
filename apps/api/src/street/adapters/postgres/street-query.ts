@@ -37,7 +37,7 @@ const OVERDUE_RESIDENTS_SQL = `
       r.status_override = 'atrasado'
       OR (r.status_override IS NULL AND EXISTS (
         SELECT 1 FROM receipts rc
-        WHERE rc.resident_id = r.id AND rc.status = 'pendente'
+        WHERE rc.resident_id = r.id AND rc.visible AND rc.status = 'pendente'
           AND rc.due_date < $2::date AND rc.condominium_id = r.condominium_id
       ))
     )
@@ -60,7 +60,7 @@ const DUE_SOON_SQL = `
 const PROOFS_SQL = `
   SELECT condominium_id, count(*) AS n
   FROM receipts
-  WHERE condominium_id = ANY($1) AND status = 'em_analise'
+  WHERE condominium_id = ANY($1) AND visible AND status = 'em_analise'
   GROUP BY condominium_id`;
 
 const UNREAD_SQL = `

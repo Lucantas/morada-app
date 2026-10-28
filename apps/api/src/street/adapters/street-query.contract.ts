@@ -17,6 +17,7 @@ export interface StreetSeed {
     residentId: string,
     status: string,
     dueDate: string | null,
+    visible?: boolean,
   ): Promise<void>;
   account(
     condoId: string,
@@ -77,6 +78,28 @@ export function runStreetQueryContract(
 
       expect(facts.get(A)?.pendencies.overdueResidents).toBe(2);
       expect(facts.get(B)?.pendencies.overdueResidents).toBe(1);
+    });
+
+    test('an archived overdue receipt does not make the resident overdue', async () => {
+      const query = await makeQuery();
+      await seed.apartment(A, 'a1', { block: null, floor: 1, position: 1 });
+      await seed.resident(A, 'r1', { override: null, apartmentId: 'a1' });
+      await seed.receipt(A, 'r1', 'pendente', '2026-10-01', false);
+
+      const facts = await query.factsFor([A], 'u1', TODAY);
+
+      expect(facts.get(A)?.pendencies.overdueResidents).toBe(0);
+    });
+
+    test('an archived receipt under review is not a proof to review', async () => {
+      const query = await makeQuery();
+      await seed.apartment(A, 'a1', { block: null, floor: 1, position: 1 });
+      await seed.resident(A, 'r1', { override: null, apartmentId: 'a1' });
+      await seed.receipt(A, 'r1', 'em_analise', '2026-10-01', false);
+
+      const facts = await query.factsFor([A], 'u1', TODAY);
+
+      expect(facts.get(A)?.pendencies.proofsToReview).toBe(0);
     });
 
     test('derived status ignores receipts that are paid, not yet due, or due today', async () => {
