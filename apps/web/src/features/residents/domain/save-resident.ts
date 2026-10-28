@@ -3,7 +3,7 @@ import { residentDraftSchema, residentSchema, type Resident, type ResidentDraft 
 import type { ResidentRepository } from './resident-repository';
 
 export async function saveResident(
-  repository: ResidentRepository,
+  repository: Pick<ResidentRepository, 'save'>,
   draft: ResidentDraft,
 ): Promise<Resident> {
   const parsedDraft = residentDraftSchema.safeParse(draft);

@@ -56,6 +56,7 @@ export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginRespo
     hasHome: first.hasHome,
     organizationId: first.organizationId,
     orgRole: first.orgRole,
+    onboardingPending: first.onboardingPending,
   });
   useSessionStore.getState().authenticate(first.role, null);
   return first.role;

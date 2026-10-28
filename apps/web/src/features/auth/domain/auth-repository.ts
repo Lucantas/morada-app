@@ -1,5 +1,7 @@
 import type { LoginCondo, LoginResponse } from '@/features/session/domain/login-response';
 
+import type { CreateCondoInput } from '@/features/condos/domain/create-condo';
+
 import type { SignUpInput } from './auth-schemas';
 
 export interface AuthRepository {
@@ -9,5 +11,5 @@ export interface AuthRepository {
   resendConfirmation(): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
   resetPassword(token: string, password: string): Promise<LoginResponse>;
-  createCondo(name: string): Promise<LoginCondo>;
+  createCondo(input: CreateCondoInput): Promise<LoginCondo>;
 }

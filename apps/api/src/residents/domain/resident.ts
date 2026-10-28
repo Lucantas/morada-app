@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const MAX_APARTMENT_LABEL = 80;
+
 export const residentStatusSchema = z.enum(['em_dia', 'pendente', 'atrasado']);
 export type ResidentStatus = z.infer<typeof residentStatusSchema>;
 
@@ -8,7 +10,7 @@ export type ResidentStatus = z.infer<typeof residentStatusSchema>;
 export const residentSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(120),
-  apt: z.string().min(1).max(40),
+  apt: z.string().min(1).max(MAX_APARTMENT_LABEL),
   apartmentId: z.string().min(1).max(64),
   phone: z.string().max(40),
   email: z.string().max(160),
@@ -24,7 +26,7 @@ export type Resident = z.infer<typeof residentSchema>;
 export const residentDraftSchema = z.object({
   id: z.string().min(1).optional(),
   name: z.string().min(1).max(120),
-  apt: z.string().min(1).max(40),
+  apt: z.string().min(1).max(MAX_APARTMENT_LABEL),
   phone: z.string().max(40),
   email: z.string().max(160),
   status: residentStatusSchema.default('em_dia'),

@@ -11,6 +11,8 @@ interface SettingsRow {
   pix_key: string | null;
   pix_receiver_name: string | null;
   pix_city: string | null;
+  opening_balance_cents: number | null;
+  opening_balance_date: string | null;
 }
 
 export class PostgresSettingsRepository implements SettingsRepository {
@@ -21,7 +23,8 @@ export class PostgresSettingsRepository implements SettingsRepository {
 
   async get(): Promise<CondoSettings> {
     const { rows } = await this.pool.query<SettingsRow>(
-      `SELECT monthly_fee_cents, due_day, pix_key_type, pix_key, pix_receiver_name, pix_city
+      `SELECT monthly_fee_cents, due_day, pix_key_type, pix_key, pix_receiver_name, pix_city,
+         opening_balance_cents, opening_balance_date::text AS opening_balance_date
        FROM condo_settings WHERE condominium_id = $1`,
       [this.condominiumId],
     );
@@ -39,6 +42,10 @@ export class PostgresSettingsRepository implements SettingsRepository {
               receiverName: row.pix_receiver_name,
               city: row.pix_city,
             },
+      openingBalance:
+        row.opening_balance_cents === null
+          ? null
+          : { valueCents: row.opening_balance_cents, date: row.opening_balance_date },
     });
   }
 
@@ -46,7 +53,8 @@ export class PostgresSettingsRepository implements SettingsRepository {
     const parsed = condoSettingsSchema.parse(settings);
     const result = await this.pool.query(
       `UPDATE condo_settings SET monthly_fee_cents = $2, due_day = $3,
-         pix_key_type = $4, pix_key = $5, pix_receiver_name = $6, pix_city = $7
+         pix_key_type = $4, pix_key = $5, pix_receiver_name = $6, pix_city = $7,
+         opening_balance_cents = $8, opening_balance_date = $9
        WHERE condominium_id = $1
        RETURNING condominium_id`,
       [
@@ -57,6 +65,8 @@ export class PostgresSettingsRepository implements SettingsRepository {
         parsed.pix?.key ?? null,
         parsed.pix?.receiverName ?? null,
         parsed.pix?.city ?? null,
+        parsed.openingBalance?.valueCents ?? null,
+        parsed.openingBalance?.date ?? null,
       ],
     );
     if (result.rows.length === 0) throw new SettingsNotFoundError();

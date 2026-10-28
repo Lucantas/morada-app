@@ -481,4 +481,29 @@ ALTER TABLE condo_settings ADD CONSTRAINT condo_settings_pix_all_or_none CHECK (
 );
 `,
   },
+  {
+    id: '027_building',
+    sql: `
+ALTER TABLE apartments ADD COLUMN block TEXT;
+ALTER TABLE apartments ADD COLUMN floor INTEGER;
+ALTER TABLE apartments ADD COLUMN position INTEGER;
+ALTER TABLE apartments ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+UPDATE apartments
+SET floor = placed.number / 100,
+    position = placed.number % 100
+FROM (
+  SELECT id, CASE WHEN label ~ '^Apto [0-9]{3,9}$' THEN substring(label from 6)::integer END AS number
+  FROM apartments
+) placed
+WHERE apartments.id = placed.id AND placed.number >= 100;
+ALTER TABLE condo_settings ADD COLUMN opening_balance_cents INTEGER;
+ALTER TABLE condo_settings ADD COLUMN opening_balance_date DATE;
+ALTER TABLE condo_settings ADD CONSTRAINT condo_settings_opening_all_or_none CHECK (
+  (opening_balance_cents IS NULL AND opening_balance_date IS NULL) OR
+  (opening_balance_cents IS NOT NULL AND opening_balance_date IS NOT NULL)
+);
+ALTER TABLE condominiums ADD COLUMN onboarded_at TIMESTAMPTZ;
+UPDATE condominiums SET onboarded_at = now();
+`,
+  },
 ];

@@ -12,10 +12,23 @@ const maria = {
 
 // Behavioural contract every ResidentRepository must satisfy, run against both
 // the SQLite and Postgres adapters so the two stores stay in lockstep.
+export interface ApartmentProbe {
+  read(apartmentId: string): Promise<{
+    floor: number | null;
+    position: number | null;
+    block: string | null;
+    active: boolean;
+  }>;
+  deactivate(apartmentId: string): Promise<void>;
+}
+
 export function runResidentRepositoryContract(
   label: string,
   makeRepo: (condominiumId: string) => Promise<ResidentRepository>,
+  probe: ApartmentProbe,
 ): void {
+  const readApartment = probe.read;
+  const deactivateApartment = probe.deactivate;
   describe(label, () => {
     test('save creates the apartment + active occupancy and getById joins them', async () => {
       const repo = await makeRepo('condo-a');
@@ -29,6 +42,27 @@ export function runResidentRepositoryContract(
       });
       expect(saved.apartmentId).toMatch(/.+/);
       expect(await repo.getById('r-1')).toEqual(saved);
+    });
+
+    test("saving a resident on a new 'Apto 501' places it", async () => {
+      const repo = await makeRepo('condo-a');
+
+      const saved = await repo.save({ ...maria, apt: 'Apto 501' });
+
+      const { floor, position, block } = await readApartment(saved.apartmentId);
+      expect({ floor, position, block }).toEqual({ floor: 5, position: 1, block: null });
+    });
+
+    test("saving on a deactivated apartment's label reactivates it", async () => {
+      const repo = await makeRepo('condo-a');
+      const first = await repo.save(maria);
+      await repo.deactivate('r-1');
+      await deactivateApartment(first.apartmentId);
+
+      const next = await repo.save({ ...maria, id: 'r-9', name: 'Ana' });
+
+      expect(next.apartmentId).toBe(first.apartmentId);
+      expect((await readApartment(first.apartmentId)).active).toBe(true);
     });
 
     test('reuses the apartment for the same label', async () => {

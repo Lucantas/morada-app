@@ -1,6 +1,7 @@
 import { HttpActivityRepository } from '@/features/activity/data/http-activity-repository';
 import { HttpAuthRepository } from '@/features/auth/data/http-auth-repository';
 import { HttpAccountRepository } from '@/features/accounts/data/http-account-repository';
+import { HttpBuildingRepository } from '@/features/building/data/http-building-repository';
 import { HttpCondoInfoRepository } from '@/features/condos/data/http-condo-info-repository';
 import { HttpCategoryRepository } from '@/features/categories/data/http-category-repository';
 import { HttpDashboardRepository } from '@/features/dashboard/data/http-dashboard-repository';
@@ -8,6 +9,7 @@ import { HttpInvitationRepository } from '@/features/invitations/data/http-invit
 import { HttpIncomeRepository } from '@/features/income/data/http-income-repository';
 import { HttpThreadRepository } from '@/features/messages/data/http-thread-repository';
 import { HttpNoticeRepository } from '@/features/notices/data/http-notice-repository';
+import { HttpOnboardingRepository } from '@/features/onboarding/data/http-onboarding-repository';
 import { HttpPixRepository } from '@/features/receipts/data/http-pix-repository';
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
@@ -52,8 +54,10 @@ export const threadRepository = new HttpThreadRepository(apiClient);
 export const dashboardRepository = new HttpDashboardRepository(apiClient);
 export const settingsRepository = new HttpSettingsRepository(apiClient);
 export const condoInfoRepository = new HttpCondoInfoRepository(apiClient);
+export const buildingRepository = new HttpBuildingRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
+export const onboardingRepository = new HttpOnboardingRepository(apiClient);
 export const teamRepository = new HttpTeamRepository(
   apiClient,
   () => useCondoScope.getState().condo?.organizationId ?? null,

@@ -9,6 +9,7 @@ export type CondoAccess = {
   residentId: string | null;
   organizationId: string;
   orgRole: OrgRoleName | null;
+  onboardingPending: boolean;
 };
 
 const ROLE_RANK: Record<CondoRoleName, number> = { administrador: 3, sindico: 2, morador: 1 };

@@ -1,5 +1,6 @@
 import type { AccountRepository } from '../../accounts/domain/account-repository';
 import type { IncomeRepository } from '../../income/domain/income-repository';
+import type { SettingsRepository } from '../../settings/domain/settings-repository';
 import type { ReceiptRepository } from '../../receipts/domain/receipt-repository';
 import type { DashboardRepository } from '../domain/dashboard-repository';
 
@@ -11,6 +12,7 @@ export interface DashboardHarness {
   accounts: AccountRepository;
   receipts: ReceiptRepository;
   incomes: IncomeRepository;
+  settings: SettingsRepository;
 }
 
 function previousMonthDate(today: string): string {
@@ -33,6 +35,36 @@ export function runDashboardRepositoryContract(
   setup: (condominiumId: string) => Promise<DashboardHarness>,
 ): void {
   describe(label, () => {
+    test('the opening balance anchors the balance and ignores earlier entries', async () => {
+      const { dashboard, accounts, settings } = await setup('condo-a');
+      const today = new Date().toISOString().slice(0, 10);
+      await accounts.save({
+        id: 'a-old',
+        description: 'Água',
+        category: 'Utilidades',
+        date: '2020-01-05',
+        valueCents: 50000,
+        status: 'pago',
+      });
+      await accounts.save({
+        id: 'a-new',
+        description: 'Luz',
+        category: 'Utilidades',
+        date: today,
+        valueCents: 30000,
+        status: 'pago',
+      });
+      const current = await settings.get();
+      await settings.save({
+        ...current,
+        openingBalance: { valueCents: 1_000_000, date: today },
+      });
+
+      const summary = await dashboard.getSummary();
+
+      expect(summary.balance.balanceCents).toBe(970_000);
+    });
+
     test('derives the balance live from paid accounts, paid receipts, and incomes', async () => {
       const { dashboard, accounts, receipts, incomes } = await setup('condo-a');
       const today = new Date().toISOString().slice(0, 10);

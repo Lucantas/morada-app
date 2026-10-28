@@ -39,6 +39,7 @@ const ADMIN_SUMMARY = {
   hasHome: false,
   organizationId: `org-${TEST_CONDO_ID}`,
   orgRole: 'owner',
+  onboardingPending: false,
 };
 
 const RESIDENT_SUMMARY = {
@@ -50,6 +51,7 @@ const RESIDENT_SUMMARY = {
   hasHome: false,
   organizationId: `org-${TEST_CONDO_ID}`,
   orgRole: null,
+  onboardingPending: false,
 };
 
 const pool = createPool(config.databaseUrl);
@@ -546,7 +548,12 @@ describe('Morada API', () => {
     const app = await makeApp();
     await createTestCondo(pool, 'condo-other');
     const other = makePostgresRepositories(pool).forCondo('condo-other');
-    await other.settings.save({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
+    await other.settings.save({
+      monthlyFeeCents: 99000,
+      dueDay: 3,
+      pix: null,
+      openingBalance: null,
+    });
     const admin = await authFor(app, adminCredentials);
     const headers = {
       Cookie: admin.cookie,
@@ -561,11 +568,26 @@ describe('Morada API', () => {
       body: JSON.stringify({ monthlyFeeCents: 20000, dueDay: 10 }),
     });
 
-    expect(await read.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await read.json()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
     expect(update.status).toBe(200);
-    expect(await other.settings.get()).toEqual({ monthlyFeeCents: 99000, dueDay: 3, pix: null });
+    expect(await other.settings.get()).toEqual({
+      monthlyFeeCents: 99000,
+      dueDay: 3,
+      pix: null,
+      openingBalance: null,
+    });
     const own = await app.request(`${P}/settings`, { headers });
-    expect(await own.json()).toEqual({ monthlyFeeCents: 20000, dueDay: 10, pix: null });
+    expect(await own.json()).toEqual({
+      monthlyFeeCents: 20000,
+      dueDay: 10,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   test('cross-condo categories are isolated', async () => {
@@ -954,6 +976,118 @@ describe('Morada API — real credentials', () => {
       orgRole: 'owner',
     });
     expect(((await me.json()) as { condos: unknown[] }).condos).toEqual([created]);
+  });
+
+  test('POST /me/condos creates the building', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+
+    const res = await createCondo(app, auth, {
+      name: 'Residencial Ipê',
+      structure: { blocks: [{ name: null, floors: 4, perFloor: 4 }] },
+      monthlyFeeCents: 35000,
+      dueDay: 10,
+      pix: {
+        keyType: 'cpf',
+        key: '529.982.247-25',
+        receiverName: 'Condominio Ipe',
+        city: 'Sao Paulo',
+      },
+    });
+    const created = (await res.json()) as { id: string };
+    const apartments = await pool.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM apartments WHERE condominium_id = $1',
+      [created.id],
+    );
+    const settings = await app.request(`/api/condos/${created.id}/settings`, {
+      headers: { Cookie: auth.cookie },
+    });
+
+    expect(res.status).toBe(201);
+    expect(apartments.rows[0]?.n).toBe(16);
+    expect(await settings.json()).toEqual({
+      monthlyFeeCents: 35000,
+      dueDay: 10,
+      pix: {
+        keyType: 'cpf',
+        key: '52998224725',
+        receiverName: 'Condominio Ipe',
+        city: 'Sao Paulo',
+      },
+      openingBalance: null,
+    });
+  });
+
+  test('long block names make apartments that take a resident, and "Bloco " is dropped', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const longName = 'Residencial Jardim Primavera I';
+    const res = await createCondo(app, auth, {
+      name: 'Residencial Ipê',
+      structure: {
+        blocks: [
+          { name: 'Bloco A', floors: 1, perFloor: 1 },
+          { name: longName, floors: 60, perFloor: 20 },
+        ],
+      },
+    });
+    const created = (await res.json()) as { id: string };
+    const headers = {
+      Cookie: auth.cookie,
+      'X-CSRF-Token': auth.csrf,
+      'Content-Type': 'application/json',
+    };
+    const longest = `Apto 6020 · Bloco ${longName}`;
+
+    const saved = await app.request(`/api/condos/${created.id}/residents`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: 'Ana', apt: longest, phone: '', email: '', status: 'em_dia' }),
+    });
+    const blocks = await pool.query<{ block: string }>(
+      'SELECT DISTINCT block FROM apartments WHERE condominium_id = $1 ORDER BY block',
+      [created.id],
+    );
+    const building = (await (
+      await app.request(`/api/condos/${created.id}/building`, { headers })
+    ).json()) as { blocks: { floors: { apartments: { label: string; state: string }[] }[] }[] };
+    const window = building.blocks
+      .flatMap((b) => b.floors.flatMap((f) => f.apartments))
+      .find((a) => a.label === longest);
+
+    expect(res.status).toBe(201);
+    expect(saved.status).toBe(201);
+    expect(blocks.rows.map((row) => row.block)).toEqual(['A', longName]);
+    expect(window?.state).toBe('ocupado');
+  });
+
+  test('new condo is pending until completed', async () => {
+    const app = await makeApp();
+    const auth = await verifiedEmailAuth(app, 'ana@x.com');
+    const complete = (id: string) =>
+      app.request(`/api/condos/${id}/onboarding/complete`, {
+        method: 'POST',
+        headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+      });
+    const listed = async () =>
+      (await (await app.request('/me/condos', { headers: { Cookie: auth.cookie } })).json()) as {
+        onboardingPending: boolean;
+      }[];
+
+    const created = (await (await createCondo(app, auth, { name: 'Ipê' })).json()) as {
+      id: string;
+      onboardingPending: boolean;
+    };
+    const pendingBefore = await listed();
+    const first = await complete(created.id);
+    const pendingAfter = await listed();
+    const second = await complete(created.id);
+
+    expect(created.onboardingPending).toBe(true);
+    expect(pendingBefore[0]?.onboardingPending).toBe(true);
+    expect(first.status).toBe(204);
+    expect(pendingAfter[0]?.onboardingPending).toBe(false);
+    expect(second.status).toBe(204);
   });
 
   test('a second condominium reuses the same organization', async () => {
@@ -1427,7 +1561,12 @@ describe('Morada API — authorization wiring', () => {
     const admin = await withCreds(adminCredentials);
     const res = await admin.auth(`${P}/settings`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    expect(await res.json()).toEqual({
+      monthlyFeeCents: 15000,
+      dueDay: 15,
+      pix: null,
+      openingBalance: null,
+    });
   });
 
   test('categories are admin-only; saving reclassifies matching accounts', async () => {
@@ -3024,6 +3163,14 @@ describe('Síndico access', () => {
     body: JSON.stringify(body),
   });
 
+  test('sindico cannot complete onboarding', async () => {
+    const { request } = await sindicoApp();
+
+    const res = await request(`${P}/onboarding/complete`, { method: 'POST' });
+
+    expect(res.status).toBe(403);
+  });
+
   test('sindico cannot manage fees or condo', async () => {
     const { request } = await sindicoApp();
 
@@ -3109,7 +3256,7 @@ describe('Síndico access', () => {
     await put({ monthlyFeeCents: 15000, dueDay: 15, pix: PIX_INPUT });
     await put({ monthlyFeeCents: 16000, dueDay: 12 });
     const kept = await app.request(`${P}/pix`, { headers });
-    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null });
+    await put({ monthlyFeeCents: 16000, dueDay: 12, pix: null, openingBalance: null });
     const cleared = await app.request(`${P}/pix`, { headers });
 
     expect(await before.json()).toEqual({ configured: false });
@@ -3154,6 +3301,7 @@ describe('Síndico access', () => {
         hasHome: true,
         organizationId: `org-${TEST_CONDO_ID}`,
         orgRole: null,
+        onboardingPending: false,
       },
     ]);
   });
@@ -3797,5 +3945,191 @@ describe('Organization team', () => {
         orgRole: 'member',
       }),
     ]);
+  });
+});
+
+describe('Building view and apartment management', () => {
+  const jsonBody = (method: string, body: unknown): RequestInit => ({
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  async function adminRequest(app: App) {
+    const auth = await authFor(app, adminCredentials);
+    return (path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: {
+          ...(init.headers ?? {}),
+          Cookie: auth.cookie,
+          'X-CSRF-Token': auth.csrf,
+        },
+      });
+  }
+
+  test('GET building draws the seeded apartments with their occupants', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+
+    const res = await request(`${P}/building`);
+    const body = (await res.json()) as {
+      blocks: { name: string | null; floors: { floor: number }[] }[];
+      unplaced: unknown[];
+    };
+
+    expect(res.status).toBe(200);
+    const floors = body.blocks.flatMap((b) => b.floors.map((f) => f.floor));
+    expect(floors).toEqual([...floors].sort((a, b) => b - a));
+    expect(JSON.stringify(body)).toContain('Maria Ribeiro');
+  });
+
+  test('GET building colours windows by the derived status and the admin override', async () => {
+    const app = await makeApp();
+    const repos = makePostgresRepositories(pool).forCondo(TEST_CONDO_ID);
+    await repos.receipts.save({
+      id: 'rc-future',
+      ref: '12/2099',
+      title: 'Taxa condominial',
+      dueDate: '2099-12-10',
+      valueCents: 45000,
+      status: 'pendente',
+      residentId: 'r-2',
+      apartmentId: 'apt-r-2',
+    });
+    await repos.residents.setStatusOverride('r-4', 'atrasado');
+    const request = await adminRequest(app);
+
+    const res = await request(`${P}/building`);
+    type Window = { residentId: string | null; state: string };
+    const body = (await res.json()) as {
+      blocks: { floors: { apartments: Window[] }[] }[];
+      unplaced: Window[];
+    };
+    const stateOf = (residentId: string) =>
+      [...body.blocks.flatMap((b) => b.floors.flatMap((f) => f.apartments)), ...body.unplaced].find(
+        (a) => a.residentId === residentId,
+      )?.state;
+
+    expect(stateOf('r-1')).toBe('atrasado');
+    expect(stateOf('r-2')).toBe('pendente');
+    expect(stateOf('r-5')).toBe('ocupado');
+    expect(stateOf('r-4')).toBe('atrasado');
+  });
+
+  test('administrador adds, renames and deactivates an apartment', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+
+    const created = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: 'Apto 801', block: null, floor: 8 }),
+    );
+    const apartment = (await created.json()) as { id: string; label: string };
+    const renamed = await request(
+      `${P}/building/apartments/${apartment.id}`,
+      jsonBody('PUT', { label: 'Cobertura' }),
+    );
+    const duplicate = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: 'Cobertura', block: null, floor: 8 }),
+    );
+    const invalid = await request(
+      `${P}/building/apartments`,
+      jsonBody('POST', { label: '', block: null, floor: 8 }),
+    );
+    const deactivated = await request(`${P}/building/apartments/${apartment.id}/deactivate`, {
+      method: 'POST',
+    });
+
+    expect(created.status).toBe(201);
+    expect(renamed.status).toBe(200);
+    expect(((await renamed.json()) as { label: string }).label).toBe('Cobertura');
+    expect(duplicate.status).toBe(409);
+    expect(await duplicate.json()).toEqual({ error: 'Já existe um apartamento com esse nome' });
+    expect(invalid.status).toBe(400);
+    expect(deactivated.status).toBe(204);
+  });
+
+  test('deactivating an apartment with an active resident answers 409', async () => {
+    const app = await makeApp();
+    const request = await adminRequest(app);
+    const resident = await makePostgresRepositories(pool)
+      .forCondo(TEST_CONDO_ID)
+      .residents.getById('r-1');
+
+    const res = await request(`${P}/building/apartments/${resident?.apartmentId}/deactivate`, {
+      method: 'POST',
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Apartamento com morador ativo' });
+  });
+
+  test('GET building isolates condos', async () => {
+    const app = await makeApp();
+    await createTestCondo(pool, 'condo-other');
+    const foreign = await makePostgresRepositories(pool)
+      .forCondo('condo-other')
+      .building.add({ label: 'Apto 900', block: null, floor: 9 });
+    const request = await adminRequest(app);
+
+    const rename = await request(
+      `${P}/building/apartments/${foreign.id}`,
+      jsonBody('PUT', { label: 'Invadido' }),
+    );
+    const deactivate = await request(`${P}/building/apartments/${foreign.id}/deactivate`, {
+      method: 'POST',
+    });
+    const list = await request(`${P}/building`);
+
+    expect(rename.status).toBe(404);
+    expect(await rename.json()).toEqual({ error: 'Apartamento não encontrado' });
+    expect(deactivate.status).toBe(404);
+    expect(JSON.stringify(await list.json())).not.toContain('Apto 900');
+  });
+
+  test('sindico sees the building but cannot change it', async () => {
+    const app = await makeApp();
+    const hasher = new BcryptPasswordHasher(config.bcryptCost);
+    await new PostgresUserRepository(pool).save({
+      id: 'u-sindico-b',
+      username: 'sindico-b',
+      email: null,
+      name: 'Síndica',
+      passwordHash: await hasher.hash('senha-sindico-1'),
+      role: 'resident',
+      residentId: null,
+      emailVerifiedAt: null,
+      sessionVersion: 0,
+    });
+    await pool.query(
+      `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+       VALUES ('role-sindico-b', $1, 'u-sindico-b', 'sindico', NULL)`,
+      [TEST_CONDO_ID],
+    );
+    const auth = await authFor(app, { username: 'sindico-b', password: 'senha-sindico-1' });
+    const headers = { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf };
+
+    const read = await app.request(`${P}/building`, { headers });
+    const create = await app.request(`${P}/building/apartments`, {
+      ...jsonBody('POST', { label: 'Apto 901', block: null, floor: 9 }),
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+
+    expect(read.status).toBe(200);
+    expect(create.status).toBe(403);
+    expect(await create.json()).toEqual({ error: 'Acesso negado' });
+  });
+
+  test('a resident cannot read the building', async () => {
+    const app = await makeApp();
+    const auth = await authFor(app, residentCredentials);
+
+    const res = await app.request(`${P}/building`, {
+      headers: { Cookie: auth.cookie, 'X-CSRF-Token': auth.csrf },
+    });
+
+    expect(res.status).toBe(403);
   });
 });

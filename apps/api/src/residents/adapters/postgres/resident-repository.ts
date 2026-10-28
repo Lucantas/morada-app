@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { Pool, PoolClient } from 'pg';
 
+import { placementFromLabel } from '../../../building/domain/placement';
 import { ApartmentOccupiedError, ResidentNotFoundError } from '../../domain/errors';
 import { residentSchema, type Resident } from '../../domain/resident';
 import type { ResidentRepository } from '../../domain/resident-repository';
@@ -152,13 +153,19 @@ export class PostgresResidentRepository implements ResidentRepository {
       'SELECT id FROM apartments WHERE condominium_id = $1 AND label = $2',
       [this.condominiumId, label],
     );
-    if (existing.rows[0]) return existing.rows[0].id;
+    if (existing.rows[0]) {
+      await client.query('UPDATE apartments SET active = TRUE WHERE id = $1 AND NOT active', [
+        existing.rows[0].id,
+      ]);
+      return existing.rows[0].id;
+    }
     const id = randomUUID();
-    await client.query('INSERT INTO apartments (id, label, condominium_id) VALUES ($1, $2, $3)', [
-      id,
-      label,
-      this.condominiumId,
-    ]);
+    const placement = placementFromLabel(label);
+    await client.query(
+      `INSERT INTO apartments (id, label, condominium_id, block, floor, position)
+       VALUES ($1, $2, $3, NULL, $4, $5)`,
+      [id, label, this.condominiumId, placement?.floor ?? null, placement?.position ?? null],
+    );
     return id;
   }
 

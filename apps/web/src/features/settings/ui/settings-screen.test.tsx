@@ -36,6 +36,7 @@ function Harness({
   onOpenActivity,
   onOpenSindico,
   onOpenTeam,
+  onOpenBuilding,
 }: {
   settings: SettingsRepository;
   categoryRepo: CategoryRepository;
@@ -45,6 +46,7 @@ function Harness({
   onOpenActivity?: () => void;
   onOpenSindico?: () => void;
   onOpenTeam?: () => void;
+  onOpenBuilding?: () => void;
 }) {
   const categories = useCategories(categoryRepo);
   const saveCategories = useSaveCategories(categoryRepo);
@@ -66,6 +68,7 @@ function Harness({
       onOpenActivity={onOpenActivity}
       onOpenSindico={onOpenSindico}
       onOpenTeam={onOpenTeam}
+      onOpenBuilding={onOpenBuilding}
       onBack={() => {}}
     />
   );
@@ -247,7 +250,12 @@ describe('SettingsScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
 
     await waitFor(() =>
-      expect(repo.snapshot()).toEqual({ monthlyFeeCents: 20000, dueDay: 15, pix: null }),
+      expect(repo.snapshot()).toEqual({
+        monthlyFeeCents: 20000,
+        dueDay: 15,
+        pix: null,
+        openingBalance: null,
+      }),
     );
   });
 
@@ -319,6 +327,35 @@ describe('SettingsScreen', () => {
     );
     await screen.findByLabelText('Nome da nova categoria');
     expect(screen.queryByRole('button', { name: 'Atividade' })).not.toBeInTheDocument();
+  });
+
+  test('the administrador opens Estrutura do prédio', async () => {
+    const onOpenBuilding = jest.fn();
+    renderWithClient(
+      <Harness
+        settings={new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 })}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        onOpenBuilding={onOpenBuilding}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Estrutura do prédio' }));
+
+    expect(onOpenBuilding).toHaveBeenCalled();
+  });
+
+  test('síndico does not see Estrutura do prédio', async () => {
+    renderWithClient(
+      <Harness
+        settings={new InMemorySettingsRepository({ monthlyFeeCents: 15000, dueDay: 15 })}
+        categoryRepo={new InMemoryCategoryRepository([])}
+        canManageCondo={false}
+        onOpenBuilding={jest.fn()}
+      />,
+    );
+
+    await screen.findByLabelText('Nome da nova categoria');
+    expect(screen.queryByRole('button', { name: 'Estrutura do prédio' })).not.toBeInTheDocument();
   });
 
   test('shows the Síndico row only when an opener is provided and opens it', async () => {

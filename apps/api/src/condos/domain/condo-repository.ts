@@ -1,3 +1,5 @@
+import type { GeneratedApartment } from '../../building/domain/structure';
+import type { PixSettings } from '../../settings/domain/pix-key';
 import type { CondoAccess, OrgRoleName } from './condo-access';
 import type { Condominium, CondoRoleName } from './condominium';
 
@@ -6,6 +8,8 @@ export interface CreateCondominiumInput {
   name: string;
   monthlyFeeCents: number;
   dueDay: number;
+  pix: PixSettings | null;
+  apartments: GeneratedApartment[];
 }
 
 export interface CondoGrant {
@@ -28,6 +32,7 @@ export interface CondoRepository {
   isOperational(condominiumId: string): Promise<boolean>;
   rename(condominiumId: string, name: string): Promise<Condominium>;
   create(input: CreateCondominiumInput): Promise<Condominium>;
+  completeOnboarding(condominiumId: string): Promise<void>;
   ownedOrganization(userId: string): Promise<{ id: string } | null>;
   memberOrganization(userId: string): Promise<{ id: string } | null>;
   createOrganization(input: { name: string; ownerUserId: string }): Promise<{ id: string }>;

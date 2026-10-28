@@ -24,6 +24,28 @@ describe('startNavHistory', () => {
     push.mockRestore();
   });
 
+  test('keeps the preset apartment in the history entry and restores it', () => {
+    stop = startNavHistory();
+    const push = jest.spyOn(window.history, 'pushState');
+    act(() => useNavStore.getState().go('a-resident-edit', { apt: 'Apto 101 · Bloco A' }));
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ view: 'a-resident-edit', apt: 'Apto 101 · Bloco A' }),
+      '',
+    );
+    push.mockClear();
+    act(() => useNavStore.getState().go('a-resident-edit', { apt: 'Apto 102 · Bloco A' }));
+    expect(push).toHaveBeenCalledTimes(1);
+    act(() => {
+      window.dispatchEvent(
+        new PopStateEvent('popstate', {
+          state: { view: 'a-resident-edit', apt: 'Apto 101 · Bloco A' },
+        }),
+      );
+    });
+    expect(useNavStore.getState().apt).toBe('Apto 101 · Bloco A');
+    push.mockRestore();
+  });
+
   test('does not push when the destination equals the current view', () => {
     stop = startNavHistory();
     const push = jest.spyOn(window.history, 'pushState');

@@ -16,7 +16,7 @@ function mount(settings: CondoSettings) {
 
 describe('pix routes', () => {
   it('answers configured false when no key is set', async () => {
-    const app = mount({ monthlyFeeCents: 15000, dueDay: 15, pix: null });
+    const app = mount({ monthlyFeeCents: 15000, dueDay: 15, pix: null, openingBalance: null });
 
     const res = await app.request('/pix');
 
@@ -34,6 +34,7 @@ describe('pix routes', () => {
         receiverName: 'Condomínio Morada',
         city: 'Santos',
       },
+      openingBalance: null,
     });
 
     const res = await app.request('/pix');

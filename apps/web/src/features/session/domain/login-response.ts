@@ -13,6 +13,7 @@ export const loginCondoSchema = z.object({
   hasHome: z.boolean(),
   organizationId: z.string().min(1),
   orgRole: orgRoleSchema.nullable(),
+  onboardingPending: z.boolean().default(false),
 });
 
 const loginResponseSchema = z.object({

@@ -32,7 +32,11 @@ prédio"** and **"Minha casa"** (the web sends `X-Morada-View: admin|resident`).
   `pendente` / `aceito` / `expirado` / `revogado`, one pending per resident
 - `AuthToken` — a single-use e-mailed link (`confirm_email` or `reset_password`)
 - `Apartment` — the stable unit and ledger anchor (`Apto 302`); survives resident
-  turnover. **The apartment is the key, never the resident's name/login.**
+  turnover. **The apartment is the key, never the resident's name/login.** It also
+  carries `block`, `floor`, `position` (where it is drawn) and `active` (deactivated,
+  never deleted)
+- `Building` — the drawing of a condominium: blocks → floors → windows, a projection
+  of its active apartments (not stored). Unplaced apartments go in "Outras unidades"
 - `Resident` — a person; belongs to an apartment via an `Occupancy`
 - `Occupancy` (`apartment_residents`) — the apartment↔resident link with an
   `active` flag; **at most one active resident per apartment** (DB-enforced)
@@ -44,6 +48,8 @@ prédio"** and **"Minha casa"** (the web sends `X-Morada-View: admin|resident`).
 - `ActivityEntry` — a row of the condominium activity log (`activity_log`):
   who did which write, when; visible to `administrador` in Ajustes → "Atividade"
 - `CondoBalance` — condominium financial summary (saldo, entradas, contas pagas)
+- `OpeningBalance` — `{ valueCents, date }` in `condo_settings`, set only by the
+  onboarding; the balance is it plus the movements dated on or after `date`
 
 The web identity flows (login, sign-up, confirmation, reset, invitation accept)
 live in `apps/web/src/features/auth`.

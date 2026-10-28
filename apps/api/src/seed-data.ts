@@ -54,6 +54,8 @@ async function ensureAdminCondominium(condos: CondoRepository): Promise<void> {
     name: DEMO_CONDOMINIUM.name,
     monthlyFeeCents: DEMO_CONDOMINIUM.monthlyFeeCents,
     dueDay: DEMO_CONDOMINIUM.dueDay,
+    pix: null,
+    apartments: [],
   });
   await condos.grant({
     condominiumId: condominium.id,
@@ -61,6 +63,7 @@ async function ensureAdminCondominium(condos: CondoRepository): Promise<void> {
     role: 'administrador',
     residentId: null,
   });
+  await condos.completeOnboarding(condominium.id);
 }
 
 export async function seedAdmin(

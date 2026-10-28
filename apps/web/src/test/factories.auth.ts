@@ -12,6 +12,7 @@ export function loginCondo(overrides: Partial<LoginCondo> = {}): LoginCondo {
     hasHome: false,
     organizationId: 'o1',
     orgRole: 'owner',
+    onboardingPending: false,
     ...overrides,
   };
 }
@@ -41,7 +42,9 @@ export function fakeAuthRepository(
     resetPassword: jest
       .fn<Promise<LoginResponse>, [string, string]>()
       .mockResolvedValue(ADMIN_LOGIN),
-    createCondo: jest.fn<Promise<LoginCondo>, [string]>().mockResolvedValue(CREATED_CONDO),
+    createCondo: jest
+      .fn<Promise<LoginCondo>, Parameters<AuthRepository['createCondo']>>()
+      .mockResolvedValue(CREATED_CONDO),
   } satisfies FakeAuthRepository;
   return { ...repository, ...overrides };
 }

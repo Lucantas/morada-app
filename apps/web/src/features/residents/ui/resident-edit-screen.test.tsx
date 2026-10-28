@@ -734,3 +734,67 @@ describe('ResidentEditScreen', () => {
     expect(archiveSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('ResidentEditScreen preset apartment', () => {
+  test('preset apartment is read-only', async () => {
+    const repository = new InMemoryResidentRepository([]);
+    const onBack = jest.fn();
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        presetApt="Apto 101 · Bloco A"
+        onBack={onBack}
+      />,
+    );
+
+    const field = screen.getByLabelText('Número do apartamento');
+    expect(field).toHaveValue('Apto 101 · Bloco A');
+    expect(field).toHaveAttribute('readonly');
+    await userEvent.type(screen.getByLabelText('Nome completo'), 'Carla Dias');
+    await userEvent.click(screen.getByRole('button', { name: /cadastrar apartamento/i }));
+
+    await waitFor(() => expect(onBack).toHaveBeenCalled());
+    const saved = await repository.list();
+    expect(saved.map((r) => r.apt)).toContain('Apto 101 · Bloco A');
+  });
+
+  test('numeric label stays editable', async () => {
+    renderWithClient(
+      <ResidentEditScreen
+        repository={new InMemoryResidentRepository([])}
+        receiptRepository={noReceipts()}
+        presetApt="Apto 101"
+        onBack={jest.fn()}
+      />,
+    );
+
+    const field = screen.getByLabelText('Número do apartamento');
+    expect(field).toHaveValue('101');
+    expect(field).not.toHaveAttribute('readonly');
+  });
+
+  test('an existing resident on a block label keeps the label on save', async () => {
+    const repository = new InMemoryResidentRepository([
+      buildResident({ id: 'r-9', name: 'Ana', apt: 'Apto 101 · Bloco A' }),
+    ]);
+    const onBack = jest.fn();
+    renderWithClient(
+      <ResidentEditScreen
+        repository={repository}
+        receiptRepository={noReceipts()}
+        residentId="r-9"
+        onBack={onBack}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Número do apartamento')).toHaveValue('Apto 101 · Bloco A'),
+    );
+    expect(screen.getByLabelText('Número do apartamento')).toHaveAttribute('readonly');
+    await userEvent.click(screen.getByRole('button', { name: /salvar/i }));
+
+    await waitFor(() => expect(onBack).toHaveBeenCalled());
+    expect((await repository.list()).map((r) => r.apt)).toContain('Apto 101 · Bloco A');
+  });
+});

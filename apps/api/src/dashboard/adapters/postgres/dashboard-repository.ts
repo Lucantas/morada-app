@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 
 import {
   buildDashboardSummary,
+  type OpeningBalance,
   type LedgerAccount,
   type LedgerIncome,
   type LedgerReceipt,
@@ -28,6 +29,11 @@ interface ReceiptRow {
 interface IncomeRow {
   value_cents: number;
   date: string | null;
+}
+
+interface OpeningRow {
+  opening_balance_cents: number | null;
+  opening_balance_date: string | null;
 }
 
 // The summary is derived live from the ledger (accounts = expenses,
@@ -72,7 +78,19 @@ export class PostgresDashboardRepository implements DashboardRepository {
       date: row.date,
     }));
 
+    const openingResult = await this.pool.query<OpeningRow>(
+      'SELECT opening_balance_cents, opening_balance_date::text AS opening_balance_date FROM condo_settings WHERE condominium_id = $1',
+      [this.condominiumId],
+    );
+    const openingRow = openingResult.rows[0];
+    const opening: OpeningBalance | null =
+      openingRow !== undefined &&
+      openingRow.opening_balance_cents !== null &&
+      openingRow.opening_balance_date !== null
+        ? { valueCents: openingRow.opening_balance_cents, date: openingRow.opening_balance_date }
+        : null;
+
     const today = new Date().toISOString().slice(0, 10);
-    return buildDashboardSummary(accounts, receipts, incomes, today);
+    return buildDashboardSummary(accounts, receipts, incomes, today, opening);
   }
 }

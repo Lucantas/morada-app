@@ -22,6 +22,8 @@ jest.mock('./container', () => {
     },
     receiptRepository: new InMemoryReceiptRepository([]),
     accountRepository: unused,
+    buildingRepository: { get: async () => ({ blocks: [], unplaced: [] }) },
+    onboardingRepository: unused,
     categoryRepository: unused,
     condoInfoRepository: unused,
     dashboardRepository: unused,
@@ -72,6 +74,53 @@ describe('App router', () => {
 
     expect(useSessionStore.getState().role).toBe('admin');
     expect(await screen.findByText('Painel do administrador')).toBeInTheDocument();
+  });
+
+  test('signing out from the onboarding conversation clears its draft', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      'morada-onboarding-draft',
+      JSON.stringify({ answers: [{ question: 'name', name: 'Ipê', text: 'Ipê' }] }),
+    );
+    act(() => useSessionStore.setState({ pendingUser: { emailVerified: true } }));
+    render(<App />);
+
+    expect(screen.getByText('Ele tem blocos ou é um prédio só?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(window.localStorage.getItem('morada-onboarding-draft')).toBeNull();
+  });
+
+  test('pending condo opens onboarding for the administrador', async () => {
+    act(() => {
+      useCondoScope.getState().setCondo(testCondo({ onboardingPending: true }));
+      useSessionStore.getState().authenticate('admin', null);
+    });
+
+    render(<App />);
+
+    expect(
+      await screen.findByText('Pronto, esse é o Residencial Ipê. Quem mora em cada um?'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Painel do administrador')).not.toBeInTheDocument();
+  });
+
+  test('pending condo shows the normal home for the síndico', async () => {
+    act(() => {
+      useCondoScope.getState().setCondo(
+        testCondo({
+          onboardingPending: true,
+          condoRole: 'sindico',
+          permissions: ['view_building', 'publish_notices', 'manage_residents', 'manage_money'],
+        }),
+      );
+      useSessionStore.getState().authenticate('admin', null);
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Painel do administrador')).toBeInTheDocument();
+    expect(screen.queryByText(/Quem mora em cada um\?/)).not.toBeInTheDocument();
   });
 
   test('shows the login screen when signed out', () => {

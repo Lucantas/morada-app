@@ -1,11 +1,21 @@
 import { useNavStore, type NavSnapshot } from './nav-store';
 
 function snapshotOf(state: NavSnapshot): NavSnapshot {
-  return { view: state.view, residentId: state.residentId, incomeId: state.incomeId };
+  return {
+    view: state.view,
+    residentId: state.residentId,
+    incomeId: state.incomeId,
+    apt: state.apt,
+  };
 }
 
 function sameView(a: NavSnapshot, b: NavSnapshot): boolean {
-  return a.view === b.view && a.residentId === b.residentId && a.incomeId === b.incomeId;
+  return (
+    a.view === b.view &&
+    a.residentId === b.residentId &&
+    a.incomeId === b.incomeId &&
+    a.apt === b.apt
+  );
 }
 
 export function startNavHistory(): () => void {

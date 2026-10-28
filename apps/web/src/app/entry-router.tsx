@@ -4,13 +4,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { AuthRepository } from '@/features/auth/domain/auth-repository';
 import { loginErrorMessage } from '@/features/auth/ui/auth-error-message';
 import { ConfirmEmailScreen } from '@/features/auth/ui/confirm-email-screen';
-import { CreateCondoScreen } from '@/features/auth/ui/create-condo-screen';
 import { ForgotPasswordScreen } from '@/features/auth/ui/forgot-password-screen';
 import { PendingConfirmationScreen } from '@/features/auth/ui/pending-confirmation-screen';
 import { ResetPasswordScreen } from '@/features/auth/ui/reset-password-screen';
 import { SignUpScreen } from '@/features/auth/ui/signup-screen';
 import type { InvitationRepository } from '@/features/invitations/domain/invitation-repository';
 import { AcceptInviteScreen } from '@/features/invitations/ui/accept-invite-screen';
+import { localDraftStore } from '@/features/onboarding/data/local-draft-store';
+import { ConversationScreen } from '@/features/onboarding/ui/conversation-screen';
 import type { LoginResponse } from '@/features/session/domain/login-response';
 import type { Role } from '@/features/session/domain/session';
 import { LoginScreen } from '@/features/session/ui/login-screen';
@@ -122,8 +123,9 @@ export function EntryRouter({ repository, invitations, onLanded, onSignOut, chil
 
   if (pendingUser) {
     return pendingUser.emailVerified ? (
-      <CreateCondoScreen
+      <ConversationScreen
         repository={repository}
+        drafts={localDraftStore}
         onCreated={(condo) => enter({ condos: [condo], emailVerified: true })}
         onSignOut={onSignOut}
       />

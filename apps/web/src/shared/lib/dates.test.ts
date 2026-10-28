@@ -1,4 +1,4 @@
-import { addMonths, formatIsoDate, formatMonthName } from './dates';
+import { addMonths, formatIsoDate, formatMonthName, todayIso } from './dates';
 
 describe('formatIsoDate', () => {
   test('formats an ISO date as DD/MM/YYYY', () => {
@@ -56,5 +56,12 @@ describe('addMonths', () => {
     ['2026-01', 12, '2027-01'],
   ])('addMonths("%s", %i) === "%s"', (monthKey: string, delta: number, expected: string) => {
     expect(addMonths(monthKey, delta)).toBe(expected);
+  });
+});
+
+describe('todayIso', () => {
+  test('formats the local calendar day, not the UTC one', () => {
+    expect(todayIso(new Date(2026, 9, 27, 23, 30))).toBe('2026-10-27');
+    expect(todayIso(new Date(2026, 0, 5, 0, 10))).toBe('2026-01-05');
   });
 });

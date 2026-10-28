@@ -6,6 +6,8 @@ import {
   type LoginResponse,
 } from '@/features/session/domain/login-response';
 
+import type { CreateCondoInput } from '@/features/condos/domain/create-condo';
+
 import type { AuthRepository } from '../domain/auth-repository';
 import type { SignUpInput } from '../domain/auth-schemas';
 import { AuthError, type AuthErrorKind } from '../domain/errors';
@@ -85,9 +87,9 @@ export class HttpAuthRepository implements AuthRepository {
     );
   }
 
-  createCondo(name: string): Promise<LoginCondo> {
+  createCondo(input: CreateCondoInput): Promise<LoginCondo> {
     return attempt(
-      async () => loginCondoSchema.parse(await this.api.post('/me/condos', { name })),
+      async () => loginCondoSchema.parse(await this.api.post('/me/condos', input)),
       CREATE_CONDO_KINDS,
     );
   }

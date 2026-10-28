@@ -24,6 +24,11 @@ import { useSessionStore } from '@/features/session/ui/session-store';
 import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { InviteForm } from '@/features/invitations/ui/invite-form';
+import { clearDraft } from '@/features/onboarding/data/local-draft-store';
+import { OnboardingFlow } from '@/features/onboarding/ui/onboarding-flow';
+import { BuildingPanel } from '@/features/building/ui/building-panel';
+import { BuildingView } from '@/features/building/ui/building-view';
+import { ResidentAccessCard } from '@/features/invitations/ui/resident-access-card';
 import { InviteShare } from '@/features/invitations/ui/invite-share';
 import { SindicoScreen } from '@/features/invitations/ui/sindico-screen';
 import { ResidentAccessScreen } from '@/features/invitations/ui/resident-access-screen';
@@ -32,6 +37,7 @@ import { ResidentsScreen } from '@/features/residents/ui/residents-screen';
 import { residentsQueryKey } from '@/features/residents/ui/use-residents';
 import { useCurrentResident } from '@/features/residents/ui/use-current-resident';
 import { useCondoInfo, useRenameCondo } from '@/features/condos/ui/use-condo-info';
+import { BuildingStructureScreen } from '@/features/building/ui/building-structure-screen';
 import { ActivityScreen } from '@/features/activity/ui/activity-screen';
 import { TeamScreen } from '@/features/team/ui/team-screen';
 import { SettingsScreen } from '@/features/settings/ui/settings-screen';
@@ -45,6 +51,7 @@ import { StatusView } from '@/shared/ui/status-view';
 import {
   accountRepository,
   activityRepository,
+  buildingRepository,
   categoryRepository,
   condoInfoRepository,
   confirmPayment,
@@ -56,6 +63,7 @@ import {
   issueCharge,
   logout,
   noticeRepository,
+  onboardingRepository,
   overrideResidentStatus,
   pixRepository,
   receiptRepository,
@@ -83,6 +91,7 @@ const ADMIN_TAB: Partial<Record<View, string>> = {
   'a-activity': 'settings',
   'a-sindico': 'settings',
   'a-team': 'settings',
+  'a-building': 'settings',
 };
 
 const RESIDENT_TAB: Partial<Record<View, string>> = {
@@ -109,6 +118,7 @@ function Router() {
   const queryClient = useQueryClient();
 
   const handleSignOut = useCallback(() => {
+    clearDraft();
     queryClient.clear();
     void logout();
   }, [queryClient]);
@@ -131,9 +141,12 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   const view = useNavStore((s) => s.view);
   const residentId = useNavStore((s) => s.residentId);
   const incomeId = useNavStore((s) => s.incomeId);
+  const apt = useNavStore((s) => s.apt);
   const go = useNavStore((s) => s.go);
   const queryClient = useQueryClient();
   const switchView = useSessionStore((s) => s.switchView);
+  const onboardingPending = useCondoScope((s) => s.condo?.onboardingPending ?? false);
+  const canManageCondo = useCanDo('manage_condo');
 
   const handleSwitch = useCallback(
     (next: Role) => {
@@ -145,12 +158,16 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   );
   const headerAction = <ViewSwitch onSwitch={handleSwitch} />;
 
+  if (role === 'admin' && onboardingPending && canManageCondo) {
+    return <AdminOnboarding onDone={() => go('a-home')} />;
+  }
   if (role === 'admin') {
     return (
       <AdminRouter
         view={view}
         residentId={residentId}
         incomeId={incomeId}
+        apt={apt}
         go={go}
         signOut={signOut}
         headerAction={headerAction}
@@ -169,17 +186,35 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   );
 }
 
+function AdminOnboarding({ onDone }: { onDone: () => void }) {
+  return (
+    <OnboardingFlow
+      building={buildingRepository}
+      categories={categoryRepository}
+      accounts={accountRepository}
+      settings={settingsRepository}
+      residents={residentRepository}
+      invitations={invitationRepository}
+      onboarding={onboardingRepository}
+      onDone={onDone}
+      buildingView={BuildingView}
+      accessCard={ResidentAccessCard}
+    />
+  );
+}
+
 type RouteProps = {
   view: View;
   residentId?: string;
   incomeId?: string;
+  apt?: string;
   condoId?: string | null;
-  go: (view: View, opts?: { residentId?: string; incomeId?: string }) => void;
+  go: (view: View, opts?: { residentId?: string; incomeId?: string; apt?: string }) => void;
   signOut: () => void;
   headerAction?: ReactNode;
 };
 
-function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: RouteProps) {
+function AdminRouter({ view, residentId, incomeId, apt, go, signOut, headerAction }: RouteProps) {
   const settings = useSettings(settingsRepository);
   const dueDay = settings.data?.dueDay ?? 15;
   const defaultReceiptValueCents = settings.data?.monthlyFeeCents ?? 0;
@@ -210,6 +245,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           repository={residentRepository}
           receiptRepository={receiptRepository}
           residentId={residentId}
+          presetApt={apt}
           onBack={() => go('a-residents')}
           onOpenAccess={residentId ? () => go('a-resident-login', { residentId }) : undefined}
           dueDay={dueDay}
@@ -275,6 +311,7 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           onOpenActivity={() => go('a-activity')}
           onOpenSindico={() => go('a-sindico')}
           onOpenTeam={() => go('a-team')}
+          onOpenBuilding={() => go('a-building')}
         />
       );
     case 'a-sindico':
@@ -287,6 +324,10 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           inviteShare={InviteShare}
           onBack={() => go('a-settings')}
         />
+      );
+    case 'a-building':
+      return (
+        <BuildingStructureScreen repository={buildingRepository} onBack={() => go('a-settings')} />
       );
     case 'a-activity':
       return <ActivityScreen repository={activityRepository} onBack={() => go('a-settings')} />;
@@ -309,6 +350,18 @@ function AdminRouter({ view, residentId, incomeId, go, signOut, headerAction }: 
           bottomNav={nav}
           headerAction={headerAction}
           ensureMonthlyReceipts={ensureMonthly}
+          categories={categoryRepository}
+          renderBuilding={(ground) => (
+            <BuildingPanel
+              repository={buildingRepository}
+              ground={ground}
+              onSelectApartment={(apartment) =>
+                apartment.residentId !== null
+                  ? go('a-resident-edit', { residentId: apartment.residentId })
+                  : go('a-resident-edit', { apt: apartment.label })
+              }
+            />
+          )}
         />
       );
   }
@@ -319,11 +372,13 @@ function AdminSettings({
   onOpenActivity,
   onOpenSindico,
   onOpenTeam,
+  onOpenBuilding,
 }: {
   onBack: () => void;
   onOpenActivity: () => void;
   onOpenSindico: () => void;
   onOpenTeam: () => void;
+  onOpenBuilding: () => void;
 }) {
   const categories = useCategories(categoryRepository);
   const saveCategories = useSaveCategories(categoryRepository);
@@ -348,6 +403,7 @@ function AdminSettings({
       canManageCondo={canManageCondo}
       onOpenSindico={canManageCondo ? onOpenSindico : undefined}
       onOpenTeam={isOrgOwner ? onOpenTeam : undefined}
+      onOpenBuilding={canManageCondo ? onOpenBuilding : undefined}
       onOpenActivity={canViewActivity ? onOpenActivity : undefined}
       onBack={onBack}
     />

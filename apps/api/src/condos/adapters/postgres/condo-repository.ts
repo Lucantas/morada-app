@@ -28,13 +28,15 @@ const DEFAULT_CATEGORIES = [
 
 const GRANTS_SQL = `
   SELECT c.id AS condominium_id, c.name, 'administrador' AS role, NULL AS resident_id,
-    c.organization_id, 'owner' AS org_role
+    c.organization_id, 'owner' AS org_role,
+    c.onboarded_at IS NULL AS onboarding_pending
   FROM condominiums c
   JOIN organizations o ON o.id = c.organization_id AND o.active
   JOIN organization_members m ON m.organization_id = c.organization_id
   WHERE m.user_id = $1 AND m.active AND m.role = 'owner' AND c.active
   UNION ALL
-  SELECT c.id, c.name, r.role, r.resident_id, c.organization_id, om.role
+  SELECT c.id, c.name, r.role, r.resident_id, c.organization_id, om.role,
+    c.onboarded_at IS NULL
   FROM condo_roles r
   JOIN condominiums c ON c.id = r.condominium_id
   JOIN organizations o ON o.id = c.organization_id AND o.active
@@ -71,6 +73,7 @@ const grantRowSchema = z.object({
   resident_id: z.string().nullable(),
   organization_id: z.string(),
   org_role: z.enum(['owner', 'member']).nullable(),
+  onboarding_pending: z.boolean(),
 });
 
 const condoRowSchema = z.object({
@@ -83,6 +86,14 @@ const condoRowSchema = z.object({
 const createInputSchema = condoSettingsSchema.extend({
   organizationId: z.string().min(1).max(64),
   name: condominiumSchema.shape.name,
+  apartments: z.array(
+    z.object({
+      label: z.string().min(1).max(80),
+      block: z.string().min(1).max(30).nullable(),
+      floor: z.number().int().min(1),
+      position: z.number().int().min(1),
+    }),
+  ),
 });
 
 const organizationInputSchema = z.object({
@@ -119,6 +130,7 @@ function toAccess(row: unknown): CondoAccess {
     residentId: parsed.resident_id,
     organizationId: parsed.organization_id,
     orgRole: parsed.org_role,
+    onboardingPending: parsed.onboarding_pending,
   };
 }
 
@@ -165,6 +177,13 @@ export class PostgresCondoRepository implements CondoRepository {
     return toCondominium(rows[0]);
   }
 
+  async completeOnboarding(condominiumId: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE condominiums SET onboarded_at = now() WHERE id = $1 AND onboarded_at IS NULL',
+      [condominiumId],
+    );
+  }
+
   async create(input: CreateCondominiumInput): Promise<Condominium> {
     const parsed = createInputSchema.parse(input);
     const id = randomUUID();
@@ -175,9 +194,35 @@ export class PostgresCondoRepository implements CondoRepository {
         [id, parsed.organizationId, parsed.name],
       );
       await client.query(
-        'INSERT INTO condo_settings (condominium_id, monthly_fee_cents, due_day) VALUES ($1, $2, $3)',
-        [id, parsed.monthlyFeeCents, parsed.dueDay],
+        `INSERT INTO condo_settings
+           (condominium_id, monthly_fee_cents, due_day,
+            pix_key_type, pix_key, pix_receiver_name, pix_city)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          id,
+          parsed.monthlyFeeCents,
+          parsed.dueDay,
+          parsed.pix?.keyType ?? null,
+          parsed.pix?.key ?? null,
+          parsed.pix?.receiverName ?? null,
+          parsed.pix?.city ?? null,
+        ],
       );
+      if (parsed.apartments.length > 0) {
+        await client.query(
+          `INSERT INTO apartments (id, label, condominium_id, block, floor, position)
+           SELECT gen_random_uuid()::text, label, $1, block, floor, position
+           FROM unnest($2::text[], $3::text[], $4::int[], $5::int[])
+             AS t(label, block, floor, position)`,
+          [
+            id,
+            parsed.apartments.map((a) => a.label),
+            parsed.apartments.map((a) => a.block),
+            parsed.apartments.map((a) => a.floor),
+            parsed.apartments.map((a) => a.position),
+          ],
+        );
+      }
       for (const [position, category] of DEFAULT_CATEGORIES.entries()) {
         await client.query(
           `INSERT INTO categories (id, name, keywords, position, condominium_id)

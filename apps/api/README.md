@@ -75,6 +75,20 @@ Only one síndico is active per condominium; accepting a new invitation replaces
 previous one atomically. The web sends `X-Morada-View: admin | resident` so a staff
 user with a resident grant can switch between "O prédio" and "Minha casa".
 
+## Building and onboarding routes
+
+| Route                                                     | Guard            | Purpose                                                                                                                                                                                                                         |
+| --------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /me/condos`                                         | confirmed e-mail | Create a condominium in one request: `{ name, structure?, monthlyFeeCents?, dueDay?, pix? }`. `structure` is `{ blocks: [{ name, floors, perFloor }] }` and generates the apartments; the condo starts with `onboarded_at` null |
+| `POST /api/condos/:id/onboarding/complete`                | `manage_condo`   | Mark the onboarding done (`onboarded_at = now()`), 204                                                                                                                                                                          |
+| `GET /api/condos/:id/building`                            | `view_building`  | The drawing: blocks, floors, windows and "unplaced" apartments                                                                                                                                                                  |
+| `POST /api/condos/:id/building/apartments`                | `manage_condo`   | Add an apartment                                                                                                                                                                                                                |
+| `PUT /api/condos/:id/building/apartments/:id`             | `manage_condo`   | Rename an apartment                                                                                                                                                                                                             |
+| `POST /api/condos/:id/building/apartments/:id/deactivate` | `manage_condo`   | Deactivate an apartment (409 `"Apartamento com morador ativo"` if occupied)                                                                                                                                                     |
+
+`PUT /api/condos/:id/settings` also accepts `openingBalance: { valueCents, date } | null`.
+When the field is omitted the stored value is kept, like `pix`.
+
 ## Seeded login
 
 The database seeds **only the admin login** — **change it before any real

@@ -29,6 +29,7 @@ type Props = {
   onOpenActivity?: () => void;
   onOpenSindico?: () => void;
   onOpenTeam?: () => void;
+  onOpenBuilding?: () => void;
   onBack: () => void;
 };
 
@@ -93,6 +94,7 @@ export function SettingsScreen({
   onOpenActivity,
   onOpenSindico,
   onOpenTeam,
+  onOpenBuilding,
   onBack,
 }: Props) {
   const scopeCondoName = useCondoName();
@@ -221,6 +223,9 @@ export function SettingsScreen({
       <ScreenBody>
         {onOpenSindico && <SettingsLink label="Síndico" onClick={onOpenSindico} />}
         {onOpenTeam && <SettingsLink label="Equipe" onClick={onOpenTeam} />}
+        {canManageCondo && onOpenBuilding && (
+          <SettingsLink label="Estrutura do prédio" onClick={onOpenBuilding} />
+        )}
         {onOpenActivity && <SettingsLink label="Atividade" onClick={onOpenActivity} />}
         {(settings.isError || categoriesError) && (
           <p style={{ color: 'var(--atraso-700)' }}>Não foi possível carregar as configurações.</p>
