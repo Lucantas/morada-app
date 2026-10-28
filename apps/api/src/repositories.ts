@@ -36,6 +36,8 @@ import { PostgresResidentRepository } from './residents/adapters/postgres/reside
 import type { ResidentRepository } from './residents/domain/resident-repository';
 import { PostgresSettingsRepository } from './settings/adapters/postgres/settings-repository';
 import type { SettingsRepository } from './settings/domain/settings-repository';
+import { PostgresStreetQuery } from './street/adapters/postgres/street-query';
+import type { StreetQuery } from './street/domain/street-query';
 import { PostgresAuthTokenRepository } from './users/adapters/postgres/auth-token-repository';
 import { PostgresUserRepository } from './users/adapters/postgres/user-repository';
 import type { AuthTokenRepository } from './users/domain/auth-token-repository';
@@ -69,6 +71,7 @@ export interface Repositories {
   invitationTokens: InvitationTokenRepository;
   organizations: OrganizationRepository;
   orgInvitations: OrgInvitationRepository;
+  street: StreetQuery;
 }
 
 export function makePostgresRepositories(pool: Pool): Repositories {
@@ -94,6 +97,7 @@ export function makePostgresRepositories(pool: Pool): Repositories {
     invitationTokens: new PostgresInvitationTokenRepository(pool),
     organizations: new PostgresOrganizationRepository(pool),
     orgInvitations: new PostgresOrgInvitationRepository(pool),
+    street: new PostgresStreetQuery(pool),
   };
 }
 
