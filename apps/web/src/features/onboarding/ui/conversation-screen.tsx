@@ -29,6 +29,7 @@ type Props = {
   drafts: DraftStore;
   onCreated: (condo: LoginCondo) => void;
   onSignOut: () => void;
+  leaveLabel?: string;
 };
 
 const CREATE_ERRORS: Partial<Record<AuthErrorKind, string>> = {
@@ -101,7 +102,7 @@ function Transcript({
   );
 }
 
-function Header({ onSignOut }: { onSignOut: (() => void) | null }) {
+function Header({ onSignOut, label }: { onSignOut: (() => void) | null; label: string }) {
   return (
     <div
       style={{
@@ -124,12 +125,18 @@ function Header({ onSignOut }: { onSignOut: (() => void) | null }) {
       >
         <Icon name="bank" size={20} color="currentColor" />
       </div>
-      {onSignOut && <TextLink onClick={onSignOut}>Sair</TextLink>}
+      {onSignOut && <TextLink onClick={onSignOut}>{label}</TextLink>}
     </div>
   );
 }
 
-export function ConversationScreen({ repository, drafts, onCreated, onSignOut }: Props) {
+export function ConversationScreen({
+  repository,
+  drafts,
+  onCreated,
+  onSignOut,
+  leaveLabel = 'Sair',
+}: Props) {
   const [state, setState] = useState<ConversationState>(() => drafts.load() ?? startConversation());
   const [invalid, setInvalid] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -172,7 +179,7 @@ export function ConversationScreen({ repository, drafts, onCreated, onSignOut }:
 
   return (
     <Screen>
-      <Header onSignOut={busy ? null : onSignOut} />
+      <Header onSignOut={busy ? null : onSignOut} label={leaveLabel} />
       <ScreenBody>
         <div style={{ maxWidth: 560, margin: '0 auto' }}>
           <Transcript state={state} onCorrect={busy ? null : () => change(undo(state))} />

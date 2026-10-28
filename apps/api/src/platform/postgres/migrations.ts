@@ -506,4 +506,18 @@ ALTER TABLE condominiums ADD COLUMN onboarded_at TIMESTAMPTZ;
 UPDATE condominiums SET onboarded_at = now();
 `,
   },
+  {
+    id: '028_thread_reads',
+    sql: `
+ALTER TABLE threads ADD COLUMN resident_message_at TIMESTAMPTZ;
+UPDATE threads SET resident_message_at = now() WHERE unread;
+CREATE TABLE thread_reads (
+  thread_id TEXT NOT NULL REFERENCES threads(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  condominium_id TEXT NOT NULL REFERENCES condominiums(id),
+  read_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (thread_id, user_id)
+);
+`,
+  },
 ];

@@ -36,7 +36,11 @@ const currentCondoSchema = z.object({
 
 type CondoScopeState = {
   condo: CurrentCondo | null;
+  atStreet: boolean;
+  condoCount: number;
   setCondo: (condo: CurrentCondo | null) => void;
+  setAtStreet: (atStreet: boolean) => void;
+  setCondoCount: (condoCount: number) => void;
   rename: (name: string) => void;
   completeOnboarding: () => void;
 };
@@ -48,11 +52,29 @@ function parseStoredCondo(persisted: unknown): CurrentCondo | null {
   return parsed.success ? parsed.data : null;
 }
 
+const storedStreetSchema = z.object({
+  atStreet: z.boolean().catch(false),
+  condoCount: z.number().int().min(1).catch(1),
+});
+
+function parseStoredStreet(persisted: unknown): { atStreet: boolean; condoCount: number } {
+  const parsed = storedStreetSchema.safeParse(persisted);
+  return parsed.success ? parsed.data : { atStreet: false, condoCount: 1 };
+}
+
+function parseStoredScope(persisted: unknown) {
+  return { condo: parseStoredCondo(persisted), ...parseStoredStreet(persisted) };
+}
+
 export const useCondoScope = create<CondoScopeState>()(
   persist(
     (set) => ({
       condo: null,
+      atStreet: false,
+      condoCount: 1,
       setCondo: (condo) => set({ condo }),
+      setAtStreet: (atStreet) => set({ atStreet }),
+      setCondoCount: (condoCount) => set({ condoCount }),
       rename: (name) => set((state) => (state.condo ? { condo: { ...state.condo, name } } : state)),
       completeOnboarding: () =>
         set((state) =>
@@ -62,9 +84,13 @@ export const useCondoScope = create<CondoScopeState>()(
     {
       name: 'morada-condo',
       version: 1,
-      partialize: (state) => ({ condo: state.condo }),
-      migrate: (persisted) => ({ condo: parseStoredCondo(persisted) }),
-      merge: (persisted, current) => ({ ...current, condo: parseStoredCondo(persisted) }),
+      partialize: (state) => ({
+        condo: state.condo,
+        atStreet: state.atStreet,
+        condoCount: state.condoCount,
+      }),
+      migrate: (persisted) => parseStoredScope(persisted),
+      merge: (persisted, current) => ({ ...current, ...parseStoredScope(persisted) }),
     },
   ),
 );
@@ -79,6 +105,13 @@ export function useCanDo(permission: Permission): boolean {
 
 export function useHasHome(): boolean {
   return useCondoScope((state) => state.condo?.hasHome ?? false);
+}
+
+export function useCanSeeStreet(): boolean {
+  return useCondoScope(
+    (state) =>
+      state.condoCount > 1 || (state.condo !== null && state.condo.condoRole !== 'morador'),
+  );
 }
 
 const API_PREFIX = '/api/';

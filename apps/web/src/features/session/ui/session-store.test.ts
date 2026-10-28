@@ -5,7 +5,13 @@ import { useCondoScope } from '@/shared/lib/condo-scope';
 import { testCondo } from '@/test/condo';
 import { loginCondo } from '@/test/factories.auth';
 
-import { applyLogin, restoreSession, useSessionStore } from './session-store';
+import {
+  applyLogin,
+  enterCondo,
+  goToStreet,
+  restoreSession,
+  useSessionStore,
+} from './session-store';
 
 describe('useSessionStore', () => {
   afterEach(() => act(() => useSessionStore.getState().signOut()));
@@ -93,6 +99,95 @@ describe('condo-aware session', () => {
     });
 
     expect(useCondoScope.getState().condo?.id).toBe('c1');
+  });
+
+  test('login with two condos lands at the street', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+    });
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: true, condoCount: 2 });
+  });
+
+  test('login with one condo skips the street', () => {
+    applyLogin({ condos: [loginCondo()], emailVerified: true });
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: false, condoCount: 1 });
+  });
+
+  test('login from an invitation lands in the invited condo even with many condos', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+      invitedCondoId: 'c2',
+    });
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: false, condoCount: 2 });
+    expect(useCondoScope.getState().condo?.id).toBe('c2');
+  });
+
+  test('enterCondo replaces the current condo with fresh permissions and leaves the street', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+    });
+
+    const role = enterCondo(
+      loginCondo({
+        id: 'c2',
+        name: 'Outro',
+        role: 'resident',
+        condoRole: 'morador',
+        permissions: [],
+      }),
+    );
+
+    expect(role).toBe('resident');
+    expect(useSessionStore.getState().role).toBe('resident');
+    expect(useCondoScope.getState().atStreet).toBe(false);
+    expect(useCondoScope.getState().condo).toMatchObject({
+      id: 'c2',
+      condoRole: 'morador',
+      permissions: [],
+    });
+  });
+
+  test('goToStreet keeps the session and the condo', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+      invitedCondoId: 'c2',
+    });
+
+    act(() => goToStreet());
+
+    expect(useCondoScope.getState().atStreet).toBe(true);
+    expect(useCondoScope.getState().condo?.id).toBe('c2');
+    expect(useSessionStore.getState().role).toBe('admin');
+  });
+
+  test('boot at the street keeps the session', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+    });
+
+    restoreSession();
+
+    expect(useSessionStore.getState().role).toBe('admin');
+    expect(useCondoScope.getState().atStreet).toBe(true);
+  });
+
+  test('signOut leaves the street state clean', () => {
+    applyLogin({
+      condos: [loginCondo(), loginCondo({ id: 'c2', name: 'Outro' })],
+      emailVerified: true,
+    });
+
+    act(() => useSessionStore.getState().signOut());
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: false, condoCount: 1 });
   });
 
   test('signOut clears the condo', () => {

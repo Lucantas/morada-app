@@ -148,7 +148,7 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
       limiter: invitationLimiter,
     }),
   );
-  app.route('/me', meRoutes({ auth, condos, users }));
+  app.route('/me', meRoutes({ auth, condos, users, street: repos.street }));
 
   const api = new Hono<ApiEnv>();
   api.use('*', auth);

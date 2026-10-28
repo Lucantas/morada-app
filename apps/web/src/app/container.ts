@@ -14,6 +14,7 @@ import { HttpPixRepository } from '@/features/receipts/data/http-pix-repository'
 import { HttpReceiptRepository } from '@/features/receipts/data/http-receipt-repository';
 import { HttpResidentRepository } from '@/features/residents/data/http-resident-repository';
 import { HttpSettingsRepository } from '@/features/settings/data/http-settings-repository';
+import { HttpStreetRepository } from '@/features/street/data/http-street-repository';
 import { HttpTeamRepository } from '@/features/team/data/http-team-repository';
 import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
 import { createApiClient } from '@/shared/lib/api-client';
@@ -58,6 +59,7 @@ export const buildingRepository = new HttpBuildingRepository(apiClient);
 export const categoryRepository = new HttpCategoryRepository(apiClient);
 export const incomeRepository = new HttpIncomeRepository(apiClient);
 export const onboardingRepository = new HttpOnboardingRepository(apiClient);
+export const streetRepository = new HttpStreetRepository(apiClient);
 export const teamRepository = new HttpTeamRepository(
   apiClient,
   () => useCondoScope.getState().condo?.organizationId ?? null,

@@ -1,6 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { signUpConfirmAndLogin } from './confirmed-user';
+import { answerUntilFee } from './onboarding-steps';
 
 const CONDO_NAME = 'Residencial Ipê';
 
@@ -8,23 +9,10 @@ function uniqueEmail(label: string): string {
   return `${label}-${Date.now()}@onboarding.test`;
 }
 
-async function answerUntilFee(page: Page): Promise<void> {
-  await expect(page.getByText('Que condomínio vamos gerenciar hoje?')).toBeVisible();
-  await page.getByLabel('Nome do condomínio').fill(CONDO_NAME);
-  await page.getByRole('button', { name: 'Enviar' }).click();
-  await page.getByRole('button', { name: 'Só um prédio' }).click();
-  await page.getByLabel('Andares').fill('4');
-  await page.getByLabel('Apartamentos por andar').fill('4');
-  await page.getByRole('button', { name: 'Enviar' }).click();
-  await expect(
-    page.getByText('Quanto cada apartamento paga por mês, e até que dia?'),
-  ).toBeVisible();
-}
-
 test.describe('onboarding do condomínio', () => {
   test('conversa, prédio, moradores, contas e caixa até a casa aberta', async ({ page }) => {
     await signUpConfirmAndLogin(page, uniqueEmail('jornada'));
-    await answerUntilFee(page);
+    await answerUntilFee(page, CONDO_NAME);
 
     await page.getByLabel('Valor por mês').fill('35000');
     await page.getByLabel('Dia do vencimento').fill('10');
@@ -63,7 +51,7 @@ test.describe('onboarding do condomínio', () => {
 
   test('retoma a conversa ao recarregar na pergunta da taxa', async ({ page }) => {
     await signUpConfirmAndLogin(page, uniqueEmail('retomada'));
-    await answerUntilFee(page);
+    await answerUntilFee(page, CONDO_NAME);
 
     await page.reload();
 

@@ -16,15 +16,25 @@ afterAll(async () => {
   await pool.end();
 });
 
+async function createViewer(id: string): Promise<void> {
+  await pool.query(
+    "INSERT INTO users (id, username, password_hash, role) VALUES ($1, $1, 'x', 'admin')",
+    [id],
+  );
+}
+
 describe('PostgresThreadRepository — contract', () => {
   beforeEach(async () => {
     await resetPg(pool);
     await createTestCondo(pool, 'condo-a');
     await createTestCondo(pool, 'condo-b');
+    await createViewer('u-a');
+    await createViewer('u-b');
   });
 
   runThreadRepositoryContract(
     'PostgresThreadRepository',
     async (condominiumId) => new PostgresThreadRepository(pool, condominiumId),
+    { a: 'u-a', b: 'u-b' },
   );
 });

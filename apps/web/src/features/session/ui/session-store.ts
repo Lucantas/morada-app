@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { useCondoScope } from '@/shared/lib/condo-scope';
+import { useCondoScope, type CurrentCondo } from '@/shared/lib/condo-scope';
 
-import type { LoginResponse } from '../domain/login-response';
+import type { LoginCondo, LoginResponse } from '../domain/login-response';
 import type { Role } from '../domain/session';
 
 export type PendingUser = { emailVerified: boolean };
@@ -28,6 +28,8 @@ export const useSessionStore = create<SessionState>()(
       signOut: () => {
         set({ role: null, subject: null, pendingUser: null });
         useCondoScope.getState().setCondo(null);
+        useCondoScope.getState().setAtStreet(false);
+        useCondoScope.getState().setCondoCount(1);
       },
     }),
     {
@@ -41,6 +43,19 @@ export const useSessionStore = create<SessionState>()(
   ),
 );
 
+function toCurrentCondo(condo: LoginCondo): CurrentCondo {
+  return {
+    id: condo.id,
+    name: condo.name,
+    condoRole: condo.condoRole,
+    permissions: condo.permissions,
+    hasHome: condo.hasHome,
+    organizationId: condo.organizationId,
+    orgRole: condo.orgRole,
+    onboardingPending: condo.onboardingPending,
+  };
+}
+
 export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginResponse): Role | null {
   const first = condos.find((condo) => condo.id === invitedCondoId) ?? condos[0];
   if (!first) {
@@ -48,18 +63,24 @@ export function applyLogin({ condos, emailVerified, invitedCondoId }: LoginRespo
     useSessionStore.setState({ role: null, subject: null, pendingUser: { emailVerified } });
     return null;
   }
-  useCondoScope.getState().setCondo({
-    id: first.id,
-    name: first.name,
-    condoRole: first.condoRole,
-    permissions: first.permissions,
-    hasHome: first.hasHome,
-    organizationId: first.organizationId,
-    orgRole: first.orgRole,
-    onboardingPending: first.onboardingPending,
-  });
+  const scope = useCondoScope.getState();
+  scope.setCondoCount(condos.length);
+  scope.setAtStreet(condos.length > 1 && !invitedCondoId);
+  scope.setCondo(toCurrentCondo(first));
   useSessionStore.getState().authenticate(first.role, null);
   return first.role;
+}
+
+export function enterCondo(condo: LoginCondo): Role {
+  const scope = useCondoScope.getState();
+  scope.setCondo(toCurrentCondo(condo));
+  scope.setAtStreet(false);
+  useSessionStore.getState().authenticate(condo.role, null);
+  return condo.role;
+}
+
+export function goToStreet(): void {
+  useCondoScope.getState().setAtStreet(true);
 }
 
 export function restoreSession(): void {

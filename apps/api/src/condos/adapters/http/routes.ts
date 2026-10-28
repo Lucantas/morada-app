@@ -7,6 +7,8 @@ import { createMyCondominium } from '../../app/create-my-condominium';
 import { listMyCondos } from '../../app/condo-access-views';
 import type { CondoRepository } from '../../domain/condo-repository';
 import { isEmailVerified } from '../../../users/domain/user';
+import { getStreet } from '../../../street/app/get-street';
+import type { StreetQuery } from '../../../street/domain/street-query';
 import type { UserRepository } from '../../../users/domain/user-repository';
 
 export function meRoutes(deps: {
@@ -21,8 +23,9 @@ export function meRoutes(deps: {
     | 'grant'
   >;
   users: Pick<UserRepository, 'findById'>;
+  street: Pick<StreetQuery, 'factsFor'>;
 }) {
-  const { condos, users } = deps;
+  const { condos, users, street } = deps;
   const app = new Hono<ApiEnv>();
   app.use('*', deps.auth);
   app.use('*', csrfMiddleware);
@@ -38,6 +41,12 @@ export function meRoutes(deps: {
     });
   });
   app.get('/condos', async (c) => c.json(await listMyCondos(condos, c.get('uid'))));
+  app.get('/street', async (c) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await getStreet({ condos, users, street }, c.get('uid'), today);
+    if (!result) return c.json({ error: 'Sessão inválida' }, 401);
+    return c.json(result);
+  });
   app.post('/condos', async (c) => {
     const user = await users.findById(c.get('uid'));
     if (!user) return c.json({ error: 'Sessão inválida' }, 401);

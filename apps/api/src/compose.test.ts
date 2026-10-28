@@ -541,7 +541,7 @@ describe('Morada API', () => {
     expect(((await list.json()) as { id: string }[]).map((t) => t.id)).not.toContain('th-foreign');
     expect(read.status).toBe(404);
     expect(post.status).toBe(404);
-    expect((await other.threads.getById('th-foreign'))?.messages).toEqual([]);
+    expect((await other.threads.getById('th-foreign', 'u-any'))?.messages).toEqual([]);
   });
 
   test('cross-condo settings are isolated', async () => {
@@ -1135,6 +1135,81 @@ describe('Morada API — real credentials', () => {
       "SELECT 1 FROM organization_members WHERE user_id = 'u-ana' AND role = 'owner'",
     );
     expect(members).toHaveLength(1);
+  });
+
+  describe('GET /me/street', () => {
+    type StreetBody = { name: string | null; condos: { id: string }[]; homes: unknown[] };
+
+    async function streetFor(app: App, auth: Auth): Promise<Response> {
+      return app.request('/me/street', { headers: { Cookie: auth.cookie } });
+    }
+
+    async function streetBody(app: App, auth: Auth): Promise<StreetBody> {
+      return (await streetFor(app, auth)).json() as Promise<StreetBody>;
+    }
+
+    async function orgWithTwoCondos(memberRole: 'owner' | 'member'): Promise<void> {
+      await createTestCondo(pool, 'street-1', { orgId: 'org-street', name: 'Rua Um' });
+      await createTestCondo(pool, 'street-2', { orgId: 'org-street', name: 'Rua Dois' });
+      await pool.query(
+        `INSERT INTO organization_members (id, organization_id, user_id, role)
+         VALUES ('om-ana', 'org-street', 'u-ana', $1)`,
+        [memberRole],
+      );
+    }
+
+    test('requires authentication', async () => {
+      const res = await (await makeApp()).request('/me/street');
+      expect(res.status).toBe(401);
+    });
+
+    test('returns staff condos with facts and homes without them', async () => {
+      const app = await makeApp();
+      const admin = await authFor(app, adminCredentials);
+      const resident = await authFor(app, residentCredentials);
+
+      const adminBody = await streetBody(app, admin);
+      const residentBody = await streetBody(app, resident);
+
+      expect(adminBody.condos).toEqual([
+        {
+          ...ADMIN_SUMMARY,
+          pendencies: expect.objectContaining({ unreadThreads: expect.any(Number) }),
+          windows: [],
+        },
+      ]);
+      expect(adminBody.homes).toEqual([]);
+      expect(residentBody.condos).toEqual([]);
+      expect(residentBody.homes).toEqual([RESIDENT_SUMMARY]);
+    });
+
+    test('an organization owner sees every condominium of the organization', async () => {
+      const app = await makeApp();
+      const auth = await verifiedEmailAuth(app, 'ana@x.com');
+      await orgWithTwoCondos('owner');
+
+      const res = await streetFor(app, auth);
+      const body = (await res.json()) as StreetBody;
+
+      expect(res.status).toBe(200);
+      expect(body.name).toBe('Ana');
+      expect(body.condos.map((c) => c.id)).toEqual(['street-2', 'street-1']);
+    });
+
+    test('an organization member sees only the condominiums assigned to them', async () => {
+      const app = await makeApp();
+      const auth = await verifiedEmailAuth(app, 'ana@x.com');
+      await orgWithTwoCondos('member');
+      await pool.query(
+        `INSERT INTO condo_roles (id, condominium_id, user_id, role, resident_id)
+         VALUES ('cr-ana-street', 'street-1', 'u-ana', 'administrador', NULL)`,
+      );
+
+      const body = await streetBody(app, auth);
+
+      expect(body.condos.map((c) => c.id)).toEqual(['street-1']);
+      expect(body.homes).toEqual([]);
+    });
   });
 
   test('GET /me requires a session', async () => {

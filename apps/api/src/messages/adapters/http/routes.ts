@@ -41,8 +41,13 @@ export function threadRoutes(
 
   // A thread is created lazily the first time it is opened/written, so residents
   // start with an empty conversation rather than a 404.
-  async function loadOrEmpty(repo: ThreadRepository, id: string, condoId: string): Promise<Thread> {
-    const existing = await repo.getById(id);
+  async function loadOrEmpty(
+    repo: ThreadRepository,
+    id: string,
+    condoId: string,
+    viewerUserId: string,
+  ): Promise<Thread> {
+    const existing = await repo.getById(id, viewerUserId);
     if (existing) return existing;
     const resident = await lookupFor(condoId)(id);
     if (!resident) throw new ThreadNotFoundError(id);
@@ -58,7 +63,7 @@ export function threadRoutes(
   }
 
   app.get('/', requireRole('admin'), async (c) =>
-    c.json(await listThreads(scope(c.get('condoId')).threads)),
+    c.json(await listThreads(scope(c.get('condoId')).threads, c.get('uid'))),
   );
 
   app.get('/:id', async (c) => {
@@ -66,7 +71,7 @@ export function threadRoutes(
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
     const { threads: repo } = scope(c.get('condoId'));
-    return c.json(await loadOrEmpty(repo, id, c.get('condoId')));
+    return c.json(await loadOrEmpty(repo, id, c.get('condoId'), c.get('uid')));
   });
 
   app.post('/:id/messages', async (c) => {
@@ -74,10 +79,13 @@ export function threadRoutes(
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
     const { threads: repo } = scope(c.get('condoId'));
-    if (!(await repo.getById(id))) await repo.save(await loadOrEmpty(repo, id, c.get('condoId')));
+    const uid = c.get('uid');
+    if (!(await repo.getById(id, uid))) {
+      await repo.save(await loadOrEmpty(repo, id, c.get('condoId'), uid));
+    }
     const { text } = postMessageSchema.parse(await c.req.json());
     const author = c.get('role') ?? 'resident';
-    return c.json(await postMessage(repo, id, author, text));
+    return c.json(await postMessage(repo, id, author, text, uid));
   });
 
   app.post('/:id/read', async (c) => {
@@ -85,10 +93,11 @@ export function threadRoutes(
     const denied = denyForeignThread(c, id);
     if (denied) return denied;
     const { threads: repo } = scope(c.get('condoId'));
+    const uid = c.get('uid');
     return c.json(
-      (await repo.getById(id))
-        ? await markRead(repo, id)
-        : await loadOrEmpty(repo, id, c.get('condoId')),
+      (await repo.getById(id, uid))
+        ? await markRead(repo, id, uid)
+        : await loadOrEmpty(repo, id, c.get('condoId'), uid),
     );
   });
 
