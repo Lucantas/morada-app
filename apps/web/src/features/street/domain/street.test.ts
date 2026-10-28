@@ -43,8 +43,6 @@ describe('reasonsOf', () => {
     ['accountsDueSoon', 4, 'atencao', '4 contas vencem em até 3 dias', 'vence em breve'],
     ['proofsToReview', 1, 'atencao', '1 comprovante de Pix pra conferir', '1 comprov.'],
     ['proofsToReview', 5, 'atencao', '5 comprovantes de Pix pra conferir', '5 comprov.'],
-    ['unreadThreads', 1, 'atencao', '1 mensagem não lida', '1 msg'],
-    ['unreadThreads', 6, 'atencao', '6 mensagens não lidas', '6 msg'],
   ] as const)('%s x%i', (key, count, level, text, flag) => {
     const [reason] = reasonsOf({ ...none, [key]: count });
 
@@ -60,11 +58,22 @@ describe('reasonsOf', () => {
       unreadThreads: 3,
     });
 
-    expect(reasons.map((r) => r.kind)).toEqual([
-      'overdue_accounts',
-      'accounts_due_soon',
-      'unread_threads',
-    ]);
+    expect(reasons.map((r) => r.kind)).toEqual(['overdue_accounts', 'accounts_due_soon']);
+  });
+
+  test('unread threads never raise a flag', () => {
+    const pendencies = { ...none, unreadThreads: 4 };
+
+    expect(reasonsOf(pendencies)).toEqual([]);
+    expect(levelOf(pendencies)).toBeNull();
+    expect(
+      sortByUrgency([condo('B', { unreadThreads: 9 }), condo('A', { overdueAccounts: 1 })]).map(
+        (c) => c.name,
+      ),
+    ).toEqual(['A', 'B']);
+    expect(
+      sortByUrgency([condo('Zeta', { unreadThreads: 9 }), condo('Alfa')]).map((c) => c.name),
+    ).toEqual(['Alfa', 'Zeta']);
   });
 
   test('is empty without pendencies', () => {
@@ -78,8 +87,8 @@ describe('levelOf', () => {
   });
 
   test('is the level of the first reason', () => {
-    expect(levelOf({ ...none, unreadThreads: 2, overdueResidents: 1 })).toBe('urgente');
-    expect(levelOf({ ...none, unreadThreads: 2 })).toBe('atencao');
+    expect(levelOf({ ...none, accountsDueSoon: 2, overdueResidents: 1 })).toBe('urgente');
+    expect(levelOf({ ...none, accountsDueSoon: 2 })).toBe('atencao');
   });
 });
 
@@ -87,7 +96,7 @@ describe('sortByUrgency', () => {
   test('orders urgente, atencao, then none', () => {
     const sorted = sortByUrgency([
       condo('A'),
-      condo('B', { unreadThreads: 1 }),
+      condo('B', { accountsDueSoon: 1 }),
       condo('C', { overdueAccounts: 1 }),
     ]);
 
@@ -97,7 +106,7 @@ describe('sortByUrgency', () => {
   test('ties break by total count descending', () => {
     const sorted = sortByUrgency([
       condo('A', { overdueAccounts: 1 }),
-      condo('B', { overdueAccounts: 1, unreadThreads: 3 }),
+      condo('B', { overdueAccounts: 1, accountsDueSoon: 3 }),
     ]);
 
     expect(sorted.map((c) => c.name)).toEqual(['B', 'A']);

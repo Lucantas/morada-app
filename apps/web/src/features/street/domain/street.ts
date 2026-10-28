@@ -37,11 +37,7 @@ export type Street = z.infer<typeof streetSchema>;
 
 export type FlagLevel = 'urgente' | 'atencao';
 export type ReasonKind =
-  | 'overdue_residents'
-  | 'overdue_accounts'
-  | 'accounts_due_soon'
-  | 'proofs_to_review'
-  | 'unread_threads';
+  'overdue_residents' | 'overdue_accounts' | 'accounts_due_soon' | 'proofs_to_review';
 export type Reason = {
   kind: ReasonKind;
   level: FlagLevel;
@@ -52,7 +48,7 @@ export type Reason = {
 
 type ReasonSpec = {
   kind: ReasonKind;
-  key: keyof Pendencies;
+  key: Exclude<keyof Pendencies, 'unreadThreads'>;
   level: FlagLevel;
   text: (count: number) => string;
   flag: (count: number) => string;
@@ -89,13 +85,6 @@ const REASON_SPECS: readonly ReasonSpec[] = [
     level: 'atencao',
     text: (n) => plural(n, 'comprovante de Pix pra conferir', 'comprovantes de Pix pra conferir'),
     flag: (n) => `${n} comprov.`,
-  },
-  {
-    kind: 'unread_threads',
-    key: 'unreadThreads',
-    level: 'atencao',
-    text: (n) => plural(n, 'mensagem não lida', 'mensagens não lidas'),
-    flag: (n) => `${n} msg`,
   },
 ];
 

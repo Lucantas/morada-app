@@ -20,7 +20,7 @@ import type { StreetRepository } from '../domain/street-repository';
 import { MiniBuilding } from './mini-building';
 import { useStreet } from './use-street';
 
-export type StreetTarget = 'a-home' | 'a-residents' | 'a-accounts' | 'a-messages' | 'r-home';
+export type StreetTarget = 'a-home' | 'a-residents' | 'a-accounts' | 'r-home';
 
 type Props = {
   repository: StreetRepository;
@@ -35,7 +35,6 @@ const TARGET_BY_REASON: Readonly<Record<ReasonKind, StreetTarget>> = {
   proofs_to_review: 'a-residents',
   overdue_accounts: 'a-accounts',
   accounts_due_soon: 'a-accounts',
-  unread_threads: 'a-messages',
 };
 
 const TAG_BY_LEVEL: Readonly<Record<FlagLevel, string>> = {

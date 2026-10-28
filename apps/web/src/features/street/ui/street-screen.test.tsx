@@ -60,7 +60,7 @@ describe('StreetScreen', () => {
       repositoryOf({
         condos: [
           condo('Calmo'),
-          condo('Aviso', { unreadThreads: 1 }),
+          condo('Aviso', { accountsDueSoon: 1 }),
           condo('Fogo', { overdueAccounts: 2 }),
         ],
       }),
@@ -107,15 +107,14 @@ describe('StreetScreen', () => {
     await userEvent.click(
       within(section).getByRole('button', { name: /1 morador com taxa vencida/ }),
     );
-    await userEvent.click(within(section).getByRole('button', { name: /3 mensagens não lidas/ }));
 
     expect(onOpen.mock.calls).toEqual([
       [fogo, 'a-accounts'],
       [fogo, 'a-residents'],
-      [fogo, 'a-messages'],
     ]);
+    expect(within(section).queryByText(/mensage/)).toBeNull();
     expect(within(section).getAllByText('urgente')).toHaveLength(2);
-    expect(within(section).getAllByText('atenção')).toHaveLength(1);
+    expect(within(section).queryAllByText('atenção')).toHaveLength(0);
   });
 
   test('the select lists condos by urgency with the reason', async () => {
