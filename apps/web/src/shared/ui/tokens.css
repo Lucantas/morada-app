@@ -351,6 +351,17 @@ a:hover {
   margin: 0 2px;
   color: var(--ink-500);
 }
+.street-shortcut {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 32px;
+}
 .street-signout {
   display: block;
   margin: 28px auto 8px;

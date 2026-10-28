@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 
 import { AccountEditScreen } from '@/features/accounts/ui/account-edit-screen';
@@ -20,11 +20,15 @@ import { useReceipts } from '@/features/receipts/ui/use-receipts';
 import { ResidentFinanceScreen } from '@/features/resident-home/ui/resident-finance-screen';
 import { ResidentHomeScreen } from '@/features/resident-home/ui/resident-home-screen';
 import { ResidentProfileScreen } from '@/features/resident-home/ui/resident-profile-screen';
-import { useSessionStore } from '@/features/session/ui/session-store';
+import { enterCondo, goToStreet, useSessionStore } from '@/features/session/ui/session-store';
 import type { Role } from '@/features/session/domain/session';
 import { ViewSwitch } from '@/features/session/ui/view-switch';
 import { InviteForm } from '@/features/invitations/ui/invite-form';
-import { clearDraft } from '@/features/onboarding/data/local-draft-store';
+import { clearDraft, localDraftStore } from '@/features/onboarding/data/local-draft-store';
+import { ConversationScreen } from '@/features/onboarding/ui/conversation-screen';
+import type { LoginCondo } from '@/features/session/domain/login-response';
+import { StreetScreen, type StreetTarget } from '@/features/street/ui/street-screen';
+import { StreetShortcut } from '@/features/street/ui/street-shortcut';
 import { OnboardingFlow } from '@/features/onboarding/ui/onboarding-flow';
 import { BuildingPanel } from '@/features/building/ui/building-panel';
 import { BuildingView } from '@/features/building/ui/building-view';
@@ -71,6 +75,7 @@ import {
   rejectPayment,
   residentRepository,
   settingsRepository,
+  streetRepository,
   teamRepository,
   authRepository,
 } from './container';
@@ -147,6 +152,7 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
   const switchView = useSessionStore((s) => s.switchView);
   const onboardingPending = useCondoScope((s) => s.condo?.onboardingPending ?? false);
   const canManageCondo = useCanDo('manage_condo');
+  const atStreet = useCondoScope((s) => s.atStreet);
 
   const handleSwitch = useCallback(
     (next: Role) => {
@@ -156,8 +162,20 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
     },
     [queryClient, switchView, go],
   );
-  const headerAction = <ViewSwitch onSwitch={handleSwitch} />;
+  const handleStreet = useCallback(() => {
+    queryClient.clear();
+    goToStreet();
+  }, [queryClient]);
+  const headerAction = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <StreetShortcut onClick={handleStreet} />
+      <ViewSwitch onSwitch={handleSwitch} />
+    </div>
+  );
 
+  if (atStreet) {
+    return <StreetRouter signOut={signOut} />;
+  }
   if (role === 'admin' && onboardingPending && canManageCondo) {
     return <AdminOnboarding onDone={() => go('a-home')} />;
   }
@@ -182,6 +200,53 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
       go={go}
       signOut={signOut}
       headerAction={headerAction}
+    />
+  );
+}
+
+function StreetRouter({ signOut }: { signOut: () => void }) {
+  const go = useNavStore((s) => s.go);
+  const queryClient = useQueryClient();
+  const condoCount = useCondoScope((s) => s.condoCount);
+  const setCondoCount = useCondoScope((s) => s.setCondoCount);
+  const [creating, setCreating] = useState(false);
+
+  const handleOpen = useCallback(
+    (condo: LoginCondo, target: StreetTarget) => {
+      queryClient.clear();
+      enterCondo(condo);
+      go(target);
+    },
+    [queryClient, go],
+  );
+
+  const handleCreated = useCallback(
+    (condo: LoginCondo) => {
+      setCondoCount(condoCount + 1);
+      queryClient.clear();
+      enterCondo(condo);
+      go('a-home');
+    },
+    [condoCount, setCondoCount, queryClient, go],
+  );
+
+  if (creating) {
+    return (
+      <ConversationScreen
+        repository={authRepository}
+        drafts={localDraftStore}
+        onCreated={handleCreated}
+        onSignOut={() => setCreating(false)}
+        leaveLabel="Voltar"
+      />
+    );
+  }
+  return (
+    <StreetScreen
+      repository={streetRepository}
+      onOpen={handleOpen}
+      onNewCondo={() => setCreating(true)}
+      onSignOut={signOut}
     />
   );
 }

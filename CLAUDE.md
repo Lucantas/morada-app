@@ -43,8 +43,12 @@ prédio"** and **"Minha casa"** (the web sends `X-Morada-View: admin|resident`).
 - `Account` — a condominium expense/lançamento (água, energia, …) with a status
 - `Receipt` — a monthly fee charge tied to an `Apartment` **and** the `Resident`
   charged (`pago` / `pendente`); listable per-resident (own) or per-apartment (history)
+- `Street` — the home screen of whoever administers more than one condominium:
+  miniature buildings, `urgente` / `atenção` flags and "Pede atenção hoje"; a
+  projection computed on the server (`GET /me/street`), never stored
 - `Notice` — a communication the admin sends to residents (`aviso`)
 - `Message` — a resident→admin message in the admin inbox
+- `ThreadRead` — the "read" mark of a conversation, per person
 - `ActivityEntry` — a row of the condominium activity log (`activity_log`):
   who did which write, when; visible to `administrador` in Ajustes → "Atividade"
 - `CondoBalance` — condominium financial summary (saldo, entradas, contas pagas)
