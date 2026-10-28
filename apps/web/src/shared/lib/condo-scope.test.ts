@@ -5,7 +5,13 @@ import { renderHook } from '@testing-library/react';
 import { restoreSession, useSessionStore } from '@/features/session/ui/session-store';
 import { testCondo } from '@/test/condo';
 
-import { scopedApiPath, useCanDo, useCondoName, useCondoScope } from './condo-scope';
+import {
+  scopedApiPath,
+  useCanDo,
+  useCanSeeStreet,
+  useCondoName,
+  useCondoScope,
+} from './condo-scope';
 
 describe('scopedApiPath', () => {
   test('prefixes /api paths with the condominium', () => {
@@ -139,5 +145,83 @@ describe('persisted condo from an older version', () => {
     restoreSession();
 
     expect(useSessionStore.getState().role).toBeNull();
+  });
+});
+
+describe('useCanSeeStreet', () => {
+  afterEach(() => {
+    act(() => useCondoScope.getState().setCondo(null));
+    act(() => useCondoScope.getState().setCondoCount(1));
+  });
+
+  test('staff of a single condo can still reach the street', () => {
+    act(() => useCondoScope.getState().setCondo(testCondo({ condoRole: 'administrador' })));
+
+    expect(renderHook(() => useCanSeeStreet()).result.current).toBe(true);
+  });
+
+  test('a morador of a single condo cannot', () => {
+    act(() =>
+      useCondoScope.getState().setCondo(testCondo({ condoRole: 'morador', permissions: [] })),
+    );
+
+    expect(renderHook(() => useCanSeeStreet()).result.current).toBe(false);
+  });
+
+  test('a morador with several condos can', () => {
+    act(() =>
+      useCondoScope.getState().setCondo(testCondo({ condoRole: 'morador', permissions: [] })),
+    );
+    act(() => useCondoScope.getState().setCondoCount(2));
+
+    expect(renderHook(() => useCanSeeStreet()).result.current).toBe(true);
+  });
+
+  test('is false without a condominium and a single condo', () => {
+    expect(renderHook(() => useCanSeeStreet()).result.current).toBe(false);
+  });
+});
+
+describe('persisted street state', () => {
+  afterEach(() => {
+    localStorage.clear();
+    act(() => useCondoScope.getState().setCondo(null));
+    act(() => useCondoScope.getState().setAtStreet(false));
+    act(() => useCondoScope.getState().setCondoCount(1));
+  });
+
+  test('persisted state from before the street restores with atStreet false and condoCount 1', async () => {
+    const condo = testCondo();
+    localStorage.setItem('morada-condo', JSON.stringify({ state: { condo }, version: 1 }));
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState()).toMatchObject({ condo, atStreet: false, condoCount: 1 });
+  });
+
+  test('keeps a stored street state', async () => {
+    const condo = testCondo();
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({ state: { condo, atStreet: true, condoCount: 3 }, version: 1 }),
+    );
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: true, condoCount: 3 });
+  });
+
+  test.each([-2, 0, 1.5, 'x', null])('rejects garbage condoCount %p', async (condoCount) => {
+    localStorage.setItem(
+      'morada-condo',
+      JSON.stringify({
+        state: { condo: testCondo(), atStreet: 'yes', condoCount },
+        version: 1,
+      }),
+    );
+
+    await act(() => useCondoScope.persist.rehydrate());
+
+    expect(useCondoScope.getState()).toMatchObject({ atStreet: false, condoCount: 1 });
   });
 });
