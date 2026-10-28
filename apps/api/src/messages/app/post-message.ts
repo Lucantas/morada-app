@@ -9,16 +9,18 @@ export async function postMessage(
   threadId: string,
   author: Message['author'],
   text: string,
+  viewerUserId: string,
 ): Promise<Thread> {
-  const thread = await repo.getById(threadId);
+  const thread = await repo.getById(threadId, viewerUserId);
   if (!thread) throw new ThreadNotFoundError(threadId);
   if (text.trim().length === 0) throw new EmptyMessageError();
 
   const message: Message = { id: randomUUID(), author, text, dateLabel: 'Agora' };
-  const updated: Thread = {
-    ...thread,
-    unread: author === 'resident',
-    messages: [...thread.messages, message],
-  };
-  return repo.save(updated);
+  await repo.save({ ...thread, messages: [...thread.messages, message] });
+  if (author === 'resident') await repo.recordResidentMessage(threadId);
+  else await repo.markRead(threadId, viewerUserId);
+
+  const refreshed = await repo.getById(threadId, viewerUserId);
+  if (!refreshed) throw new ThreadNotFoundError(threadId);
+  return refreshed;
 }

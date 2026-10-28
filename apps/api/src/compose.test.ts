@@ -541,7 +541,7 @@ describe('Morada API', () => {
     expect(((await list.json()) as { id: string }[]).map((t) => t.id)).not.toContain('th-foreign');
     expect(read.status).toBe(404);
     expect(post.status).toBe(404);
-    expect((await other.threads.getById('th-foreign'))?.messages).toEqual([]);
+    expect((await other.threads.getById('th-foreign', 'u-any'))?.messages).toEqual([]);
   });
 
   test('cross-condo settings are isolated', async () => {

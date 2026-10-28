@@ -9,6 +9,7 @@ const DATA_TABLES = [
   'accounts',
   'receipts',
   'notices',
+  'thread_reads',
   'threads',
   'auth_tokens',
   'users',

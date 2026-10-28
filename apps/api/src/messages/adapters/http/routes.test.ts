@@ -3,20 +3,9 @@ import { Hono } from 'hono';
 import type { ApiEnv, Role } from '../../../platform/auth';
 import type { Thread } from '../../domain/message';
 import type { ThreadRepository } from '../../domain/thread-repository';
+import { inMemoryThreads as fakeRepo } from '../../../test-support/in-memory-threads';
 
 import { threadRoutes, type ThreadResidentLookup } from './routes';
-
-function fakeRepo(list: Thread[]): ThreadRepository {
-  const map = new Map(list.map((t) => [t.id, t]));
-  return {
-    list: async () => [...map.values()],
-    getById: async (id) => map.get(id) ?? null,
-    save: async (t) => {
-      map.set(t.id, t);
-      return t;
-    },
-  };
-}
 
 const build = (over: Partial<Thread>): Thread => ({
   id: 't-1',
@@ -37,11 +26,13 @@ function mount(
     apartmentId: 'ap-1',
   }),
   role: Role = 'admin',
+  uid = 'u-admin',
 ) {
   const app = new Hono<ApiEnv>();
   app.use('*', async (c, next) => {
     c.set('role', role);
     c.set('sub', 't-1');
+    c.set('uid', uid);
     await next();
   });
   app.route(
@@ -101,7 +92,7 @@ describe('threadRoutes', () => {
       body: JSON.stringify({ text: 'Primeira mensagem' }),
     });
     expect(res.status).toBe(200);
-    expect((await repo.getById('r-1'))?.messages).toHaveLength(1);
+    expect((await repo.getById('r-1', 'u-admin'))?.messages).toHaveLength(1);
   });
 
   test('POST /:id/messages appends a message', async () => {
@@ -117,11 +108,23 @@ describe('threadRoutes', () => {
     expect(body.messages[0]?.text).toBe('Olá');
   });
 
-  test('POST /:id/read clears unread', async () => {
+  test('POST /:id/read clears unread for the caller', async () => {
     const app = mount(fakeRepo([build({ id: 't-1', unread: true })]));
     const res = await app.request('/threads/t-1/read', { method: 'POST' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Thread;
     expect(body.unread).toBe(false);
+  });
+
+  test('POST /:id/read by the resident does not make the thread read for the admin', async () => {
+    const repo = fakeRepo([build({ id: 't-1', unread: true })]);
+    const asResident = mount(repo, undefined, 'resident', 'u-resident');
+
+    const res = await asResident.request('/threads/t-1/read', { method: 'POST' });
+
+    expect(res.status).toBe(200);
+    const listRes = await mount(repo).request('/threads');
+    const list = (await listRes.json()) as Thread[];
+    expect(list[0]?.unread).toBe(true);
   });
 });

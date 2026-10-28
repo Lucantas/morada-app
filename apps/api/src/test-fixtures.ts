@@ -229,6 +229,7 @@ const threads = [
     resident_name: 'Maria Ribeiro',
     apt: 'Apto 302',
     unread: false,
+    resident_message_at: null,
     messages: JSON.stringify([
       {
         id: 'm1',
@@ -249,6 +250,7 @@ const threads = [
     resident_name: 'Ana Costa',
     apt: 'Apto 202',
     unread: true,
+    resident_message_at: new Date().toISOString(),
     messages: JSON.stringify([
       { id: 'm3', author: 'resident', text: 'Posso reservar o salão dia 22?', dateLabel: 'Há 3h' },
     ]),
@@ -335,7 +337,7 @@ export async function seedFixtures(pool: Pool): Promise<void> {
   await insertRows(
     pool,
     'threads',
-    ['id', 'resident_name', 'apt', 'unread', 'messages', 'condominium_id'],
+    ['id', 'resident_name', 'apt', 'unread', 'resident_message_at', 'messages', 'condominium_id'],
     inTestCondo(threads),
   );
   await insertRows(

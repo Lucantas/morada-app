@@ -1,23 +1,11 @@
 import type { Thread } from '../domain/message';
-import type { ThreadRepository } from '../domain/thread-repository';
+import { inMemoryThreads as fakeRepo } from '../../test-support/in-memory-threads';
 
 import { getThread } from './get-thread';
 import { listThreads } from './list-threads';
 import { markRead } from './mark-read';
 import { postMessage } from './post-message';
 import { unreadCount } from './unread-count';
-
-function fakeRepo(list: Thread[]): ThreadRepository {
-  const map = new Map(list.map((t) => [t.id, t]));
-  return {
-    list: async () => [...map.values()],
-    getById: async (id) => map.get(id) ?? null,
-    save: async (t) => {
-      map.set(t.id, t);
-      return t;
-    },
-  };
-}
 
 const build = (over: Partial<Thread>): Thread => ({
   id: 'x',
@@ -37,14 +25,18 @@ describe('listThreads', () => {
       build({ id: 'a', residentName: 'Ana' }),
       build({ id: 'c', residentName: 'Carla' }),
     ]);
-    expect((await listThreads(repo)).map((t) => t.residentName)).toEqual(['Ana', 'Bruno', 'Carla']);
+    expect((await listThreads(repo, 'u-1')).map((t) => t.residentName)).toEqual([
+      'Ana',
+      'Bruno',
+      'Carla',
+    ]);
   });
 });
 
 describe('getThread', () => {
   test('throws with status 404 when missing', async () => {
     try {
-      await getThread(fakeRepo([]), 'nope');
+      await getThread(fakeRepo([]), 'nope', 'u-1');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);
@@ -57,7 +49,7 @@ describe('postMessage', () => {
     const original = build({ id: 't-1', messages: [] });
     const repo = fakeRepo([original]);
 
-    const updated = await postMessage(repo, 't-1', 'admin', 'Olá');
+    const updated = await postMessage(repo, 't-1', 'admin', 'Olá', 'u-1');
 
     expect(original.messages).toHaveLength(0);
     expect(updated.messages).toHaveLength(1);
@@ -65,20 +57,27 @@ describe('postMessage', () => {
     expect(updated.messages[0]?.id).toMatch(/.+/);
   });
 
-  test('marks unread when the author is a resident', async () => {
+  test('postMessage by a resident records the resident message', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: false })]);
-    expect((await postMessage(repo, 't-1', 'resident', 'Oi')).unread).toBe(true);
+
+    await postMessage(repo, 't-1', 'resident', 'Oi', 'u-resident');
+
+    expect((await repo.getById('t-1', 'u-admin'))?.unread).toBe(true);
   });
 
-  test('clears unread when the author is an admin', async () => {
+  test('postMessage by staff marks the thread read for that staff member only', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: true })]);
-    expect((await postMessage(repo, 't-1', 'admin', 'Resposta')).unread).toBe(false);
+
+    const updated = await postMessage(repo, 't-1', 'admin', 'Resposta', 'u-admin');
+
+    expect(updated.unread).toBe(false);
+    expect((await repo.getById('t-1', 'u-sindico'))?.unread).toBe(true);
   });
 
   test('rejects empty text', async () => {
     const repo = fakeRepo([build({ id: 't-1' })]);
     try {
-      await postMessage(repo, 't-1', 'admin', '   ');
+      await postMessage(repo, 't-1', 'admin', '   ', 'u-1');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(400);
@@ -87,7 +86,7 @@ describe('postMessage', () => {
 
   test('throws 404 when the thread is missing', async () => {
     try {
-      await postMessage(fakeRepo([]), 'nope', 'admin', 'Oi');
+      await postMessage(fakeRepo([]), 'nope', 'admin', 'Oi', 'u-1');
       throw new Error('should have thrown');
     } catch (err) {
       expect((err as { status?: number }).status).toBe(404);
@@ -96,9 +95,15 @@ describe('postMessage', () => {
 });
 
 describe('markRead', () => {
-  test('clears the unread flag', async () => {
+  test('clears the unread flag for the reader only', async () => {
     const repo = fakeRepo([build({ id: 't-1', unread: true })]);
-    expect((await markRead(repo, 't-1')).unread).toBe(false);
+
+    expect((await markRead(repo, 't-1', 'u-admin')).unread).toBe(false);
+    expect((await repo.getById('t-1', 'u-sindico'))?.unread).toBe(true);
+  });
+
+  test('throws 404 when the thread is missing', async () => {
+    await expect(markRead(fakeRepo([]), 'nope', 'u-admin')).rejects.toMatchObject({ status: 404 });
   });
 });
 

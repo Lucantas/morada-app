@@ -121,6 +121,15 @@ when issuing a charge and for apartment-level queries.
 resource of another condominium answers 404. `threads` also carry `resident_id`
 and `apartment_id`; `accounts` carry an optional `due_date`.
 
+### Conversation unread state (migration 028)
+
+`threads.resident_message_at` is when the last resident message arrived (null
+= no resident message). `thread_reads` (`thread_id`, `user_id`,
+`condominium_id`, `read_at`; PK thread + user) records when each person last
+read a thread. A thread is unread for a viewer when `resident_message_at` is
+set and the viewer has no read or an older one. The legacy `threads.unread`
+column is kept but no longer used.
+
 ### Per-condominium uniqueness
 
 - `apartments`: `UNIQUE (condominium_id, label)` (was global on `label`).
