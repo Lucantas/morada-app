@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 
-import { moneyActivityResolver } from './activity/adapters/http/money-activity';
+import { activityResolver } from './activity/adapters/http/activity-table';
 import { recordActivity } from './activity/adapters/http/record-activity';
 import { activityRoutes } from './activity/adapters/http/routes';
 import { buildingRoutes } from './building/adapters/http/routes';
@@ -155,13 +155,22 @@ export async function buildApp(repos: Repositories, opts?: AppOptions): Promise<
   api.use('*', csrfMiddleware);
   api.use('*', condoAccessMiddleware(resolveCondoAccess(condos)));
 
-  const logMoneyActivity = recordActivity(
-    moneyActivityResolver,
+  const logActivity = recordActivity(
+    activityResolver,
     scoped(({ activity }) => ({ record: (entry) => activity.record(entry) })),
     now,
   );
-  for (const prefix of ['accounts', 'incomes', 'categories', 'receipts', 'residents']) {
-    api.use(`/${prefix}/*`, logMoneyActivity);
+  for (const prefix of [
+    'accounts',
+    'incomes',
+    'categories',
+    'receipts',
+    'residents',
+    'building',
+    'settings',
+    'info',
+  ]) {
+    api.use(`/${prefix}/*`, logActivity);
   }
 
   api.route('/info', condoInfoRoutes(condos));

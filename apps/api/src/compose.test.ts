@@ -1,6 +1,6 @@
 import { sign } from 'hono/jwt';
 
-import { moneyActivityResolver } from './activity/adapters/http/money-activity';
+import { activityResolver } from './activity/adapters/http/activity-table';
 import { buildApp } from './compose';
 import { config } from './platform/config';
 import {
@@ -3686,6 +3686,62 @@ describe('Síndico access', () => {
       expect(body.find((e) => e.action === 'account.updated')?.subjectId).toBe(created.id);
     });
 
+    test('building, Ajustes and condo rename writes are logged with the actor', async () => {
+      const app = await makeApp();
+      const admin = await authFor(app, adminCredentials);
+      const headers = {
+        Cookie: admin.cookie,
+        'X-CSRF-Token': admin.csrf,
+        'Content-Type': 'application/json',
+      };
+      const send = (method: string, path: string, body?: unknown) =>
+        app.request(`${P}${path}`, {
+          method,
+          headers,
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+
+      const created = await send('POST', '/building/apartments', {
+        label: 'Apto 801',
+        block: null,
+        floor: 8,
+      });
+      const apartment = (await created.json()) as { id: string };
+      await send('PUT', `/building/apartments/${apartment.id}`, { label: 'Cobertura' });
+      await send('POST', `/building/apartments/${apartment.id}/deactivate`);
+      await send('PUT', '/settings', { monthlyFeeCents: 20000, dueDay: 10 });
+      await send('PUT', '/info', { name: 'Residencial Ipê' });
+      const res = await send('GET', '/activity');
+
+      const body = (await res.json()) as {
+        action: string;
+        label: string;
+        actorName: string;
+        subjectId: string | null;
+      }[];
+      expect(body.map((e) => [e.action, e.label, e.subjectId])).toEqual(
+        expect.arrayContaining([
+          ['apartment.added', 'Apartamento adicionado', null],
+          ['apartment.renamed', 'Apartamento renomeado', apartment.id],
+          ['apartment.deactivated', 'Apartamento desativado', apartment.id],
+          ['settings.saved', 'Ajustes do condomínio salvos', null],
+          ['condo.renamed', 'Condomínio renomeado', null],
+        ]),
+      );
+      expect(body).toHaveLength(5);
+      expect(new Set(body.map((e) => e.actorName)).size).toBe(1);
+    });
+
+    test('a forbidden settings write by the síndico records nothing', async () => {
+      const { app, request } = await sindicoApp();
+
+      const denied = await request(`${P}/settings`, json('PUT', { monthlyFeeCents: 1, dueDay: 5 }));
+      const res = await adminActivity(app);
+
+      expect(denied.status).toBe(403);
+      expect(await res.json()).toEqual([]);
+    });
+
     test('every money write has an activity label', async () => {
       const app = await makeApp();
       const prefixes = ['accounts', 'incomes', 'categories', 'receipts'].map(
@@ -3706,7 +3762,7 @@ describe('Síndico access', () => {
         expect([
           route.method,
           route.path,
-          moneyActivityResolver(route.method, route.path),
+          activityResolver(route.method, route.path),
         ]).not.toContain(null);
       }
     });

@@ -4,7 +4,7 @@ import { resolverFromTable } from './record-activity';
 
 const BASE = '/api/condos/:condoId';
 
-export const MONEY_ACTIVITY_TABLE: Readonly<Record<string, ActivityAction>> = {
+export const ACTIVITY_TABLE: Readonly<Record<string, ActivityAction>> = {
   [`POST ${BASE}/accounts`]: 'account.created',
   [`PUT ${BASE}/accounts/:id`]: 'account.updated',
   [`DELETE ${BASE}/accounts/:id`]: 'account.archived',
@@ -21,6 +21,11 @@ export const MONEY_ACTIVITY_TABLE: Readonly<Record<string, ActivityAction>> = {
   [`POST ${BASE}/receipts/:id/pay`]: 'receipt.paid',
   [`POST ${BASE}/receipts/:id/submit-payment`]: 'receipt.submitted',
   [`PUT ${BASE}/residents/:id/status`]: 'resident.status',
+  [`POST ${BASE}/building/apartments`]: 'apartment.added',
+  [`PUT ${BASE}/building/apartments/:id`]: 'apartment.renamed',
+  [`POST ${BASE}/building/apartments/:id/deactivate`]: 'apartment.deactivated',
+  [`PUT ${BASE}/settings`]: 'settings.saved',
+  [`PUT ${BASE}/info`]: 'condo.renamed',
 };
 
-export const moneyActivityResolver = resolverFromTable(MONEY_ACTIVITY_TABLE);
+export const activityResolver = resolverFromTable(ACTIVITY_TABLE);
