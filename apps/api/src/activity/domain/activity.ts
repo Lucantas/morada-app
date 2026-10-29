@@ -17,6 +17,11 @@ export const ACTIVITY_LABELS = {
   'receipt.paid': 'Pagamento registrado',
   'receipt.submitted': 'Comprovante enviado',
   'resident.status': 'Situação do morador alterada',
+  'apartment.added': 'Apartamento adicionado',
+  'apartment.renamed': 'Apartamento renomeado',
+  'apartment.deactivated': 'Apartamento desativado',
+  'settings.saved': 'Ajustes do condomínio salvos',
+  'condo.renamed': 'Condomínio renomeado',
 } as const;
 
 export type ActivityAction = keyof typeof ACTIVITY_LABELS;

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { useCondoName } from '@/shared/lib/condo-scope';
-import { addMonths, formatIsoDate, formatMonthName } from '@/shared/lib/dates';
+import { addMonths, formatIsoDate, formatMonthName, todayIso } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -15,6 +15,7 @@ import type { Account } from '../domain/account';
 import type { AccountRepository } from '../domain/account-repository';
 import { accountMonths, monthlyExpenseCents, resolveSelectedMonth } from '../domain/account-totals';
 import { activeFilterCount, filterAccounts, type AccountFilters } from '../domain/filter-accounts';
+import { effectiveAccountStatus, overdueCount } from '../domain/effective-status';
 import { sortAccountsByDateDesc } from '../domain/sort-accounts';
 
 import { AccountsSkeleton } from './accounts-skeleton';
@@ -29,6 +30,7 @@ type Props = {
   incomeSection: ReactNode;
   bottomNav: ReactNode;
   monthlyIncomeCents: Record<string, number>;
+  today?: string;
 };
 
 function uniqueSortedUnion(a: string[], b: string[]): string[] {
@@ -41,6 +43,7 @@ export function AccountsScreen({
   incomeSection,
   bottomNav,
   monthlyIncomeCents,
+  today: todayProp,
 }: Props) {
   const condoName = useCondoName();
   const accounts = useAccounts(repository);
@@ -48,7 +51,8 @@ export function AccountsScreen({
 
   const data = accounts.data ?? [];
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const today = todayProp ?? todayIso();
+  const currentMonth = today.slice(0, 7);
   const dataMonths = uniqueSortedUnion(accountMonths(data), Object.keys(monthlyIncomeCents));
   const allMonths = uniqueSortedUnion(dataMonths, [currentMonth]);
   const lower = allMonths.at(0) ?? currentMonth;
@@ -117,6 +121,7 @@ export function AccountsScreen({
           <AccountsContent
             accounts={accounts.data}
             onOpenAccount={onOpenAccount}
+            today={today}
             filters={filters}
             onFiltersChange={setFilters}
           />
@@ -205,16 +210,19 @@ function HeaderTile({
 function AccountsContent({
   accounts,
   onOpenAccount,
+  today,
   filters,
   onFiltersChange,
 }: {
   accounts: Account[];
   onOpenAccount: (id?: string) => void;
+  today: string;
   filters: AccountFilters;
   onFiltersChange: (filters: AccountFilters) => void;
 }) {
   const categories = Array.from(new Set(accounts.map((account) => account.category))).sort();
   const filtered = sortAccountsByDateDesc(filterAccounts(accounts, filters));
+  const overdue = overdueCount(accounts, today);
 
   return (
     <>
@@ -224,6 +232,14 @@ function AccountsContent({
         </PrimaryButton>
       </div>
       <FilterPanel filters={filters} categories={categories} onFiltersChange={onFiltersChange} />
+      {overdue > 0 && (
+        <p
+          role="status"
+          style={{ margin: '14px 0 0', fontWeight: 600, color: 'var(--atraso-700)' }}
+        >
+          {overdue === 1 ? '1 conta vencida' : `${overdue} contas vencidas`}
+        </p>
+      )}
       <SectionLabel
         right={<span style={{ fontWeight: 600, color: 'var(--ink-300)' }}>{filtered.length}</span>}
       >
@@ -249,6 +265,7 @@ function AccountsContent({
             <AccountRow
               key={account.id}
               account={account}
+              today={today}
               onClick={() => onOpenAccount(account.id)}
             />
           ))}
@@ -486,8 +503,16 @@ function CategoryChip({
   );
 }
 
-function AccountRow({ account, onClick }: { account: Account; onClick: () => void }) {
-  const view = accountStatusView(account.status);
+function AccountRow({
+  account,
+  today,
+  onClick,
+}: {
+  account: Account;
+  today: string;
+  onClick: () => void;
+}) {
+  const view = accountStatusView(effectiveAccountStatus(account, today));
   return (
     <SurfaceCard
       onClick={onClick}
@@ -499,6 +524,9 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
         <div style={{ fontSize: '.86rem', color: 'var(--ink-500)' }}>
           {account.category}
           {account.date ? ` · ${formatIsoDate(account.date)}` : ''}
+          {account.dueDate && account.status !== 'pago'
+            ? ` · vence ${formatIsoDate(account.dueDate)}`
+            : ''}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>

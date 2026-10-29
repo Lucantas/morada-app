@@ -4,7 +4,7 @@ import { logServerError } from '../../../platform/http-error';
 import type { ApiEnv } from '../../../platform/auth';
 import { ACTIVITY_LABELS } from '../../domain/activity';
 
-import { MONEY_ACTIVITY_TABLE, moneyActivityResolver } from './money-activity';
+import { ACTIVITY_TABLE, activityResolver } from './activity-table';
 import { recordActivity } from './record-activity';
 
 jest.mock('../../../platform/http-error', () => ({ logServerError: jest.fn() }));
@@ -71,7 +71,7 @@ describe('recordActivity', () => {
     app.use(
       '*',
       recordActivity(
-        moneyActivityResolver,
+        activityResolver,
         () => ({ record: async (entry) => void recorded.push(entry) }),
         () => new Date('2026-05-01T10:00:00Z'),
       ),
@@ -106,9 +106,9 @@ describe('recordActivity', () => {
   });
 
   test('every table entry has a label and unknown routes resolve to null', () => {
-    for (const action of Object.values(MONEY_ACTIVITY_TABLE)) {
+    for (const action of Object.values(ACTIVITY_TABLE)) {
       expect(ACTIVITY_LABELS[action]).toBeTruthy();
     }
-    expect(moneyActivityResolver('POST', '/nope')).toBeNull();
+    expect(activityResolver('POST', '/nope')).toBeNull();
   });
 });

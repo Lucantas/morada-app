@@ -4,6 +4,7 @@ import { dueDateFromRef } from '@/features/receipts/domain/due-date';
 import { fileToDataUrl, isAllowedProof } from '@/features/receipts/domain/proof';
 import type { ReceiptMethod } from '@/features/receipts/domain/receipt';
 import { maskCompetence } from '@/shared/lib/competence';
+import { todayIso } from '@/shared/lib/dates';
 import { Icon } from '@/shared/ui/icon';
 import { MoneyInput } from '@/shared/ui/money-input';
 
@@ -80,7 +81,7 @@ export function NewReceiptCard({ dueDay, issue, onClose, defaultValueCents }: Pr
     setPending(true);
     setError(null);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIso();
       await issue({
         ref: ref.trim(),
         valueCents,

@@ -2,17 +2,14 @@ import type { ReceiptRepository } from '../../receipts/domain/receipt-repository
 import { deriveResidentStatus } from '../domain/derive-status';
 import type { Resident } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayIn } from '../../shared/domain/today';
 
 export async function listResidents(
   repo: ResidentRepository,
   receipts: ReceiptRepository,
 ): Promise<Resident[]> {
   const [residents, allReceipts] = await Promise.all([repo.list(), receipts.list()]);
-  const now = today();
+  const now = todayIn();
   const byResident = new Map<string, { status: string; dueDate: string | null }[]>();
   for (const r of allReceipts) {
     if (!r.residentId) continue;

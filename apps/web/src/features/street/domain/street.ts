@@ -143,6 +143,14 @@ export function summaryLine(total: number, needingAttention: number): string {
   return `${condos} · ${attention}`;
 }
 
+export function homesSummaryLine(count: number): string {
+  return `Você mora em ${plural(count, 'condomínio', 'condomínios')}`;
+}
+
+export function apartmentsLabel(count: number): string {
+  return plural(count, 'apartamento', 'apartamentos');
+}
+
 export type MiniBlock = { block: string | null; floors: boolean[][] };
 
 export function miniBuilding(windows: StreetWindow[]): MiniBlock[] {

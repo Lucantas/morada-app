@@ -9,6 +9,7 @@ import {
 } from '../../domain/build-dashboard-summary';
 import type { DashboardSummary } from '../../domain/dashboard';
 import type { DashboardRepository } from '../../domain/dashboard-repository';
+import { todayIn } from '../../../shared/domain/today';
 
 interface AccountRow {
   id: string;
@@ -90,7 +91,7 @@ export class PostgresDashboardRepository implements DashboardRepository {
         ? { valueCents: openingRow.opening_balance_cents, date: openingRow.opening_balance_date }
         : null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIn();
     return buildDashboardSummary(accounts, receipts, incomes, today, opening);
   }
 }

@@ -10,6 +10,7 @@ import { isEmailVerified } from '../../../users/domain/user';
 import { getStreet } from '../../../street/app/get-street';
 import type { StreetQuery } from '../../../street/domain/street-query';
 import type { UserRepository } from '../../../users/domain/user-repository';
+import { todayIn } from '../../../shared/domain/today';
 
 export function meRoutes(deps: {
   auth: MiddlewareHandler<ApiEnv>;
@@ -42,7 +43,7 @@ export function meRoutes(deps: {
   });
   app.get('/condos', async (c) => c.json(await listMyCondos(condos, c.get('uid'))));
   app.get('/street', async (c) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIn();
     const result = await getStreet({ condos, users, street }, c.get('uid'), today);
     if (!result) return c.json({ error: 'Sessão inválida' }, 401);
     return c.json(result);

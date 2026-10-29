@@ -3,10 +3,7 @@ import { deriveResidentStatus } from '../domain/derive-status';
 import { ResidentNotFoundError } from '../domain/errors';
 import type { Resident } from '../domain/resident';
 import type { ResidentRepository } from '../domain/resident-repository';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayIn } from '../../shared/domain/today';
 
 export async function getResident(
   repo: ResidentRepository,
@@ -20,7 +17,7 @@ export async function getResident(
     resident.statusOverride ??
     deriveResidentStatus(
       mine.map((r) => ({ status: r.status, dueDate: r.dueDate })),
-      today(),
+      todayIn(),
     );
   return { ...resident, status };
 }

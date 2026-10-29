@@ -6,7 +6,9 @@ import { Skeleton, SkeletonScreen } from '@/shared/ui/skeleton';
 import { StatusView } from '@/shared/ui/status-view';
 
 import {
+  apartmentsLabel,
   greeting,
+  homesSummaryLine,
   reasonsOf,
   sortByUrgency,
   summaryLine,
@@ -53,7 +55,7 @@ function labelOf(condo: StreetCondo): string {
 
 function ariaLabelOf(condo: StreetCondo): string {
   const reasons = reasonsOf(condo.pendencies).map((reason) => reason.text);
-  return [condo.name, `${condo.windows.length} apartamentos`, ...reasons].join(', ');
+  return [condo.name, apartmentsLabel(condo.windows.length), ...reasons].join(', ');
 }
 
 function attentionItems(condos: StreetCondo[]) {
@@ -91,80 +93,88 @@ function StreetContent({ street, hour, onOpen, onNewCondo, onSignOut }: ContentP
   return (
     <>
       <h1 className="fraunces street-greeting">{greeting(hour, street.name)}</h1>
-      <p className="street-summary">{summaryLine(condos.length, needingAttention)}</p>
+      <p className="street-summary">
+        {condos.length === 0
+          ? homesSummaryLine(street.homes.length)
+          : summaryLine(condos.length, needingAttention)}
+      </p>
 
-      <ul className="street-row" aria-label="Rua de condomínios">
-        {condos.map((condo) => {
-          const first = reasonsOf(condo.pendencies)[0];
-          return (
-            <li key={condo.id}>
-              <button
-                type="button"
-                className="street-condo"
-                aria-label={ariaLabelOf(condo)}
-                onClick={() => onOpen(condo, 'a-home')}
-              >
-                <MiniBuilding windows={condo.windows} />
-                {first && (
-                  <span className="street-flag" data-level={first.level}>
-                    {first.flag}
-                  </span>
-                )}
-                <span className="street-name">{condo.name}</span>
+      {condos.length > 0 && (
+        <>
+          <ul className="street-row" aria-label="Rua de condomínios">
+            {condos.map((condo) => {
+              const first = reasonsOf(condo.pendencies)[0];
+              return (
+                <li key={condo.id}>
+                  <button
+                    type="button"
+                    className="street-condo"
+                    aria-label={ariaLabelOf(condo)}
+                    onClick={() => onOpen(condo, 'a-home')}
+                  >
+                    <MiniBuilding windows={condo.windows} />
+                    {first && (
+                      <span className="street-flag" data-level={first.level}>
+                        {first.flag}
+                      </span>
+                    )}
+                    <span className="street-name">{condo.name}</span>
+                  </button>
+                </li>
+              );
+            })}
+            <li>
+              <button type="button" className="street-lot" onClick={onNewCondo}>
+                + Novo condomínio
               </button>
             </li>
-          );
-        })}
-        <li>
-          <button type="button" className="street-lot" onClick={onNewCondo}>
-            + Novo condomínio
-          </button>
-        </li>
-      </ul>
-      <p className="street-hint">arraste para ver mais →</p>
-
-      <label className="visually-hidden" htmlFor="street-select">
-        {SELECT_PLACEHOLDER}
-      </label>
-      <select id="street-select" className="street-select" value="" onChange={chooseCondo}>
-        <option value="" disabled>
-          {SELECT_PLACEHOLDER}
-        </option>
-        {condos.map((condo) => (
-          <option key={condo.id} value={condo.id}>
-            {labelOf(condo)}
-          </option>
-        ))}
-      </select>
-
-      <section aria-labelledby="street-attention">
-        <h2 id="street-attention" className="street-title">
-          Pede atenção hoje
-        </h2>
-        {items.length === 0 ? (
-          <p className="street-empty">Nada pede atenção hoje.</p>
-        ) : (
-          <ul className="street-list">
-            {items.map(({ condo, reason }) => (
-              <li key={`${condo.id}-${reason.kind}`}>
-                <button
-                  type="button"
-                  className="street-item"
-                  onClick={() => onOpen(condo, TARGET_BY_REASON[reason.kind])}
-                >
-                  <span className="street-item-text">
-                    <strong>{condo.name}</strong>
-                    <span>{reason.text}</span>
-                  </span>
-                  <span className="street-tag" data-level={reason.level}>
-                    {TAG_BY_LEVEL[reason.level]}
-                  </span>
-                </button>
-              </li>
-            ))}
           </ul>
-        )}
-      </section>
+          <p className="street-hint">arraste para ver mais →</p>
+
+          <label className="visually-hidden" htmlFor="street-select">
+            {SELECT_PLACEHOLDER}
+          </label>
+          <select id="street-select" className="street-select" value="" onChange={chooseCondo}>
+            <option value="" disabled>
+              {SELECT_PLACEHOLDER}
+            </option>
+            {condos.map((condo) => (
+              <option key={condo.id} value={condo.id}>
+                {labelOf(condo)}
+              </option>
+            ))}
+          </select>
+
+          <section aria-labelledby="street-attention">
+            <h2 id="street-attention" className="street-title">
+              Pede atenção hoje
+            </h2>
+            {items.length === 0 ? (
+              <p className="street-empty">Nada pede atenção hoje.</p>
+            ) : (
+              <ul className="street-list">
+                {items.map(({ condo, reason }) => (
+                  <li key={`${condo.id}-${reason.kind}`}>
+                    <button
+                      type="button"
+                      className="street-item"
+                      onClick={() => onOpen(condo, TARGET_BY_REASON[reason.kind])}
+                    >
+                      <span className="street-item-text">
+                        <strong>{condo.name}</strong>
+                        <span>{reason.text}</span>
+                      </span>
+                      <span className="street-tag" data-level={reason.level}>
+                        {TAG_BY_LEVEL[reason.level]}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
 
       {street.homes.length > 0 && (
         <section aria-labelledby="street-homes">
@@ -185,6 +195,12 @@ function StreetContent({ street, hour, onOpen, onNewCondo, onSignOut }: ContentP
             ))}
           </ul>
         </section>
+      )}
+
+      {condos.length === 0 && (
+        <button type="button" className="street-lot" onClick={onNewCondo}>
+          + Novo condomínio
+        </button>
       )}
 
       <button type="button" className="street-signout" onClick={onSignOut}>

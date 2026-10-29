@@ -13,7 +13,11 @@ import { AccountsScreen } from './accounts-screen';
 beforeEach(() => setTestCondo());
 afterEach(() => clearTestCondo());
 
-function setup(accounts = defaultAccounts, monthlyIncomeCents: Record<string, number> = {}) {
+function setup(
+  accounts = defaultAccounts,
+  monthlyIncomeCents: Record<string, number> = {},
+  today?: string,
+) {
   const repository = new InMemoryAccountRepository(accounts);
   const onOpenAccount = jest.fn();
   renderWithClient(
@@ -23,6 +27,7 @@ function setup(accounts = defaultAccounts, monthlyIncomeCents: Record<string, nu
       incomeSection={<div>outras-entradas-slot</div>}
       bottomNav={null}
       monthlyIncomeCents={monthlyIncomeCents}
+      today={today}
     />,
   );
   return { onOpenAccount };
@@ -292,5 +297,43 @@ describe('AccountsScreen', () => {
     await userEvent.type(screen.getByLabelText('Buscar por nome'), 'inexistente');
 
     expect(screen.getByText('Nenhum lançamento encontrado com esses filtros.')).toBeInTheDocument();
+  });
+});
+
+describe('overdue accounts', () => {
+  const TODAY = '2026-10-29';
+  const overdue = (id: string, dueDate: string) =>
+    buildAccount({
+      id,
+      description: `Conta ${id}`,
+      date: '2026-10-01',
+      dueDate,
+      status: 'pendente',
+    });
+
+  test('shows the Atrasado pill and the due date for a pending account past due', async () => {
+    setup([overdue('a-1', '2026-10-20')], {}, TODAY);
+
+    expect(await screen.findByText('Atrasado')).toBeInTheDocument();
+    expect(screen.getByText(/vence 20\/10\/2026/)).toBeInTheDocument();
+  });
+
+  test('summarizes several overdue accounts above the list', async () => {
+    setup([overdue('a-1', '2026-10-20'), overdue('a-2', '2026-10-21')], {}, TODAY);
+
+    expect(await screen.findByText('2 contas vencidas')).toHaveAttribute('role', 'status');
+  });
+
+  test('uses the singular for one overdue account', async () => {
+    setup([overdue('a-1', '2026-10-20')], {}, TODAY);
+
+    expect(await screen.findByText('1 conta vencida')).toHaveAttribute('role', 'status');
+  });
+
+  test('shows no summary when nothing is overdue', async () => {
+    setup([overdue('a-1', TODAY)], {}, TODAY);
+
+    await screen.findByText('Conta a-1');
+    expect(screen.queryByText(/conta(s)? vencida/)).not.toBeInTheDocument();
   });
 });

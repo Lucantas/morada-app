@@ -89,13 +89,13 @@ describe('App street', () => {
     landAtStreet();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /^Alfa, 1 apartamentos/ }));
+    await user.click(await screen.findByRole('button', { name: /^Alfa, 1 apartamento/ }));
     await user.click(await screen.findByRole('button', { name: 'Apartamentos' }));
     expect(await screen.findByText(/Morador do Alfa/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Início' }));
 
     await user.click(await screen.findByRole('button', { name: 'Seus condomínios' }));
-    await user.click(await screen.findByRole('button', { name: /^Beta, 1 apartamentos/ }));
+    await user.click(await screen.findByRole('button', { name: /^Beta, 1 apartamento/ }));
     await user.click(await screen.findByRole('button', { name: 'Apartamentos' }));
 
     expect(screen.queryByText(/Morador do Alfa/)).not.toBeInTheDocument();

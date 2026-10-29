@@ -1,10 +1,7 @@
 import { PaymentError, ReceiptNotFoundError } from '../domain/errors';
 import { isoDateSchema, receiptMethodSchema, type Receipt } from '../domain/receipt';
 import type { ReceiptRepository } from '../domain/receipt-repository';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayIn } from '../../shared/domain/today';
 
 // Marks a receipt paid, recording the method and the date it was paid. `paidAt`
 // lets the admin register a payment made on a specific (e.g. past) date; when
@@ -28,7 +25,7 @@ export async function payReceipt(
     ...receipt,
     status: 'pago',
     method: parsedMethod.data,
-    paidAt: parsedDate ? parsedDate.data : today(),
+    paidAt: parsedDate ? parsedDate.data : todayIn(),
   };
   return repo.save(paid);
 }
