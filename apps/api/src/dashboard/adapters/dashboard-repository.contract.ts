@@ -3,6 +3,7 @@ import type { IncomeRepository } from '../../income/domain/income-repository';
 import type { SettingsRepository } from '../../settings/domain/settings-repository';
 import type { ReceiptRepository } from '../../receipts/domain/receipt-repository';
 import type { DashboardRepository } from '../domain/dashboard-repository';
+import { todayIn } from '../../shared/domain/today';
 
 // The dashboard reads the ledger, so the harness also exposes the account,
 // receipt, and income repositories (driver-matched) to seed it through the
@@ -37,7 +38,7 @@ export function runDashboardRepositoryContract(
   describe(label, () => {
     test('the opening balance anchors the balance and ignores earlier entries', async () => {
       const { dashboard, accounts, settings } = await setup('condo-a');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIn();
       await accounts.save({
         id: 'a-old',
         description: 'Água',
@@ -67,7 +68,7 @@ export function runDashboardRepositoryContract(
 
     test('derives the balance live from paid accounts, paid receipts, and incomes', async () => {
       const { dashboard, accounts, receipts, incomes } = await setup('condo-a');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIn();
       const thisMonth = today.slice(0, 7);
       const previousMonth = previousMonthDate(today);
       await accounts.save({
@@ -159,7 +160,7 @@ export function runDashboardRepositoryContract(
 
     test('an archived income is not counted in the summary', async () => {
       const { dashboard, incomes } = await setup('condo-a');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayIn();
       const thisMonth = today.slice(0, 7);
       await incomes.save({
         id: 'i-1',
@@ -179,7 +180,7 @@ export function runDashboardRepositoryContract(
     test("summary ignores other condos' receipts, accounts and incomes", async () => {
       const a = await setup('condo-a');
       const b = await setup('condo-b');
-      const thisMonth = new Date().toISOString().slice(0, 7);
+      const thisMonth = todayIn().slice(0, 7);
       await b.accounts.save({
         id: 'b-acc',
         description: 'Água',
