@@ -1,5 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 
 import type { Account } from '@/features/accounts/domain/account';
 import type { Building } from '@/features/building/domain/building';
@@ -29,10 +30,16 @@ const SETTINGS: CondoSettings = {
 };
 
 function setup({
+  headerAction,
   buildingFails = false,
   savedAccounts = new Map<string, Account>(),
   pending = true,
-}: { buildingFails?: boolean; savedAccounts?: Map<string, Account>; pending?: boolean } = {}) {
+}: {
+  headerAction?: ReactNode;
+  buildingFails?: boolean;
+  savedAccounts?: Map<string, Account>;
+  pending?: boolean;
+} = {}) {
   let residents: readonly Resident[] = [];
   const residentRepository = {
     save: jest.fn(async (resident: Resident) => {
@@ -95,7 +102,7 @@ function setup({
     buildingView: BuildingView,
     accessCard: ResidentAccessCard,
   };
-  const view = renderWithClient(<OnboardingFlow {...props} />);
+  const view = renderWithClient(<OnboardingFlow {...props} headerAction={headerAction} />);
   return { ...props, unmount: view.unmount };
 }
 
@@ -110,6 +117,12 @@ beforeEach(() => {
 });
 
 describe('OnboardingFlow', () => {
+  test('renders the header action above the question when provided', async () => {
+    setup({ headerAction: <button type="button">Seus condomínios</button> });
+
+    expect(await screen.findByRole('button', { name: 'Seus condomínios' })).toBeVisible();
+  });
+
   test('adding a resident lights the window', async () => {
     const user = userEvent.setup();
     const props = setup();

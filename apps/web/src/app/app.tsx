@@ -177,7 +177,12 @@ function SessionRouter({ signOut }: { signOut: () => void }) {
     return <StreetRouter signOut={signOut} />;
   }
   if (role === 'admin' && onboardingPending && canManageCondo) {
-    return <AdminOnboarding onDone={() => go('a-home')} />;
+    return (
+      <AdminOnboarding
+        onDone={() => go('a-home')}
+        headerAction={<StreetShortcut onClick={handleStreet} />}
+      />
+    );
   }
   if (role === 'admin') {
     return (
@@ -251,7 +256,13 @@ function StreetRouter({ signOut }: { signOut: () => void }) {
   );
 }
 
-function AdminOnboarding({ onDone }: { onDone: () => void }) {
+function AdminOnboarding({
+  onDone,
+  headerAction,
+}: {
+  onDone: () => void;
+  headerAction: ReactNode;
+}) {
   return (
     <OnboardingFlow
       building={buildingRepository}
@@ -264,6 +275,7 @@ function AdminOnboarding({ onDone }: { onDone: () => void }) {
       onDone={onDone}
       buildingView={BuildingView}
       accessCard={ResidentAccessCard}
+      headerAction={headerAction}
     />
   );
 }

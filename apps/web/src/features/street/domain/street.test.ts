@@ -5,6 +5,8 @@ import {
   reasonsOf,
   sortByUrgency,
   summaryLine,
+  apartmentsLabel,
+  homesSummaryLine,
   type Pendencies,
   type StreetCondo,
 } from './street';
@@ -201,5 +203,23 @@ describe('miniBuilding', () => {
         ],
       },
     ]);
+  });
+});
+
+describe('homesSummaryLine', () => {
+  test.each([
+    [1, 'Você mora em 1 condomínio'],
+    [3, 'Você mora em 3 condomínios'],
+  ])('%i homes reads %s', (count, expected) => {
+    expect(homesSummaryLine(count)).toBe(expected);
+  });
+});
+
+describe('apartmentsLabel', () => {
+  test.each([
+    [1, '1 apartamento'],
+    [12, '12 apartamentos'],
+  ])('%i units reads %s', (count, expected) => {
+    expect(apartmentsLabel(count)).toBe(expected);
   });
 });

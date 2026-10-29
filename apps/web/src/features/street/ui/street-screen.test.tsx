@@ -83,7 +83,7 @@ describe('StreetScreen', () => {
     renderScreen(repositoryOf({ condos: [condo('Fogo', { overdueAccounts: 2 })] }));
 
     expect(
-      await screen.findByRole('button', { name: 'Fogo, 1 apartamentos, 2 contas vencidas' }),
+      await screen.findByRole('button', { name: 'Fogo, 1 apartamento, 2 contas vencidas' }),
     ).toBeVisible();
   });
 
@@ -191,5 +191,34 @@ describe('StreetScreen', () => {
 
     expect(onNewCondo).toHaveBeenCalledTimes(1);
     expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  test('homes-only street shows the homes summary, homes and new condo, without the row', async () => {
+    const onNewCondo = jest.fn();
+    const homeA = loginCondoSchema.parse(condo('Casa A'));
+    const homeB = loginCondoSchema.parse(condo('Casa B'));
+    renderWithClient(
+      <StreetScreen
+        repository={repositoryOf({ condos: [], homes: [homeA, homeB] })}
+        now={now}
+        onOpen={jest.fn()}
+        onNewCondo={onNewCondo}
+        onSignOut={noop}
+      />,
+    );
+
+    expect(await screen.findByText('Você mora em 2 condomínios')).toBeVisible();
+    const section = screen.getByRole('region', { name: 'Onde você mora' });
+    expect(within(section).getAllByRole('button')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeVisible();
+    expect(screen.queryByText(/condomínios ·/)).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Rua de condomínios' })).toBeNull();
+    expect(screen.queryByLabelText('Ir para um condomínio…')).toBeNull();
+    expect(screen.queryByText('Pede atenção hoje')).toBeNull();
+    expect(screen.queryByText(/arraste/)).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: '+ Novo condomínio' }));
+
+    expect(onNewCondo).toHaveBeenCalledTimes(1);
   });
 });

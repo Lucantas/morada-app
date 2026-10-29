@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { AccountRepository } from '@/features/accounts/domain/account-repository';
@@ -35,6 +35,7 @@ type Props = {
   onDone: () => void;
   buildingView: BuildingViewSlot;
   accessCard: AccessCardSlot;
+  headerAction?: ReactNode;
 };
 
 type Step = 'residents' | 'ground';
@@ -170,6 +171,9 @@ export function OnboardingFlow(props: Props) {
     <Screen>
       <ScreenBody>
         <div style={{ maxWidth: 560, margin: '0 auto', display: 'grid', gap: 12 }}>
+          {props.headerAction && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{props.headerAction}</div>
+          )}
           <Question>
             {step === 'residents'
               ? `Pronto, esse é o ${condoName}. Quem mora em cada um?`
