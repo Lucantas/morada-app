@@ -19,6 +19,7 @@ import { rejectPayment } from '../../app/reject-payment';
 import { submitPayment } from '../../app/submit-payment';
 import type { Receipt } from '../../domain/receipt';
 import type { ReceiptRepository } from '../../domain/receipt-repository';
+import { todayIn } from '../../../shared/domain/today';
 
 const paySchema = z.object({
   method: z.enum(['dinheiro', 'pix']),
@@ -72,7 +73,7 @@ export function receiptRoutes(scope: Scoped<ReceiptRoutesDeps>) {
   app.post('/:id/confirm', requireRole('admin'), async (c) => {
     const { receipts: repo } = scope(c.get('condoId'));
     const body = (await c.req.json().catch(() => ({}))) as { paidAt?: string };
-    const paidAt = body.paidAt ?? new Date().toISOString().slice(0, 10);
+    const paidAt = body.paidAt ?? todayIn();
     return c.json(await confirmPayment(repo, c.req.param('id'), paidAt));
   });
   app.post('/:id/reject', requireRole('admin'), async (c) => {
@@ -84,15 +85,7 @@ export function receiptRoutes(scope: Scoped<ReceiptRoutesDeps>) {
   // (one 'pendente' charge per active resident for the current ref/month).
   app.post('/ensure-month', requireRole('admin'), async (c) => {
     const { receipts: repo, residents, settings } = scope(c.get('condoId'));
-    return c.json(
-      await generateMonthlyReceipts(
-        repo,
-        residents,
-        settings,
-        new Date().toISOString().slice(0, 10),
-      ),
-      201,
-    );
+    return c.json(await generateMonthlyReceipts(repo, residents, settings, todayIn()), 201);
   });
 
   app.get('/', async (c) => {
@@ -138,7 +131,7 @@ export function receiptRoutes(scope: Scoped<ReceiptRoutesDeps>) {
     const denied = denyForeignReceipt(c, receipt);
     if (denied) return denied;
     const body = await c.req.json();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIn();
     return c.json(await submitPayment(repo, c.req.param('id'), { ...body, today }));
   });
 

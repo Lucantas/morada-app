@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 import { useCondoName } from '@/shared/lib/condo-scope';
-import { addMonths, formatIsoDate, formatMonthName } from '@/shared/lib/dates';
+import { addMonths, formatIsoDate, formatMonthName, todayIso } from '@/shared/lib/dates';
 import { formatBRL } from '@/shared/lib/money';
 import { Screen, ScreenBody } from '@/shared/ui/app-shell';
 import { DateInput } from '@/shared/ui/date-input';
@@ -48,7 +48,7 @@ export function AccountsScreen({
 
   const data = accounts.data ?? [];
   const [monthOverride, setMonthOverride] = useState<string | null>(null);
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = todayIso().slice(0, 7);
   const dataMonths = uniqueSortedUnion(accountMonths(data), Object.keys(monthlyIncomeCents));
   const allMonths = uniqueSortedUnion(dataMonths, [currentMonth]);
   const lower = allMonths.at(0) ?? currentMonth;
